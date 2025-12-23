@@ -23,8 +23,17 @@ echo "Version: $CURRENT_VERSION"
 echo ""
 
 # Confirm uninstall
-read -p "Remove Vectra Guard? [y/N] " -n 1 -r
-echo
+# Use /dev/tty to read from terminal when piped through curl | bash
+if [ -t 0 ]; then
+    read -p "Remove Vectra Guard? [y/N] " -n 1 -r
+    echo
+else
+    # Non-interactive mode - require explicit confirmation
+    echo "⚠️  Running in non-interactive mode"
+    echo "   Uninstall cancelled (use interactive terminal for removal)"
+    exit 0
+fi
+
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     echo "❌ Uninstall cancelled"
     exit 0
@@ -88,43 +97,26 @@ fi
 echo ""
 echo "4/4: Configuration and session data..."
 if [ -d ~/.vectra-guard ]; then
-    echo ""
-    echo "Found data directory: ~/.vectra-guard"
-    echo "Contains:"
-    du -sh ~/.vectra-guard 2>/dev/null || echo "  (unable to calculate size)"
-    echo ""
-    read -p "Remove all configuration and session data? [y/N] " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        rm -rf ~/.vectra-guard
-        echo "  ✅ Data directory removed"
-    else
-        echo "  ℹ️  Keeping data directory (can be removed manually later)"
-    fi
+    echo "  ℹ️  Data directory found: ~/.vectra-guard"
+    echo "  ℹ️  Keeping data directory (remove manually if desired: rm -rf ~/.vectra-guard)"
 else
     echo "  ℹ️  No data directory found"
 fi
 
-# 5. Restore backups if they exist
+# 5. Check for backups
 echo ""
 echo "Checking for backups..."
-RESTORED_BACKUP=false
+FOUND_BACKUPS=false
 
 for backup in ~/.bashrc.vectra-backup ~/.zshrc.vectra-backup ~/.config/fish/config.fish.vectra-backup; do
     if [ -f "$backup" ]; then
-        original="${backup%.vectra-backup}"
-        echo ""
-        read -p "Restore backup: $(basename $original)? [Y/n] " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Nn]$ ]]; then
-            cp "$backup" "$original"
-            echo "  ✅ Restored $(basename $original)"
-            RESTORED_BACKUP=true
-        fi
+        echo "  ℹ️  Backup found: $backup"
+        echo "     Restore with: cp $backup ${backup%.vectra-backup}"
+        FOUND_BACKUPS=true
     fi
 done
 
-if [ "$RESTORED_BACKUP" = false ]; then
+if [ "$FOUND_BACKUPS" = false ]; then
     echo "  ℹ️  No backups found"
 fi
 
@@ -144,6 +136,12 @@ fi
 if [ -d ~/.vectra-guard ]; then
     echo "ℹ️  Data directory preserved at: ~/.vectra-guard"
     echo "   Remove manually if desired: rm -rf ~/.vectra-guard"
+    echo ""
+fi
+
+if [ "$FOUND_BACKUPS" = true ]; then
+    echo "ℹ️  Backup files preserved"
+    echo "   Restore manually if desired (see paths above)"
     echo ""
 fi
 
