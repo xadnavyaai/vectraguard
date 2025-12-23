@@ -22,10 +22,10 @@ for binary in vectra-guard-*; do
         echo "📦 Creating ${ARCHIVE}..."
         zip -q "$ARCHIVE" "$binary"
     else
-        # Unix: create tar.gz
-        ARCHIVE="${binary}.tar.gz"
+        # Unix: create gz (gzip only)
+        ARCHIVE="${binary}.gz"
         echo "📦 Creating ${ARCHIVE}..."
-        tar czf "$ARCHIVE" "$binary"
+        gzip -c "$binary" > "$ARCHIVE"
     fi
 done
 
@@ -33,13 +33,13 @@ echo ""
 echo "✅ Packaging complete!"
 echo ""
 echo "📦 Archives ready for GitHub:"
-ls -lh *.tar.gz *.zip 2>/dev/null
+ls -lh *.gz *.zip 2>/dev/null
 echo ""
 echo "🚀 Upload these files to GitHub Release:"
-echo "   • vectra-guard-darwin-amd64.tar.gz"
-echo "   • vectra-guard-darwin-arm64.tar.gz"
-echo "   • vectra-guard-linux-amd64.tar.gz"
-echo "   • vectra-guard-linux-arm64.tar.gz"
+echo "   • vectra-guard-darwin-amd64.gz"
+echo "   • vectra-guard-darwin-arm64.gz"
+echo "   • vectra-guard-linux-amd64.gz"
+echo "   • vectra-guard-linux-arm64.gz"
 echo "   • vectra-guard-windows-amd64.exe.zip"
 echo "   • checksums.txt"
 echo ""

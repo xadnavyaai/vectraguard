@@ -49,7 +49,7 @@ echo ""
 
 # Get latest release
 echo "📦 Downloading Vectra Guard..."
-ARCHIVE="${BINARY_NAME}-${OS}-${ARCH}.tar.gz"
+ARCHIVE="${BINARY_NAME}-${OS}-${ARCH}.gz"
 DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${ARCHIVE}"
 
 # Create temp directory
@@ -78,8 +78,8 @@ fi
 
 # Extract
 echo "📦 Extracting..."
-tar xzf "$TEMP_ARCHIVE" -C "$TEMP_DIR"
-TEMP_FILE="${TEMP_DIR}/${BINARY_NAME}-${OS}-${ARCH}"
+gunzip -c "$TEMP_ARCHIVE" > "${TEMP_DIR}/${BINARY_NAME}"
+TEMP_FILE="${TEMP_DIR}/${BINARY_NAME}"
 
 # Make executable
 chmod +x "$TEMP_FILE"
