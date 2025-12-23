@@ -13,6 +13,9 @@ Vectra Guard is a security platform designed to protect systems from risky shell
 ### 🔍 Script Validation & Analysis
 - Analyze shell scripts for security risks before execution
 - Detect dangerous patterns (fork bombs, rm -rf /, privilege escalation)
+- **NEW**: Detect SQL/NoSQL database operations (MySQL, PostgreSQL, MongoDB, Redis, Cassandra, DynamoDB, and more)
+- **NEW**: Production/staging environment detection with escalated warnings
+- **NEW**: Smart severity escalation for destructive database operations in production (CRITICAL alerts)
 - Policy-based validation with allow/deny lists
 - Risk scoring (low, medium, high, critical)
 - Human-readable explanations of security issues
@@ -31,6 +34,7 @@ Vectra Guard is a security platform designed to protect systems from risky shell
 - Works across all IDEs (Cursor, VSCode, etc.)
 - Works in terminals, SSH sessions, and scripts
 - One installation protects all environments
+- **NEW**: Automatically installs `vg` alias for convenience (`vg validate`, `vg exec`, etc.)
 
 ### ⚡ Real-Time Execution Control
 - Interactive approval for risky commands

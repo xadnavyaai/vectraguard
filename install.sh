@@ -146,6 +146,7 @@ if command -v vectra-guard &> /dev/null; then
     echo ""
     echo "   2. Install universal protection (recommended):"
     echo "      curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install-universal-shell-protection.sh | bash"
+    echo "      💡 This also adds a convenient 'vg' alias!"
     echo ""
     echo "   3. Or validate a script:"
     echo "      vectra-guard validate your-script.sh"

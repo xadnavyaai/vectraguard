@@ -14,15 +14,18 @@ Or download the binary for your platform below.
 
 ## ✨ What is Vectra Guard?
 
-A security platform that protects your system from risky shell commands and AI agent activities. It validates scripts, monitors command execution, tracks agent sessions, and enforces security policies with real-time protection.
+A security platform that protects your system from risky shell commands and AI agent activities. It validates scripts, detects database operations, monitors command execution, tracks agent sessions, and enforces security policies with real-time protection including production environment warnings.
 
 ---
 
 ## 🎯 Key Features
 
 - ✅ **Script Validation** - Analyze shell scripts for security risks before execution
+- ✅ **Database Operation Detection** - Detects SQL/NoSQL commands (MySQL, PostgreSQL, MongoDB, Redis, etc.)
+- ✅ **Production Environment Warnings** - Escalated alerts for prod/staging operations
 - ✅ **AI Agent Tracking** - Monitor all agent activities with unique session IDs
 - ✅ **Universal Shell Protection** - Automatic integration with Bash, Zsh, Fish
+- ✅ **Convenience Alias** - Use `vg` shorthand for all commands
 - ✅ **Real-Time Control** - Interactive approval for risky operations
 - ✅ **Container Isolation** - Docker-based sandboxing with seccomp profiles
 - ✅ **Audit Trails** - Complete logging for compliance and debugging

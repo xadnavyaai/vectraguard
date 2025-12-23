@@ -6,7 +6,7 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)]()
 
-Vectra Guard is a comprehensive security tool that protects systems from risky shell commands and AI agent activities. It validates scripts, monitors command execution, tracks agent sessions, and enforces security policies with real-time protection.
+Vectra Guard is a comprehensive security tool that protects systems from risky shell commands and AI agent activities. It validates scripts, monitors command execution, detects database operations, tracks agent sessions, and enforces security policies with real-time protection including production environment warnings.
 
 ---
 
@@ -21,10 +21,13 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 
 **Vectra Guard provides a security layer that:**
 - ✅ Validates scripts and commands before execution
+- ✅ Detects SQL/NoSQL database operations (MySQL, PostgreSQL, MongoDB, Redis, etc.)
+- ✅ Warns about production/staging environment interactions
 - ✅ Tracks all agent activities in auditable sessions
 - ✅ Blocks or requires approval for risky operations
 - ✅ Provides comprehensive audit trails
 - ✅ Enforces security policies with zero-trust defaults
+- ✅ Includes convenient `vg` alias for faster workflows
 
 ---
 
@@ -98,6 +101,8 @@ echo $VECTRAGUARD_SESSION_ID
 vectra-guard session show $VECTRAGUARD_SESSION_ID
 ```
 
+**🎁 Bonus**: Universal protection automatically adds a `vg` alias for convenience!
+
 **Option 2: Manual Usage**
 
 Use Vectra Guard commands directly:
@@ -106,8 +111,9 @@ Use Vectra Guard commands directly:
 # Initialize configuration
 vectra-guard init
 
-# Validate a script
+# Validate a script (use 'vg' as shorthand if you have universal protection)
 vectra-guard validate your-script.sh
+vg validate your-script.sh  # Same thing!
 
 # Execute a command safely
 vectra-guard exec "npm install"
