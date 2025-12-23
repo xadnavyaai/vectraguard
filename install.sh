@@ -1,0 +1,110 @@
+#!/bin/bash
+# Vectra Guard Quick Installer
+# Usage: curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+
+set -e
+
+REPO="xadnavyaai/vectra-guard"
+INSTALL_DIR="/usr/local/bin"
+BINARY_NAME="vectra-guard"
+
+echo "🛡️  Vectra Guard Installer"
+echo "=========================="
+echo ""
+
+# Detect OS and architecture
+OS="$(uname -s)"
+ARCH="$(uname -m)"
+
+case "$OS" in
+    Darwin)
+        OS="darwin"
+        ;;
+    Linux)
+        OS="linux"
+        ;;
+    *)
+        echo "❌ Unsupported OS: $OS"
+        echo "   Please install manually from: https://github.com/${REPO}"
+        exit 1
+        ;;
+esac
+
+case "$ARCH" in
+    x86_64|amd64)
+        ARCH="amd64"
+        ;;
+    arm64|aarch64)
+        ARCH="arm64"
+        ;;
+    *)
+        echo "❌ Unsupported architecture: $ARCH"
+        echo "   Please install manually from: https://github.com/${REPO}"
+        exit 1
+        ;;
+esac
+
+echo "📋 System: $OS $ARCH"
+echo ""
+
+# Get latest release
+echo "📦 Downloading Vectra Guard..."
+DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}-${OS}-${ARCH}"
+
+# Download
+TEMP_FILE=$(mktemp)
+if command -v curl &> /dev/null; then
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_FILE"; then
+        echo "❌ Download failed. Binary may not exist yet."
+        echo "   Build from source: https://github.com/${REPO}#installation"
+        exit 1
+    fi
+elif command -v wget &> /dev/null; then
+    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_FILE"; then
+        echo "❌ Download failed. Binary may not exist yet."
+        echo "   Build from source: https://github.com/${REPO}#installation"
+        exit 1
+    fi
+else
+    echo "❌ Need curl or wget to download"
+    exit 1
+fi
+
+# Make executable
+chmod +x "$TEMP_FILE"
+
+# Install
+echo "📝 Installing to $INSTALL_DIR..."
+if [ -w "$INSTALL_DIR" ]; then
+    mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
+else
+    echo "   (requires sudo)"
+    sudo mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
+fi
+
+# Verify
+if command -v vectra-guard &> /dev/null; then
+    VERSION=$(vectra-guard --help 2>&1 | head -1 || echo "installed")
+    echo ""
+    echo "✅ Vectra Guard installed successfully!"
+    echo ""
+    echo "🚀 Get started:"
+    echo ""
+    echo "   1. Initialize configuration:"
+    echo "      vectra-guard init"
+    echo ""
+    echo "   2. Install universal protection (recommended):"
+    echo "      curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install-universal-shell-protection.sh | bash"
+    echo ""
+    echo "   3. Or validate a script:"
+    echo "      vectra-guard validate your-script.sh"
+    echo ""
+    echo "📚 Documentation: https://github.com/${REPO}"
+    echo ""
+else
+    echo ""
+    echo "❌ Installation failed"
+    echo "   Please try manual installation: https://github.com/${REPO}"
+    exit 1
+fi
+

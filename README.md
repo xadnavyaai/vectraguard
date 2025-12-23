@@ -30,37 +30,67 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 
 ## ⚡ Quick Start
 
+> **New to Vectra Guard?** See **[GETTING_STARTED.md](GETTING_STARTED.md)** for a detailed walkthrough!
+
 ### Installation
 
+**One-Command Install** (Recommended):
+
 ```bash
-# Clone the repository
+# macOS & Linux
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+```
+
+**Alternative Methods**:
+
+```bash
+# Go developers
+go install github.com/xadnavyaai/vectra-guard@latest
+
+# Or download pre-built binary from:
+# https://github.com/xadnavyaai/vectra-guard/releases/latest
+```
+
+**Build from Source**:
+
+```bash
 git clone https://github.com/xadnavyaai/vectra-guard.git
 cd vectra-guard
-
-# Build
 go build -o vectra-guard main.go
-
-# Install to PATH (optional)
 sudo cp vectra-guard /usr/local/bin/
-
-# Install universal shell protection (RECOMMENDED)
-./scripts/install-universal-shell-protection.sh
 ```
 
-After installation, **restart your terminal**. Now all commands in any tool (Cursor, VSCode, Terminal) are automatically protected!
+### After Installation
 
-### Verify Installation
+**Option 1: Universal Protection (Recommended)**
+
+Install shell-level protection for automatic monitoring:
 
 ```bash
-# Check session is active
+# Download and run the protection installer
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
+
+# Restart terminal, then verify:
 echo $VECTRAGUARD_SESSION_ID
-
-# Run a test command
-echo "Hello, protected world"
-
-# View activity
 vectra-guard session show $VECTRAGUARD_SESSION_ID
 ```
+
+**Option 2: Manual Usage**
+
+Use Vectra Guard commands directly:
+
+```bash
+# Initialize configuration
+vectra-guard init
+
+# Validate a script
+vectra-guard validate your-script.sh
+
+# Execute a command safely
+vectra-guard exec "npm install"
+```
+
+**That's it!** See **[GETTING_STARTED.md](GETTING_STARTED.md)** for detailed usage examples.
 
 ---
 
