@@ -15,12 +15,12 @@
    - **Attach files**: Drag and drop binaries from `dist/` folder
 
 4. **Upload these 6 files** from your `dist/` folder:
-   - `vectra-guard-darwin-amd64`
-   - `vectra-guard-darwin-arm64`
-   - `vectra-guard-linux-amd64`
-   - `vectra-guard-linux-arm64`
-   - `vectra-guard-windows-amd64.exe`
-   - `checksums.txt`
+   - `vectra-guard-darwin-amd64.tar.gz`
+   - `vectra-guard-darwin-arm64.tar.gz`
+   - `vectra-guard-linux-amd64.tar.gz`
+   - `vectra-guard-linux-arm64.tar.gz`
+   - `vectra-guard-windows-amd64.exe.zip`
+   - `checksums-archives.txt` (rename to `checksums.txt`)
 
 5. **Click**: **"Publish release"** (green button at bottom)
 
@@ -86,17 +86,22 @@ go install github.com/xadnavyaai/vectra-guard@latest
 ```
 
 ### Download Binary
-Choose the appropriate binary below:
-- **macOS M1/M2/M3**: `vectra-guard-darwin-arm64`
-- **macOS Intel**: `vectra-guard-darwin-amd64`
-- **Linux 64-bit**: `vectra-guard-linux-amd64`
-- **Linux ARM**: `vectra-guard-linux-arm64`
-- **Windows**: `vectra-guard-windows-amd64.exe`
+Choose the appropriate archive below:
+- **macOS M1/M2/M3**: `vectra-guard-darwin-arm64.tar.gz`
+- **macOS Intel**: `vectra-guard-darwin-amd64.tar.gz`
+- **Linux 64-bit**: `vectra-guard-linux-amd64.tar.gz`
+- **Linux ARM**: `vectra-guard-linux-arm64.tar.gz`
+- **Windows**: `vectra-guard-windows-amd64.exe.zip`
 
-Then:
+Then extract and install:
 ```bash
+# macOS/Linux
+tar xzf vectra-guard-*.tar.gz
 chmod +x vectra-guard-*
 sudo mv vectra-guard-* /usr/local/bin/vectra-guard
+
+# Windows
+# Extract the zip and run vectra-guard.exe
 ```
 
 ## 🔐 Security

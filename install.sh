@@ -49,26 +49,37 @@ echo ""
 
 # Get latest release
 echo "📦 Downloading Vectra Guard..."
-DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_NAME}-${OS}-${ARCH}"
+ARCHIVE="${BINARY_NAME}-${OS}-${ARCH}.tar.gz"
+DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${ARCHIVE}"
+
+# Create temp directory
+TEMP_DIR=$(mktemp -d)
+TEMP_ARCHIVE="${TEMP_DIR}/${ARCHIVE}"
 
 # Download
-TEMP_FILE=$(mktemp)
 if command -v curl &> /dev/null; then
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_FILE"; then
-        echo "❌ Download failed. Binary may not exist yet."
+    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_ARCHIVE"; then
+        echo "❌ Download failed. Release may not exist yet."
         echo "   Build from source: https://github.com/${REPO}#installation"
+        rm -rf "$TEMP_DIR"
         exit 1
     fi
 elif command -v wget &> /dev/null; then
-    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_FILE"; then
-        echo "❌ Download failed. Binary may not exist yet."
+    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_ARCHIVE"; then
+        echo "❌ Download failed. Release may not exist yet."
         echo "   Build from source: https://github.com/${REPO}#installation"
+        rm -rf "$TEMP_DIR"
         exit 1
     fi
 else
     echo "❌ Need curl or wget to download"
     exit 1
 fi
+
+# Extract
+echo "📦 Extracting..."
+tar xzf "$TEMP_ARCHIVE" -C "$TEMP_DIR"
+TEMP_FILE="${TEMP_DIR}/${BINARY_NAME}-${OS}-${ARCH}"
 
 # Make executable
 chmod +x "$TEMP_FILE"
@@ -81,6 +92,9 @@ else
     echo "   (requires sudo)"
     sudo mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
 fi
+
+# Cleanup
+rm -rf "$TEMP_DIR"
 
 # Verify
 if command -v vectra-guard &> /dev/null; then

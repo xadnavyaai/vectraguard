@@ -50,13 +50,52 @@ done
 echo ""
 echo "✅ Build complete!"
 echo ""
-echo "📦 Binaries in dist/:"
-ls -lh dist/
+
+# Create archives for GitHub Release
+echo "📦 Creating release archives..."
+cd dist
+for binary in vectra-guard-*; do
+    # Skip if already an archive or checksums
+    if [[ "$binary" == *.tar.gz ]] || [[ "$binary" == *.zip ]] || [[ "$binary" == checksums.txt ]]; then
+        continue
+    fi
+    
+    if [[ "$binary" == *.exe ]]; then
+        # Windows: create zip
+        ARCHIVE="${binary}.zip"
+        echo "   Creating ${ARCHIVE}..."
+        zip -q "$ARCHIVE" "$binary"
+    else
+        # Unix: create tar.gz
+        ARCHIVE="${binary}.tar.gz"
+        echo "   Creating ${ARCHIVE}..."
+        tar czf "$ARCHIVE" "$binary"
+    fi
+done
+cd ..
+
+# Create checksums for archives
+echo ""
+echo "🔐 Generating checksums..."
+cd dist
+shasum -a 256 *.tar.gz *.zip > checksums-archives.txt 2>/dev/null || true
+cd ..
+
+echo ""
+echo "✅ Release packages ready!"
+echo ""
+echo "📦 Archives in dist/:"
+ls -lh dist/*.tar.gz dist/*.zip 2>/dev/null
 echo ""
 echo "📝 Next steps:"
-echo "   1. Test binaries"
-echo "   2. Create GitHub release: https://github.com/xadnavyaai/vectra-guard/releases/new"
-echo "   3. Upload binaries from dist/ folder"
-echo "   4. Publish release"
+echo "   1. Create GitHub release: https://github.com/xadnavyaai/vectra-guard/releases/new"
+echo "   2. Upload these files from dist/ folder:"
+echo "      • vectra-guard-darwin-amd64.tar.gz"
+echo "      • vectra-guard-darwin-arm64.tar.gz"
+echo "      • vectra-guard-linux-amd64.tar.gz"
+echo "      • vectra-guard-linux-arm64.tar.gz"
+echo "      • vectra-guard-windows-amd64.exe.zip"
+echo "      • checksums-archives.txt (rename to checksums.txt)"
+echo "   3. Publish release"
 echo ""
 
