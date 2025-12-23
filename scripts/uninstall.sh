@@ -1,6 +1,6 @@
 #!/bin/bash
 # Vectra Guard Uninstaller
-# Usage: curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/uninstall.sh | bash
+# Usage: curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
 
 set -e
 

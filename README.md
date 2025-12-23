@@ -76,7 +76,7 @@ The installer detects existing installations and offers to upgrade automatically
 
 ```bash
 # Interactive uninstall (removes binary, shell integration, optionally data)
-curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/uninstall.sh | bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
 
 # Manual uninstall
 sudo rm /usr/local/bin/vectra-guard

@@ -139,7 +139,7 @@ if command -v vectra-guard &> /dev/null; then
     echo "      vectra-guard validate your-script.sh"
     echo ""
     echo "📚 Documentation: https://github.com/${REPO}"
-    echo "🗑️  Uninstall: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/uninstall.sh | bash"
+    echo "🗑️  Uninstall: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh | bash"
     echo ""
 else
     echo ""
