@@ -15,6 +15,7 @@ type Config struct {
 	Logging       LoggingConfig       `yaml:"logging" toml:"logging" json:"logging"`
 	Policies      PolicyConfig        `yaml:"policies" toml:"policies" json:"policies"`
 	EnvProtection EnvProtectionConfig `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
+	GuardLevel    GuardLevelConfig    `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
 }
 
 // LoggingConfig controls output formatting.
@@ -22,10 +23,34 @@ type LoggingConfig struct {
 	Format string `yaml:"format" toml:"format" json:"format"`
 }
 
+// GuardLevel determines the aggressiveness of protection
+type GuardLevel string
+
+const (
+	GuardLevelOff      GuardLevel = "off"      // No protection
+	GuardLevelLow      GuardLevel = "low"      // Only critical issues
+	GuardLevelMedium   GuardLevel = "medium"   // Critical + high issues (default)
+	GuardLevelHigh     GuardLevel = "high"     // Critical + high + medium issues
+	GuardLevelParanoid GuardLevel = "paranoid" // Everything requires approval
+)
+
+// GuardLevelConfig controls the overall security posture
+type GuardLevelConfig struct {
+	Level                GuardLevel `yaml:"level" toml:"level" json:"level"`
+	AllowUserBypass      bool       `yaml:"allow_user_bypass" toml:"allow_user_bypass" json:"allow_user_bypass"`
+	BypassEnvVar         string     `yaml:"bypass_env_var" toml:"bypass_env_var" json:"bypass_env_var"`
+	RequireApprovalAbove string     `yaml:"require_approval_above" toml:"require_approval_above" json:"require_approval_above"`
+}
+
 // PolicyConfig captures simple allow/deny rules applied during analysis.
 type PolicyConfig struct {
-	Allowlist []string `yaml:"allowlist" toml:"allowlist" json:"allowlist"`
-	Denylist  []string `yaml:"denylist" toml:"denylist" json:"denylist"`
+	Allowlist           []string `yaml:"allowlist" toml:"allowlist" json:"allowlist"`
+	Denylist            []string `yaml:"denylist" toml:"denylist" json:"denylist"`
+	MonitorGitOps       bool     `yaml:"monitor_git_ops" toml:"monitor_git_ops" json:"monitor_git_ops"`
+	BlockForceGit       bool     `yaml:"block_force_git" toml:"block_force_git" json:"block_force_git"`
+	DetectProdEnv       bool     `yaml:"detect_prod_env" toml:"detect_prod_env" json:"detect_prod_env"`
+	ProdEnvPatterns     []string `yaml:"prod_env_patterns" toml:"prod_env_patterns" json:"prod_env_patterns"`
+	OnlyDestructiveSQL  bool     `yaml:"only_destructive_sql" toml:"only_destructive_sql" json:"only_destructive_sql"`
 }
 
 // EnvProtectionConfig controls environment variable protection and masking.
@@ -44,8 +69,13 @@ func DefaultConfig() Config {
 	return Config{
 		Logging: LoggingConfig{Format: "text"},
 		Policies: PolicyConfig{
-			Allowlist: []string{},
-			Denylist:  []string{"rm -rf /", "sudo ", ":(){ :|:& };:", "mkfs", "dd if="},
+			Allowlist:          []string{},
+			Denylist:           []string{"rm -rf /", "sudo ", ":(){ :|:& };:", "mkfs", "dd if="},
+			MonitorGitOps:      true,
+			BlockForceGit:      true,
+			DetectProdEnv:      true,
+			ProdEnvPatterns:    []string{"prod", "production", "prd", "live", "staging", "stg"},
+			OnlyDestructiveSQL: true, // Only flag destructive SQL operations
 		},
 		EnvProtection: EnvProtectionConfig{
 			Enabled:         true,
@@ -55,6 +85,12 @@ func DefaultConfig() Config {
 			FakeValues:      make(map[string]string),
 			BlockEnvAccess:  false, // Warn but don't block by default
 			BlockDotenvRead: true,  // Block .env file reads by default
+		},
+		GuardLevel: GuardLevelConfig{
+			Level:                GuardLevelMedium,
+			AllowUserBypass:      true,
+			BypassEnvVar:         "VECTRAGUARD_BYPASS",
+			RequireApprovalAbove: "medium",
 		},
 	}
 }
@@ -150,6 +186,28 @@ func merge(dst *Config, src Config) {
 	if len(src.Policies.Denylist) > 0 {
 		dst.Policies.Denylist = src.Policies.Denylist
 	}
+	
+	// Merge policy booleans (false is a valid value, so we don't check for zero)
+	dst.Policies.MonitorGitOps = src.Policies.MonitorGitOps
+	dst.Policies.BlockForceGit = src.Policies.BlockForceGit
+	dst.Policies.DetectProdEnv = src.Policies.DetectProdEnv
+	dst.Policies.OnlyDestructiveSQL = src.Policies.OnlyDestructiveSQL
+	
+	if len(src.Policies.ProdEnvPatterns) > 0 {
+		dst.Policies.ProdEnvPatterns = src.Policies.ProdEnvPatterns
+	}
+	
+	// Merge guard level
+	if src.GuardLevel.Level != "" {
+		dst.GuardLevel.Level = src.GuardLevel.Level
+	}
+	if src.GuardLevel.BypassEnvVar != "" {
+		dst.GuardLevel.BypassEnvVar = src.GuardLevel.BypassEnvVar
+	}
+	if src.GuardLevel.RequireApprovalAbove != "" {
+		dst.GuardLevel.RequireApprovalAbove = src.GuardLevel.RequireApprovalAbove
+	}
+	dst.GuardLevel.AllowUserBypass = src.GuardLevel.AllowUserBypass
 }
 
 func exists(path string) bool {
@@ -176,6 +234,9 @@ func decodeYAML(data []byte) (Config, error) {
 			case "policies":
 				mode = "policies"
 				listTarget = nil
+			case "guard_level":
+				mode = "guard_level"
+				listTarget = nil
 			case "allowlist":
 				if mode == "policies" {
 					listTarget = &cfg.Policies.Allowlist
@@ -183,6 +244,10 @@ func decodeYAML(data []byte) (Config, error) {
 			case "denylist":
 				if mode == "policies" {
 					listTarget = &cfg.Policies.Denylist
+				}
+			case "prod_env_patterns":
+				if mode == "policies" {
+					listTarget = &cfg.Policies.ProdEnvPatterns
 				}
 			}
 			continue
@@ -195,10 +260,42 @@ func decodeYAML(data []byte) (Config, error) {
 			continue
 		}
 
-		if mode == "logging" && strings.HasPrefix(line, "format:") {
+		// Parse key: value lines
+		if strings.Contains(line, ":") {
 			parts := strings.SplitN(line, ":", 2)
-			if len(parts) == 2 {
-				cfg.Logging.Format = strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+			if len(parts) != 2 {
+				continue
+			}
+			key := strings.TrimSpace(parts[0])
+			value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+			
+			switch mode {
+			case "logging":
+				if key == "format" {
+					cfg.Logging.Format = value
+				}
+			case "guard_level":
+				switch key {
+				case "level":
+					cfg.GuardLevel.Level = GuardLevel(value)
+				case "allow_user_bypass":
+					cfg.GuardLevel.AllowUserBypass = value == "true"
+				case "bypass_env_var":
+					cfg.GuardLevel.BypassEnvVar = value
+				case "require_approval_above":
+					cfg.GuardLevel.RequireApprovalAbove = value
+				}
+			case "policies":
+				switch key {
+				case "monitor_git_ops":
+					cfg.Policies.MonitorGitOps = value == "true"
+				case "block_force_git":
+					cfg.Policies.BlockForceGit = value == "true"
+				case "detect_prod_env":
+					cfg.Policies.DetectProdEnv = value == "true"
+				case "only_destructive_sql":
+					cfg.Policies.OnlyDestructiveSQL = value == "true"
+				}
 			}
 		}
 	}

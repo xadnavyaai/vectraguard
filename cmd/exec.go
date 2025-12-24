@@ -22,6 +22,35 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		return fmt.Errorf("no command specified")
 	}
 
+	// Check for user bypass
+	bypassEnvVar := cfg.GuardLevel.BypassEnvVar
+	if bypassEnvVar == "" {
+		bypassEnvVar = "VECTRAGUARD_BYPASS"
+	}
+	
+	if cfg.GuardLevel.AllowUserBypass && os.Getenv(bypassEnvVar) != "" {
+		bypassValue := os.Getenv(bypassEnvVar)
+		// Require a specific non-trivial value that agents are unlikely to guess
+		// Users can set: export VECTRAGUARD_BYPASS="$(date +%s | sha256sum | head -c 16)"
+		// Or a simpler approach: export VECTRAGUARD_BYPASS="i-am-human-$(whoami)"
+		if len(bypassValue) >= 10 && !isLikelyAgentBypass(bypassValue) {
+			logger.Info("command executed with user bypass", map[string]any{
+				"command": strings.Join(cmdArgs, " "),
+				"bypass":  "user authenticated",
+			})
+			// Execute without protection
+			return executeCommandDirectly(cmdArgs)
+		}
+	}
+	
+	// Check guard level
+	if cfg.GuardLevel.Level == config.GuardLevelOff {
+		logger.Info("guard level is OFF - executing without protection", map[string]any{
+			"command": strings.Join(cmdArgs, " "),
+		})
+		return executeCommandDirectly(cmdArgs)
+	}
+
 	cmdName := cmdArgs[0]
 	args := cmdArgs[1:]
 
@@ -34,9 +63,12 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	riskLevel := "low"
 	var findingCodes []string
 	
-	if len(findings) > 0 {
+	// Filter findings based on guard level
+	filteredFindings := filterFindingsByGuardLevel(findings, cfg.GuardLevel.Level)
+	
+	if len(filteredFindings) > 0 {
 		// Determine highest risk level
-		for _, f := range findings {
+		for _, f := range filteredFindings {
 			findingCodes = append(findingCodes, f.Code)
 			switch f.Severity {
 			case "critical":
@@ -53,7 +85,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 
 		// Log findings
-		for _, f := range findings {
+		for _, f := range filteredFindings {
 			logger.Warn("command risk detected", map[string]any{
 				"command":        cmdString,
 				"code":           f.Code,
@@ -63,19 +95,30 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			})
 		}
 
-		// Handle interactive approval
-		if interactive {
-			if !promptForApproval(riskLevel, cmdString, findings) {
-				logger.Info("command execution denied by user", map[string]any{
-					"command": cmdString,
+		// Determine if approval is required based on guard level
+		requiresApproval := shouldRequireApproval(riskLevel, cfg.GuardLevel.Level)
+		
+		// Handle interactive approval or blocking
+		if requiresApproval {
+			if interactive {
+				if !promptForApproval(riskLevel, cmdString, filteredFindings) {
+					logger.Info("command execution denied by user", map[string]any{
+						"command": cmdString,
+					})
+					return &exitError{message: "execution denied", code: 3}
+				}
+			} else {
+				logger.Error("risky command blocked", map[string]any{
+					"command":    cmdString,
+					"risk_level": riskLevel,
+					"guard_level": cfg.GuardLevel.Level,
 				})
-				return &exitError{message: "execution denied", code: 3}
+				return &exitError{
+					message: fmt.Sprintf("%s risk command blocked by guard level %s (use --interactive to approve, or set bypass)", 
+						riskLevel, cfg.GuardLevel.Level),
+					code: 3,
+				}
 			}
-		} else if riskLevel == "critical" {
-			logger.Error("critical command blocked", map[string]any{
-				"command": cmdString,
-			})
-			return &exitError{message: "critical command blocked (use --interactive to approve)", code: 3}
 		}
 	}
 
@@ -163,5 +206,109 @@ func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding)
 	
 	response = strings.ToLower(strings.TrimSpace(response))
 	return response == "y" || response == "yes"
+}
+
+// filterFindingsByGuardLevel filters findings based on the configured guard level
+func filterFindingsByGuardLevel(findings []analyzer.Finding, level config.GuardLevel) []analyzer.Finding {
+	if level == config.GuardLevelOff {
+		return nil
+	}
+	
+	if level == config.GuardLevelParanoid {
+		return findings // Return all findings
+	}
+	
+	var filtered []analyzer.Finding
+	for _, f := range findings {
+		switch level {
+		case config.GuardLevelLow:
+			// Only critical
+			if f.Severity == "critical" {
+				filtered = append(filtered, f)
+			}
+		case config.GuardLevelMedium:
+			// Critical and high
+			if f.Severity == "critical" || f.Severity == "high" {
+				filtered = append(filtered, f)
+			}
+		case config.GuardLevelHigh:
+			// Critical, high, and medium
+			if f.Severity == "critical" || f.Severity == "high" || f.Severity == "medium" {
+				filtered = append(filtered, f)
+			}
+		}
+	}
+	
+	return filtered
+}
+
+// shouldRequireApproval determines if a command should require approval
+func shouldRequireApproval(riskLevel string, guardLevel config.GuardLevel) bool {
+	if guardLevel == config.GuardLevelParanoid {
+		return true // Everything requires approval
+	}
+	
+	switch guardLevel {
+	case config.GuardLevelLow:
+		return riskLevel == "critical"
+	case config.GuardLevelMedium:
+		return riskLevel == "critical" || riskLevel == "high"
+	case config.GuardLevelHigh:
+		return riskLevel == "critical" || riskLevel == "high" || riskLevel == "medium"
+	default:
+		return false
+	}
+}
+
+// isLikelyAgentBypass checks if the bypass value looks like it was set by an AI agent
+func isLikelyAgentBypass(value string) bool {
+	// Simple heuristics to detect agent-generated bypass values
+	agentPatterns := []string{
+		"bypass", "agent", "ai", "automated", "script",
+		"cursor", "copilot", "gpt", "claude",
+		"true", "yes", "1", "enabled",
+	}
+	
+	lowerValue := strings.ToLower(value)
+	for _, pattern := range agentPatterns {
+		if strings.Contains(lowerValue, pattern) {
+			return true
+		}
+	}
+	
+	// If it's too simple (less than 10 chars), likely not a proper bypass
+	if len(value) < 10 {
+		return true
+	}
+	
+	return false
+}
+
+// executeCommandDirectly executes a command without protection
+func executeCommandDirectly(cmdArgs []string) error {
+	if len(cmdArgs) == 0 {
+		return fmt.Errorf("no command specified")
+	}
+	
+	cmdName := cmdArgs[0]
+	args := cmdArgs[1:]
+	
+	cmd := exec.Command(cmdName, args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	
+	err := cmd.Run()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return &exitError{
+				message: fmt.Sprintf("command exited with code %d", exitErr.ExitCode()),
+				code:    exitErr.ExitCode(),
+			}
+		}
+		return fmt.Errorf("execute command: %w", err)
+	}
+	
+	return nil
 }
 

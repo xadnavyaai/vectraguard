@@ -104,6 +104,360 @@ func TestContextHelpers(t *testing.T) {
 	}
 }
 
+func TestGuardLevelDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	if cfg.GuardLevel.Level != GuardLevelMedium {
+		t.Errorf("expected default guard level to be medium, got %s", cfg.GuardLevel.Level)
+	}
+	
+	if !cfg.GuardLevel.AllowUserBypass {
+		t.Error("expected user bypass to be allowed by default")
+	}
+	
+	if cfg.GuardLevel.BypassEnvVar != "VECTRAGUARD_BYPASS" {
+		t.Errorf("expected default bypass env var to be VECTRAGUARD_BYPASS, got %s", cfg.GuardLevel.BypassEnvVar)
+	}
+}
+
+func TestPolicyDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	if !cfg.Policies.MonitorGitOps {
+		t.Error("expected MonitorGitOps to be true by default")
+	}
+	
+	if !cfg.Policies.BlockForceGit {
+		t.Error("expected BlockForceGit to be true by default")
+	}
+	
+	if !cfg.Policies.DetectProdEnv {
+		t.Error("expected DetectProdEnv to be true by default")
+	}
+	
+	if !cfg.Policies.OnlyDestructiveSQL {
+		t.Error("expected OnlyDestructiveSQL to be true by default")
+	}
+	
+	expectedPatterns := []string{"prod", "production", "prd", "live", "staging", "stg"}
+	if len(cfg.Policies.ProdEnvPatterns) != len(expectedPatterns) {
+		t.Errorf("expected %d prod env patterns, got %d", len(expectedPatterns), len(cfg.Policies.ProdEnvPatterns))
+	}
+}
+
+func TestGuardLevelParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		expected GuardLevel
+	}{
+		{"low level", "guard_level:\n  level: low\n", GuardLevelLow},
+		{"medium level", "guard_level:\n  level: medium\n", GuardLevelMedium},
+		{"high level", "guard_level:\n  level: high\n", GuardLevelHigh},
+		{"paranoid level", "guard_level:\n  level: paranoid\n", GuardLevelParanoid},
+		{"off level", "guard_level:\n  level: off\n", GuardLevelOff},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := decodeYAML([]byte(tt.yaml))
+			if err != nil {
+				t.Fatalf("decode yaml: %v", err)
+			}
+			
+			if cfg.GuardLevel.Level != tt.expected {
+				t.Errorf("expected guard level %s, got %s", tt.expected, cfg.GuardLevel.Level)
+			}
+		})
+	}
+}
+
+<<<<<<< Current (Your changes)
+=======
+func TestGuardLevelValidation(t *testing.T) {
+	validLevels := []GuardLevel{
+		GuardLevelOff,
+		GuardLevelLow,
+		GuardLevelMedium,
+		GuardLevelHigh,
+		GuardLevelParanoid,
+	}
+	
+	for _, level := range validLevels {
+		t.Run(string(level), func(t *testing.T) {
+			cfg := DefaultConfig()
+			cfg.GuardLevel.Level = level
+			
+			// Should not panic or error
+			_ = cfg.GuardLevel.Level
+		})
+	}
+}
+
+func TestPolicyConfigDefaults(t *testing.T) {
+	cfg := DefaultConfig()
+	
+	tests := []struct {
+		name     string
+		value    bool
+		expected bool
+	}{
+		{"MonitorGitOps", cfg.Policies.MonitorGitOps, true},
+		{"BlockForceGit", cfg.Policies.BlockForceGit, true},
+		{"DetectProdEnv", cfg.Policies.DetectProdEnv, true},
+		{"OnlyDestructiveSQL", cfg.Policies.OnlyDestructiveSQL, true},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.value != tt.expected {
+				t.Errorf("expected %s to be %v, got %v", tt.name, tt.expected, tt.value)
+			}
+		})
+	}
+}
+
+func TestCompleteYAMLConfig(t *testing.T) {
+	yaml := `
+logging:
+  format: json
+
+guard_level:
+  level: high
+  allow_user_bypass: false
+  bypass_env_var: CUSTOM_BYPASS
+  require_approval_above: medium
+
+policies:
+  monitor_git_ops: true
+  block_force_git: true
+  detect_prod_env: true
+  only_destructive_sql: false
+  prod_env_patterns:
+    - prod
+    - production
+    - uat
+  allowlist:
+    - "echo *"
+    - "git status"
+  denylist:
+    - "rm -rf /"
+`
+	
+	cfg, err := decodeYAML([]byte(yaml))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	
+	// Verify all fields
+	if cfg.Logging.Format != "json" {
+		t.Errorf("expected format json, got %s", cfg.Logging.Format)
+	}
+	
+	if cfg.GuardLevel.Level != GuardLevelHigh {
+		t.Errorf("expected guard level high, got %s", cfg.GuardLevel.Level)
+	}
+	
+	if cfg.GuardLevel.AllowUserBypass != false {
+		t.Error("expected allow_user_bypass to be false")
+	}
+	
+	if cfg.GuardLevel.BypassEnvVar != "CUSTOM_BYPASS" {
+		t.Errorf("expected bypass env var CUSTOM_BYPASS, got %s", cfg.GuardLevel.BypassEnvVar)
+	}
+	
+	if !cfg.Policies.MonitorGitOps {
+		t.Error("expected monitor_git_ops to be true")
+	}
+	
+	if !cfg.Policies.BlockForceGit {
+		t.Error("expected block_force_git to be true")
+	}
+	
+	if !cfg.Policies.DetectProdEnv {
+		t.Error("expected detect_prod_env to be true")
+	}
+	
+	if cfg.Policies.OnlyDestructiveSQL {
+		t.Error("expected only_destructive_sql to be false")
+	}
+	
+	expectedPatterns := []string{"prod", "production", "uat"}
+	if len(cfg.Policies.ProdEnvPatterns) != len(expectedPatterns) {
+		t.Errorf("expected %d patterns, got %d", len(expectedPatterns), len(cfg.Policies.ProdEnvPatterns))
+	}
+	
+	if len(cfg.Policies.Allowlist) != 2 {
+		t.Errorf("expected 2 allowlist items, got %d", len(cfg.Policies.Allowlist))
+	}
+	
+	if len(cfg.Policies.Denylist) != 1 {
+		t.Errorf("expected 1 denylist item, got %d", len(cfg.Policies.Denylist))
+	}
+}
+
+func TestConfigMerging(t *testing.T) {
+	base := Config{
+		GuardLevel: GuardLevelConfig{
+			Level: GuardLevelLow,
+			AllowUserBypass: true,
+			BypassEnvVar: "BASE_VAR",
+		},
+		Policies: PolicyConfig{
+			MonitorGitOps: false,
+			BlockForceGit: false,
+		},
+	}
+	
+	override := Config{
+		GuardLevel: GuardLevelConfig{
+			Level: GuardLevelHigh,
+			AllowUserBypass: false, // Explicitly set to false
+			// BypassEnvVar not set (empty string)
+		},
+		Policies: PolicyConfig{
+			MonitorGitOps: true,
+			BlockForceGit: false, // Explicitly set to false
+		},
+	}
+	
+	merge(&base, override)
+	
+	if base.GuardLevel.Level != GuardLevelHigh {
+		t.Error("guard level should be overridden to high")
+	}
+	
+	// Note: boolean values are always merged from source, even if false
+	// This is by design since we can't distinguish between "not set" and "set to false" for booleans
+	if base.GuardLevel.AllowUserBypass != false {
+		t.Error("allow_user_bypass should be overridden to false")
+	}
+	
+	// BypassEnvVar should keep base value since override is empty
+	if base.GuardLevel.BypassEnvVar != "BASE_VAR" {
+		t.Error("bypass_env_var should keep base value when override is empty")
+	}
+	
+	if !base.Policies.MonitorGitOps {
+		t.Error("monitor_git_ops should be overridden to true")
+	}
+	
+	// BlockForceGit is merged from override (false)
+	if base.Policies.BlockForceGit {
+		t.Error("block_force_git should be overridden to false")
+	}
+}
+
+func TestInvalidGuardLevel(t *testing.T) {
+	yaml := `
+guard_level:
+  level: invalid_level
+`
+	
+	cfg, err := decodeYAML([]byte(yaml))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	
+	// Should parse but with the invalid value
+	if cfg.GuardLevel.Level != GuardLevel("invalid_level") {
+		t.Errorf("expected invalid_level, got %s", cfg.GuardLevel.Level)
+	}
+}
+
+func TestPartialConfig(t *testing.T) {
+	// Test that partial configs work and fill in defaults
+	yaml := `
+guard_level:
+  level: paranoid
+`
+	
+	cfg, err := decodeYAML([]byte(yaml))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	
+	if cfg.GuardLevel.Level != GuardLevelParanoid {
+		t.Errorf("expected paranoid, got %s", cfg.GuardLevel.Level)
+	}
+	
+	// Other fields should be empty/default
+	if cfg.GuardLevel.BypassEnvVar != "" {
+		t.Error("bypass env var should be empty when not specified")
+	}
+}
+
+func TestBooleanParsing(t *testing.T) {
+	tests := []struct {
+		name     string
+		yaml     string
+		expected bool
+	}{
+		{
+			name:     "true value",
+			yaml:     "policies:\n  monitor_git_ops: true",
+			expected: true,
+		},
+		{
+			name:     "false value",
+			yaml:     "policies:\n  monitor_git_ops: false",
+			expected: false,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg, err := decodeYAML([]byte(tt.yaml))
+			if err != nil {
+				t.Fatalf("decode yaml: %v", err)
+			}
+			
+			if cfg.Policies.MonitorGitOps != tt.expected {
+				t.Errorf("expected %v, got %v (yaml: %q)", tt.expected, cfg.Policies.MonitorGitOps, tt.yaml)
+			}
+		})
+	}
+}
+
+func TestEmptyProdPatternsConfig(t *testing.T) {
+	yaml := `
+policies:
+  detect_prod_env: true
+  prod_env_patterns: []
+`
+	
+	cfg, err := decodeYAML([]byte(yaml))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	
+	if len(cfg.Policies.ProdEnvPatterns) != 0 {
+		t.Errorf("expected empty prod patterns, got %d", len(cfg.Policies.ProdEnvPatterns))
+	}
+}
+
+func TestConfigContextHelpers(t *testing.T) {
+	cfg := Config{
+		GuardLevel: GuardLevelConfig{
+			Level: GuardLevelHigh,
+		},
+	}
+	
+	ctx := WithConfig(context.Background(), cfg)
+	retrieved := FromContext(ctx)
+	
+	if retrieved.GuardLevel.Level != GuardLevelHigh {
+		t.Error("config not properly stored/retrieved from context")
+	}
+	
+	// Test with nil context
+	defaultCfg := FromContext(nil)
+	if defaultCfg.GuardLevel.Level != GuardLevelMedium {
+		t.Error("should return default config for nil context")
+	}
+}
+
+>>>>>>> Incoming (Background Agent changes)
 func writeFile(t *testing.T, path string, body string) {
 	t.Helper()
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {

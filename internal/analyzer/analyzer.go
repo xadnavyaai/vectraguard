@@ -93,73 +93,177 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			})
 		}
 
-		// SQL/NoSQL database command detection
+		// Git operations monitoring
+		if policy.MonitorGitOps {
+			gitRiskyOps := map[string]struct {
+				severity string
+				desc     string
+				rec      string
+			}{
+				"git push --force":     {"high", "Force push detected - can overwrite remote history", "Use --force-with-lease instead or coordinate with team before force pushing."},
+				"git push -f":          {"high", "Force push detected - can overwrite remote history", "Use --force-with-lease instead or coordinate with team before force pushing."},
+				"git reset --hard":     {"medium", "Hard reset detected - will discard local changes", "Ensure you have backups or stash important changes first."},
+				"git clean -fd":        {"medium", "Git clean with force - will delete untracked files", "Review untracked files before cleaning. Consider using -n flag first for dry run."},
+				"git branch -D":        {"medium", "Force branch deletion detected", "Ensure branch is merged or no longer needed before force deleting."},
+				"git branch -d":        {"low", "Branch deletion detected", "Verify branch is fully merged before deletion."},
+				"git rebase":           {"low", "Git rebase detected - will rewrite commit history", "Only rebase local commits. Never rebase published commits."},
+				"git filter-branch":    {"high", "Git filter-branch - rewrites entire repository history", "Extremely dangerous. Coordinate with entire team and backup repository first."},
+				"git filter-repo":      {"high", "Git filter-repo - rewrites entire repository history", "Extremely dangerous. Coordinate with entire team and backup repository first."},
+				"git reflog expire":    {"high", "Reflog expiration - will permanently delete commit references", "Only use if you know what you're doing. Lost commits cannot be recovered."},
+				"git gc --aggressive":  {"medium", "Aggressive garbage collection - may make recovery difficult", "Ensure no important dangling commits exist before running."},
+				"git update-ref -d":    {"high", "Direct ref manipulation detected", "Advanced operation. Ensure you understand git internals before proceeding."},
+			}
+			
+			for pattern, info := range gitRiskyOps {
+				if strings.Contains(lower, pattern) {
+					severity := info.severity
+					
+					// Elevate severity if production environment detected
+					if policy.DetectProdEnv {
+						for _, env := range policy.ProdEnvPatterns {
+							if strings.Contains(lower, env) {
+								if severity == "medium" {
+									severity = "high"
+								} else if severity == "high" {
+									severity = "critical"
+								}
+								info.desc += " in " + strings.ToUpper(env) + " environment"
+								break
+							}
+						}
+					}
+					
+					// Block force operations if configured
+					if policy.BlockForceGit && (strings.Contains(pattern, "--force") || strings.Contains(pattern, "-f")) {
+						severity = "critical"
+					}
+					
+					findings = append(findings, Finding{
+						Severity:       severity,
+						Code:           "RISKY_GIT_OPERATION",
+						Description:    info.desc,
+						Line:           lineNum,
+						Recommendation: info.rec,
+					})
+					break
+				}
+			}
+		}
+
+		// SQL/NoSQL database command detection (refined to only flag destructive operations)
 		dbCommands := []string{"mysql", "psql", "sqlite", "sqlcmd", "mongo", "mongosh", 
 			"redis-cli", "cassandra", "cql", "dynamodb", "influx", "clickhouse"}
 		if containsAnyWord(lower, dbCommands) {
-			// Check for production/staging environment indicators
-			envIndicators := []string{"prod", "production", "prd", "staging", "stg", "live"}
-			envSeverity := "medium"
-			envWarning := ""
+			// Check for destructive SQL operations
+			destructiveSQLOps := []string{
+				"drop database", "drop table", "drop schema", "drop index",
+				"truncate table", "truncate",
+				"delete from", "delete ",
+				"update ", "alter table", "alter database",
+				"grant all", "revoke",
+			}
 			
-			for _, env := range envIndicators {
-				if strings.Contains(lower, env) {
-					envSeverity = "high"
-					envWarning = " in " + strings.ToUpper(env) + " ENVIRONMENT"
+			isDestructive := false
+			destructiveOp := ""
+			for _, op := range destructiveSQLOps {
+				if strings.Contains(lower, op) {
+					isDestructive = true
+					destructiveOp = op
 					break
 				}
 			}
 			
-			// Check for destructive operations
-			destructiveOps := []string{"drop", "delete", "truncate", "alter", "update", "insert"}
-			isDestructive := false
-			for _, op := range destructiveOps {
-				if strings.Contains(lower, op) {
-					isDestructive = true
+			// Only flag if destructive OR if OnlyDestructiveSQL is false
+			if isDestructive || !policy.OnlyDestructiveSQL {
+				envSeverity := "medium"
+				envWarning := ""
+				
+				// Check for production/staging environment indicators
+				if policy.DetectProdEnv {
+					for _, env := range policy.ProdEnvPatterns {
+						if strings.Contains(lower, env) {
+							envSeverity = "high"
+							envWarning = " in " + strings.ToUpper(env) + " ENVIRONMENT"
+							break
+						}
+					}
+				}
+				
+				if isDestructive {
 					if envSeverity == "high" {
 						envSeverity = "critical"
 					} else {
 						envSeverity = "high"
 					}
-					break
 				}
+				
+				description := "Database command detected"
+				if isDestructive {
+					description = "Destructive database operation detected: " + destructiveOp
+				}
+				description += envWarning
+				
+				recommendation := "Review database operation carefully. Use transactions and backups."
+				if envWarning != "" {
+					recommendation += " REQUIRE MANUAL APPROVAL for production changes."
+				}
+				
+				findings = append(findings, Finding{
+					Severity:       envSeverity,
+					Code:           "DATABASE_OPERATION",
+					Description:    description,
+					Line:           lineNum,
+					Recommendation: recommendation,
+				})
 			}
-			
-			description := "Database command detected"
-			if isDestructive {
-				description = "Destructive database operation detected"
-			}
-			description += envWarning
-			
-			findings = append(findings, Finding{
-				Severity:       envSeverity,
-				Code:           "DATABASE_OPERATION",
-				Description:    description,
-				Line:           lineNum,
-				Recommendation: "Review database operation carefully. Use transactions and backups. Require manual approval for production changes.",
-			})
 		}
 
 		// Production/Staging environment warnings (general)
-		envIndicators := []string{"prod", "production", "prd", "staging", "stg", "live"}
-		for _, env := range envIndicators {
-			// Look for environment in variable names, paths, or URLs
-			if strings.Contains(lower, env) && (
-				strings.Contains(lower, "export ") ||
-				strings.Contains(lower, "env") ||
-				strings.Contains(lower, "config") ||
-				strings.Contains(lower, "url") ||
-				strings.Contains(lower, "host") ||
-				strings.Contains(lower, "endpoint")) {
-				
-				findings = append(findings, Finding{
-					Severity:       "high",
-					Code:           "PRODUCTION_ENVIRONMENT",
-					Description:    "Production or staging environment detected: " + strings.ToUpper(env),
-					Line:           lineNum,
-					Recommendation: "Extra caution required. Require human approval before executing against production systems.",
-				})
-				break
+		if policy.DetectProdEnv {
+			envPatterns := policy.ProdEnvPatterns
+			if len(envPatterns) == 0 {
+				envPatterns = []string{"prod", "production", "prd", "staging", "stg", "live"}
+			}
+			
+			for _, env := range envPatterns {
+				// Look for environment in variable names, paths, URLs, or commands
+				if strings.Contains(lower, env) {
+					// Check if it's in a meaningful context
+					inContext := false
+					contextIndicators := []string{
+						"export ", "env", "config", "url", "host", "endpoint",
+						"deploy", "kubectl", "docker", "aws", "gcloud", "azure",
+						"ssh", "scp", "rsync", "curl", "wget", "ansible", "terraform",
+						"database", "db", "server", "cluster", "namespace",
+					}
+					
+					for _, indicator := range contextIndicators {
+						if strings.Contains(lower, indicator) {
+							inContext = true
+							break
+						}
+					}
+					
+					// Also check if env pattern appears in a path-like string
+					if strings.Contains(lower, "/"+env+"/") || 
+					   strings.Contains(lower, "-"+env+"-") ||
+					   strings.Contains(lower, "_"+env+"_") ||
+					   strings.Contains(lower, "."+env+".") ||
+					   strings.Contains(lower, "@"+env) {
+						inContext = true
+					}
+					
+					if inContext {
+						findings = append(findings, Finding{
+							Severity:       "high",
+							Code:           "PRODUCTION_ENVIRONMENT",
+							Description:    "Production or staging environment detected: " + strings.ToUpper(env),
+							Line:           lineNum,
+							Recommendation: "Extra caution required. REQUIRE HUMAN APPROVAL before executing against production systems.",
+						})
+						break
+					}
+				}
 			}
 		}
 
