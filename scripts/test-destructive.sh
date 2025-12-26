@@ -249,11 +249,20 @@ test_filesystem_attacks() {
         "rm -rf /opt|DANGEROUS_DELETE_ROOT"
         "rm -rf /sbin|DANGEROUS_DELETE_ROOT"
         "rm -rf /lib|DANGEROUS_DELETE_ROOT"
+        "rm -rf /lib64|DANGEROUS_DELETE_ROOT"
         "rm -rf /sys|DANGEROUS_DELETE_ROOT"
         "rm -rf /proc|DANGEROUS_DELETE_ROOT"
         "rm -rf /dev|DANGEROUS_DELETE_ROOT"
         "rm -rf /boot|DANGEROUS_DELETE_ROOT"
         "rm -rf /root|DANGEROUS_DELETE_ROOT"
+        "rm -rf /home|DANGEROUS_DELETE_ROOT"
+        "rm -rf /srv|DANGEROUS_DELETE_ROOT"
+        "rm -rf /usr/local|DANGEROUS_DELETE_ROOT"
+        "rm -rf /var/log|DANGEROUS_DELETE_ROOT"
+        "rm -rf /etc/ssh|DANGEROUS_DELETE_ROOT"
+        "rm -rf /System|DANGEROUS_DELETE_ROOT"
+        "rm -rf /Library|DANGEROUS_DELETE_ROOT"
+        "rm -rf /Applications|DANGEROUS_DELETE_ROOT"
         "rm -rf ~/*|DANGEROUS_DELETE_HOME"
         "rm -rf \$HOME/*|DANGEROUS_DELETE_HOME"
         "dd if=/dev/zero of=/dev/sda|"
@@ -266,6 +275,54 @@ test_filesystem_attacks() {
     for attack in "${attacks[@]}"; do
         IFS='|' read -r cmd code <<< "$attack"
         test_attack_blocked "Filesystem: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
+# ATTACK VECTORS - Disk/Volume Destruction
+# ============================================================================
+
+test_disk_attacks() {
+    print_header "Disk & Volume Destruction Attacks"
+
+    local attacks=(
+        "wipefs -a /dev/sda|DISK_WIPE"
+        "sfdisk /dev/sda|DISK_WIPE"
+        "fdisk /dev/sda|DISK_WIPE"
+        "parted /dev/sda mklabel gpt|DISK_WIPE"
+        "sgdisk --zap-all /dev/sda|DISK_WIPE"
+        "blkdiscard /dev/nvme0n1|DISK_WIPE"
+        "pvremove /dev/sda2|DISK_WIPE"
+        "vgremove --force vg0|DISK_WIPE"
+        "lvremove -f /dev/vg0/lv0|DISK_WIPE"
+        "cryptsetup luksFormat /dev/sda2|DISK_WIPE"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Disk: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
+# ATTACK VECTORS - Permission Tampering
+# ============================================================================
+
+test_permission_attacks() {
+    print_header "Permission Tampering Attacks"
+
+    local attacks=(
+        "chmod -R 777 /|DANGEROUS_PERMISSIONS"
+        "chmod -R 000 /|DANGEROUS_PERMISSIONS"
+        "chmod -R 777 /etc|DANGEROUS_PERMISSIONS"
+        "chown -R root:root /|DANGEROUS_PERMISSIONS"
+        "chown -R 0:0 /etc|DANGEROUS_PERMISSIONS"
+        "chown -R root /var/log|DANGEROUS_PERMISSIONS"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Permissions: $cmd" "$cmd" "$code"
     done
 }
 
@@ -387,6 +444,110 @@ test_git_attacks() {
 }
 
 # ============================================================================
+# ATTACK VECTORS - Container Cleanup Attacks
+# ============================================================================
+
+test_container_attacks() {
+    print_header "Container Destruction Attacks"
+
+    local attacks=(
+        "docker system prune -a|DESTRUCTIVE_CONTAINER_OP"
+        "docker rm -f \$(docker ps -aq)|DESTRUCTIVE_CONTAINER_OP"
+        "docker rmi -f \$(docker images -q)|DESTRUCTIVE_CONTAINER_OP"
+        "docker image prune -a|DESTRUCTIVE_CONTAINER_OP"
+        "docker volume rm \$(docker volume ls -q)|DESTRUCTIVE_CONTAINER_OP"
+        "docker volume prune|DESTRUCTIVE_CONTAINER_OP"
+        "docker network prune|DESTRUCTIVE_CONTAINER_OP"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Container: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
+# ATTACK VECTORS - Kubernetes Attacks
+# ============================================================================
+
+test_kubernetes_attacks() {
+    print_header "Kubernetes Destruction Attacks"
+
+    local attacks=(
+        "kubectl delete namespace production|DESTRUCTIVE_K8S_OP"
+        "kubectl delete pods --all -n prod|DESTRUCTIVE_K8S_OP"
+        "kubectl delete deployments --all|DESTRUCTIVE_K8S_OP"
+        "kubectl delete pvc --all|DESTRUCTIVE_K8S_OP"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Kubernetes: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
+# ATTACK VECTORS - Cloud Storage Attacks
+# ============================================================================
+
+test_cloud_storage_attacks() {
+    print_header "Cloud Storage Destruction Attacks"
+
+    local attacks=(
+        "aws s3 rm s3://prod-bucket --recursive|DESTRUCTIVE_CLOUD_STORAGE"
+        "gsutil rm -r gs://prod-bucket|DESTRUCTIVE_CLOUD_STORAGE"
+        "az storage blob delete-batch -s prod|DESTRUCTIVE_CLOUD_STORAGE"
+        "rclone purge remote:prod|DESTRUCTIVE_CLOUD_STORAGE"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Cloud Storage: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
+# ATTACK VECTORS - Infrastructure Destruction
+# ============================================================================
+
+test_infra_attacks() {
+    print_header "Infrastructure Destruction Attacks"
+
+    local attacks=(
+        "terraform destroy -auto-approve|DESTRUCTIVE_INFRA"
+        "pulumi destroy -y|DESTRUCTIVE_INFRA"
+        "helm uninstall production|DESTRUCTIVE_INFRA"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Infra: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
+# ATTACK VECTORS - Package Removal
+# ============================================================================
+
+test_package_attacks() {
+    print_header "Package Removal Attacks"
+
+    local attacks=(
+        "apt-get remove --purge openssh-server|DESTRUCTIVE_PACKAGE_REMOVAL"
+        "apt purge docker.io|DESTRUCTIVE_PACKAGE_REMOVAL"
+        "yum remove kernel|DESTRUCTIVE_PACKAGE_REMOVAL"
+        "dnf remove glibc|DESTRUCTIVE_PACKAGE_REMOVAL"
+        "pacman -Rns linux|DESTRUCTIVE_PACKAGE_REMOVAL"
+        "apk del openssl|DESTRUCTIVE_PACKAGE_REMOVAL"
+    )
+
+    for attack in "${attacks[@]}"; do
+        IFS='|' read -r cmd code <<< "$attack"
+        test_attack_blocked "Packages: $cmd" "$cmd" "$code"
+    done
+}
+
+# ============================================================================
 # ATTACK VECTORS - Command Injection
 # ============================================================================
 
@@ -498,10 +659,17 @@ test_execution_sandboxing() {
 # ============================================================================
 
 main() {
+    local suite_title="Vectra Guard - Destructive Test Suite"
+    local suite_subtitle="Attempting to break the security system..."
+    if [ "${EXTENDED_MODE:-false}" = "true" ]; then
+        suite_title="Vectra Guard - Extended Test Suite"
+        suite_subtitle="Comprehensive security testing"
+    fi
+
     echo -e "${RED}"
     echo "╔═══════════════════════════════════════════════════════════╗"
-    echo "║     Vectra Guard - Destructive Test Suite               ║"
-    echo "║     Attempting to break the security system...           ║"
+    printf "║     %-55s║\n" "$suite_title"
+    printf "║     %-55s║\n" "$suite_subtitle"
     echo "╚═══════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
     
@@ -522,6 +690,8 @@ main() {
     
     # Run attack vector tests
     test_filesystem_attacks
+    test_disk_attacks
+    test_permission_attacks
     test_process_attacks
     
     if [ "$QUICK_MODE" = false ]; then
@@ -529,6 +699,11 @@ main() {
         test_privilege_attacks
         test_database_attacks
         test_git_attacks
+        test_container_attacks
+        test_kubernetes_attacks
+        test_cloud_storage_attacks
+        test_infra_attacks
+        test_package_attacks
         test_injection_attacks
         test_path_traversal_attacks
         test_env_attacks
@@ -559,4 +734,3 @@ main() {
 
 # Run main
 main "$@"
-

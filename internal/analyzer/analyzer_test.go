@@ -42,8 +42,8 @@ func TestNonStandardExtensionAddsFinding(t *testing.T) {
 
 func TestGitForcePushDetection(t *testing.T) {
 	tests := []struct {
-		name     string
-		script   string
+		name       string
+		script     string
 		shouldFind bool
 	}{
 		{"force push long", "git push --force origin main", true},
@@ -51,9 +51,9 @@ func TestGitForcePushDetection(t *testing.T) {
 		{"normal push", "git push origin main", false},
 		{"hard reset", "git reset --hard HEAD~1", true},
 	}
-	
+
 	policy := config.PolicyConfig{MonitorGitOps: true, BlockForceGit: true}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
@@ -73,9 +73,9 @@ func TestGitForcePushDetection(t *testing.T) {
 
 func TestDestructiveSQLDetection(t *testing.T) {
 	tests := []struct {
-		name          string
-		script        string
-		shouldFind    bool
+		name            string
+		script          string
+		shouldFind      bool
 		onlyDestructive bool
 	}{
 		{"drop table", "mysql -e 'DROP TABLE users'", true, true},
@@ -83,7 +83,7 @@ func TestDestructiveSQLDetection(t *testing.T) {
 		{"delete query", "psql -c 'DELETE FROM users WHERE id=1'", true, true},
 		{"select with flag off", "mysql -e 'SELECT * FROM users'", true, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			policy := config.PolicyConfig{OnlyDestructiveSQL: tt.onlyDestructive}
@@ -114,12 +114,12 @@ func TestProductionEnvironmentDetection(t *testing.T) {
 		{"dev environment", "export ENV=development", false},
 		{"prod in comment", "# this is for prod later", false},
 	}
-	
+
 	policy := config.PolicyConfig{
 		DetectProdEnv:   true,
 		ProdEnvPatterns: []string{"prod", "production", "staging", "stg"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
@@ -145,14 +145,14 @@ func TestGitProdCombination(t *testing.T) {
 		DetectProdEnv:   true,
 		ProdEnvPatterns: []string{"production", "prod"},
 	}
-	
+
 	findings := AnalyzeScript("test.sh", []byte(script), policy)
-	
+
 	// Should have findings
 	if len(findings) == 0 {
 		t.Fatal("expected findings for force push to production")
 	}
-	
+
 	// Should be critical severity
 	foundCritical := false
 	for _, f := range findings {
@@ -161,7 +161,7 @@ func TestGitProdCombination(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !foundCritical {
 		t.Error("expected critical severity for force push to production")
 	}
@@ -174,9 +174,9 @@ func TestDestructiveSQLInProduction(t *testing.T) {
 		DetectProdEnv:      true,
 		ProdEnvPatterns:    []string{"prod"},
 	}
-	
+
 	findings := AnalyzeScript("test.sh", []byte(script), policy)
-	
+
 	foundCritical := false
 	for _, f := range findings {
 		if f.Code == "DATABASE_OPERATION" && f.Severity == "critical" {
@@ -184,7 +184,7 @@ func TestDestructiveSQLInProduction(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !foundCritical {
 		t.Error("expected critical severity for destructive SQL in production")
 	}
@@ -252,9 +252,9 @@ func TestGitOperationsDisabledByConfig(t *testing.T) {
 	policy := config.PolicyConfig{
 		MonitorGitOps: false, // Disabled
 	}
-	
+
 	findings := AnalyzeScript("test.sh", []byte(script), policy)
-	
+
 	for _, f := range findings {
 		if f.Code == "RISKY_GIT_OPERATION" {
 			t.Error("git operations should not be monitored when disabled")
@@ -267,9 +267,9 @@ func TestProdDetectionDisabledByConfig(t *testing.T) {
 	policy := config.PolicyConfig{
 		DetectProdEnv: false, // Disabled
 	}
-	
+
 	findings := AnalyzeScript("test.sh", []byte(script), policy)
-	
+
 	for _, f := range findings {
 		if f.Code == "PRODUCTION_ENVIRONMENT" {
 			t.Error("production detection should not trigger when disabled")
@@ -290,9 +290,9 @@ func TestMultipleSQLOperations(t *testing.T) {
 		{"GRANT", "psql -c 'GRANT ALL ON database TO user'", true, "high"},
 		{"REVOKE", "mysql -e 'REVOKE ALL FROM user'", true, "high"},
 	}
-	
+
 	policy := config.PolicyConfig{OnlyDestructiveSQL: true}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
@@ -314,10 +314,10 @@ func TestMultipleSQLOperations(t *testing.T) {
 
 func TestGitOperationsSeverityEscalation(t *testing.T) {
 	tests := []struct {
-		name           string
-		script         string
-		baseSeverity   string
-		prodSeverity   string
+		name         string
+		script       string
+		baseSeverity string
+		prodSeverity string
 	}{
 		{
 			name:         "force push - high to critical with BlockForceGit",
@@ -332,7 +332,7 @@ func TestGitOperationsSeverityEscalation(t *testing.T) {
 			prodSeverity: "high",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Test without production
@@ -341,7 +341,7 @@ func TestGitOperationsSeverityEscalation(t *testing.T) {
 				BlockForceGit: true,
 				DetectProdEnv: false,
 			}
-			
+
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
 			if len(findings) > 0 {
 				baseSev := findings[0].Severity
@@ -349,7 +349,7 @@ func TestGitOperationsSeverityEscalation(t *testing.T) {
 					t.Errorf("base severity: expected %s, got %s", tt.baseSeverity, baseSev)
 				}
 			}
-			
+
 			// Test with production
 			policyProd := config.PolicyConfig{
 				MonitorGitOps:   true,
@@ -357,10 +357,10 @@ func TestGitOperationsSeverityEscalation(t *testing.T) {
 				DetectProdEnv:   true,
 				ProdEnvPatterns: []string{"prod"},
 			}
-			
+
 			scriptProd := tt.script + " production"
 			findingsProd := AnalyzeScript("test.sh", []byte(scriptProd), policyProd)
-			
+
 			foundCorrectSeverity := false
 			for _, f := range findingsProd {
 				if f.Code == "RISKY_GIT_OPERATION" && f.Severity == tt.prodSeverity {
@@ -368,7 +368,7 @@ func TestGitOperationsSeverityEscalation(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if !foundCorrectSeverity {
 				t.Errorf("production severity: expected %s", tt.prodSeverity)
 			}
@@ -384,7 +384,7 @@ git push --force origin production
 mysql -h prod-db.example.com -e "DROP TABLE cache"
 rm -rf /tmp/old_data
 `
-	
+
 	policy := config.PolicyConfig{
 		MonitorGitOps:      true,
 		BlockForceGit:      true,
@@ -392,27 +392,27 @@ rm -rf /tmp/old_data
 		ProdEnvPatterns:    []string{"prod", "production"},
 		OnlyDestructiveSQL: true,
 	}
-	
+
 	findings := AnalyzeScript("deploy.sh", []byte(script), policy)
-	
+
 	// Should find multiple issues
 	if len(findings) < 3 {
 		t.Errorf("expected at least 3 findings, got %d", len(findings))
 	}
-	
+
 	// Check for expected codes
 	codes := make(map[string]bool)
 	for _, f := range findings {
 		codes[f.Code] = true
 	}
-	
+
 	expectedCodes := []string{"PRODUCTION_ENVIRONMENT", "RISKY_GIT_OPERATION", "DATABASE_OPERATION"}
 	for _, code := range expectedCodes {
 		if !codes[code] {
 			t.Errorf("expected to find code %s", code)
 		}
 	}
-	
+
 	// At least one should be critical
 	hasCritical := false
 	for _, f := range findings {
@@ -428,14 +428,14 @@ rm -rf /tmp/old_data
 
 func TestCustomProdPatterns(t *testing.T) {
 	script := "kubectl apply -f uat-deployment.yaml"
-	
+
 	policy := config.PolicyConfig{
 		DetectProdEnv:   true,
 		ProdEnvPatterns: []string{"uat", "preprod"}, // Custom patterns
 	}
-	
+
 	findings := AnalyzeScript("test.sh", []byte(script), policy)
-	
+
 	found := false
 	for _, f := range findings {
 		if f.Code == "PRODUCTION_ENVIRONMENT" && f.Description == "Production or staging environment detected: UAT" {
@@ -443,7 +443,7 @@ func TestCustomProdPatterns(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Error("custom production pattern 'uat' should be detected")
 	}
@@ -461,25 +461,25 @@ func TestNoFalsePositivesForSafeOperations(t *testing.T) {
 		// Note: "echo 'production' > config.txt" will trigger prod detection
 		// because it has both "production" and redirection operator ">"
 		// This is intentional - writing to config files with prod in the command is suspicious
-		"cat production.log",  // Just reading a file - should be safe
+		"cat production.log",     // Just reading a file - should be safe
 		"ls /var/log/production", // Just listing files - should be safe
 	}
-	
+
 	policy := config.PolicyConfig{
 		MonitorGitOps:      true,
 		DetectProdEnv:      true,
 		OnlyDestructiveSQL: true,
 		ProdEnvPatterns:    []string{"prod", "production"},
 	}
-	
+
 	for _, script := range safeScripts {
 		t.Run(script, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(script), policy)
-			
+
 			// Should have no high or critical findings for safe operations
 			for _, f := range findings {
 				if f.Severity == "high" || f.Severity == "critical" {
-					t.Errorf("safe script triggered high/critical finding: %s - %s", 
+					t.Errorf("safe script triggered high/critical finding: %s - %s",
 						f.Code, f.Description)
 				}
 			}
@@ -520,16 +520,16 @@ func TestProdDetectionEdgeCases(t *testing.T) {
 			reason:     "setting production environment variable",
 		},
 	}
-	
+
 	policy := config.PolicyConfig{
 		DetectProdEnv:   true,
 		ProdEnvPatterns: []string{"production"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
-			
+
 			foundProdWarning := false
 			for _, f := range findings {
 				if f.Code == "PRODUCTION_ENVIRONMENT" {
@@ -537,7 +537,7 @@ func TestProdDetectionEdgeCases(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if foundProdWarning != tt.shouldFlag {
 				t.Errorf("%s: expected flag=%v (reason: %s), got flag=%v",
 					tt.name, tt.shouldFlag, tt.reason, foundProdWarning)
@@ -568,7 +568,7 @@ func TestEdgeCases(t *testing.T) {
 			policy: config.PolicyConfig{},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Should not panic
@@ -583,143 +583,143 @@ func TestEdgeCases(t *testing.T) {
 // that catches all variations of destructive rm commands (the incident scenario)
 func TestEnhancedDestructiveCommandDetection(t *testing.T) {
 	tests := []struct {
-		name           string
-		script         string
-		shouldDetect   bool
-		expectedCode   string
+		name             string
+		script           string
+		shouldDetect     bool
+		expectedCode     string
 		expectedSeverity string
 	}{
 		// Original pattern (already tested, but included for completeness)
 		{
-			name:           "rm -rf / (original)",
-			script:         "rm -rf /",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf / (original)",
+			script:           "rm -rf /",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		// The incident scenario - this is what we're fixing
 		{
-			name:           "rm -r /* (incident scenario)",
-			script:         "rm -r /*",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -r /* (incident scenario)",
+			script:           "rm -r /*",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /* (with wildcard)",
-			script:         "rm -rf /*",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /* (with wildcard)",
+			script:           "rm -rf /*",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -r / (without force)",
-			script:         "rm -r /",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -r / (without force)",
+			script:           "rm -r /",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf / (with trailing space)",
-			script:         "rm -rf / ",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf / (with trailing space)",
+			script:           "rm -rf / ",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -r / * (space between)",
-			script:         "rm -r / *",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -r / * (space between)",
+			script:           "rm -r / *",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		// System directory targets
 		{
-			name:           "rm -rf /bin",
-			script:         "rm -rf /bin",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /bin",
+			script:           "rm -rf /bin",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /usr",
-			script:         "rm -rf /usr",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /usr",
+			script:           "rm -rf /usr",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /etc",
-			script:         "rm -rf /etc",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /etc",
+			script:           "rm -rf /etc",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /var",
-			script:         "rm -rf /var",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /var",
+			script:           "rm -rf /var",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /opt",
-			script:         "rm -rf /opt",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /opt",
+			script:           "rm -rf /opt",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /sbin",
-			script:         "rm -rf /sbin",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /sbin",
+			script:           "rm -rf /sbin",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /lib",
-			script:         "rm -rf /lib",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /lib",
+			script:           "rm -rf /lib",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		{
-			name:           "rm -rf /root",
-			script:         "rm -rf /root",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_ROOT",
+			name:             "rm -rf /root",
+			script:           "rm -rf /root",
+			shouldDetect:     true,
+			expectedCode:     "DANGEROUS_DELETE_ROOT",
 			expectedSeverity: "critical",
 		},
 		// Safe operations (should not trigger)
 		{
-			name:           "rm -rf ./tmp (safe - relative path)",
-			script:         "rm -rf ./tmp",
-			shouldDetect:   false,
-			expectedCode:   "",
+			name:             "rm -rf ./tmp (safe - relative path)",
+			script:           "rm -rf ./tmp",
+			shouldDetect:     false,
+			expectedCode:     "",
 			expectedSeverity: "",
 		},
 		{
-			name:           "rm -rf /tmp/test (safe - specific subdirectory)",
-			script:         "rm -rf /tmp/test",
-			shouldDetect:   false,
-			expectedCode:   "",
+			name:             "rm -rf /tmp/test (safe - specific subdirectory)",
+			script:           "rm -rf /tmp/test",
+			shouldDetect:     false,
+			expectedCode:     "",
 			expectedSeverity: "",
 		},
 		{
-			name:           "rm file.txt (safe - single file)",
-			script:         "rm file.txt",
-			shouldDetect:   false,
-			expectedCode:   "",
+			name:             "rm file.txt (safe - single file)",
+			script:           "rm file.txt",
+			shouldDetect:     false,
+			expectedCode:     "",
 			expectedSeverity: "",
 		},
 	}
-	
+
 	policy := config.PolicyConfig{}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
-			
+
 			found := false
 			for _, f := range findings {
 				if f.Code == tt.expectedCode {
@@ -730,9 +730,9 @@ func TestEnhancedDestructiveCommandDetection(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if found != tt.shouldDetect {
-				t.Errorf("expected detection=%v, got=%v for script: %s", 
+				t.Errorf("expected detection=%v, got=%v for script: %s",
 					tt.shouldDetect, found, tt.script)
 			}
 		})
@@ -742,43 +742,43 @@ func TestEnhancedDestructiveCommandDetection(t *testing.T) {
 // TestHomeDirectoryDeletionDetection tests detection of dangerous home directory operations
 func TestHomeDirectoryDeletionDetection(t *testing.T) {
 	tests := []struct {
-		name           string
-		script         string
-		shouldDetect   bool
-		expectedCode   string
+		name         string
+		script       string
+		shouldDetect bool
+		expectedCode string
 	}{
 		{
-			name:           "rm -rf ~/* (home wildcard)",
-			script:         "rm -rf ~/*",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_HOME",
+			name:         "rm -rf ~/* (home wildcard)",
+			script:       "rm -rf ~/*",
+			shouldDetect: true,
+			expectedCode: "DANGEROUS_DELETE_HOME",
 		},
 		{
-			name:           "rm -r ~/* (home wildcard without force)",
-			script:         "rm -r ~/*",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_HOME",
+			name:         "rm -r ~/* (home wildcard without force)",
+			script:       "rm -r ~/*",
+			shouldDetect: true,
+			expectedCode: "DANGEROUS_DELETE_HOME",
 		},
 		{
-			name:           "rm -rf $HOME/* (home env var)",
-			script:         "rm -rf $HOME/*",
-			shouldDetect:   true,
-			expectedCode:   "DANGEROUS_DELETE_HOME",
+			name:         "rm -rf $HOME/* (home env var)",
+			script:       "rm -rf $HOME/*",
+			shouldDetect: true,
+			expectedCode: "DANGEROUS_DELETE_HOME",
 		},
 		{
-			name:           "rm -rf ~/specific_dir (safe - specific directory)",
-			script:         "rm -rf ~/specific_dir",
-			shouldDetect:   false,
-			expectedCode:   "",
+			name:         "rm -rf ~/specific_dir (safe - specific directory)",
+			script:       "rm -rf ~/specific_dir",
+			shouldDetect: false,
+			expectedCode: "",
 		},
 	}
-	
+
 	policy := config.PolicyConfig{}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
-			
+
 			found := false
 			for _, f := range findings {
 				if f.Code == tt.expectedCode {
@@ -786,10 +786,103 @@ func TestHomeDirectoryDeletionDetection(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if found != tt.shouldDetect {
-				t.Errorf("expected detection=%v, got=%v for script: %s", 
+				t.Errorf("expected detection=%v, got=%v for script: %s",
 					tt.shouldDetect, found, tt.script)
+			}
+		})
+	}
+}
+
+func TestOperationalDestructionDetection(t *testing.T) {
+	tests := []struct {
+		name             string
+		script           string
+		expectedCode     string
+		expectedSeverity string
+	}{
+		{
+			name:             "disk wipe command",
+			script:           "wipefs -a /dev/sda",
+			expectedCode:     "DISK_WIPE",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             "volume removal command",
+			script:           "vgremove --force vg0",
+			expectedCode:     "DISK_WIPE",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             "cryptsetup luksformat command",
+			script:           "cryptsetup luksFormat /dev/sda2",
+			expectedCode:     "DISK_WIPE",
+			expectedSeverity: "critical",
+		},
+		{
+			name:             "recursive chmod on root",
+			script:           "chmod -R 777 /",
+			expectedCode:     "DANGEROUS_PERMISSIONS",
+			expectedSeverity: "high",
+		},
+		{
+			name:             "recursive chown on /etc",
+			script:           "chown -R root:root /etc",
+			expectedCode:     "DANGEROUS_PERMISSIONS",
+			expectedSeverity: "high",
+		},
+		{
+			name:             "docker system prune",
+			script:           "docker system prune -a",
+			expectedCode:     "DESTRUCTIVE_CONTAINER_OP",
+			expectedSeverity: "high",
+		},
+		{
+			name:             "kubectl delete namespace",
+			script:           "kubectl delete namespace production",
+			expectedCode:     "DESTRUCTIVE_K8S_OP",
+			expectedSeverity: "high",
+		},
+		{
+			name:             "terraform destroy",
+			script:           "terraform destroy -auto-approve",
+			expectedCode:     "DESTRUCTIVE_INFRA",
+			expectedSeverity: "high",
+		},
+		{
+			name:             "cloud storage delete",
+			script:           "aws s3 rm s3://prod-bucket --recursive",
+			expectedCode:     "DESTRUCTIVE_CLOUD_STORAGE",
+			expectedSeverity: "high",
+		},
+		{
+			name:             "package removal",
+			script:           "apt-get remove --purge openssh-server",
+			expectedCode:     "DESTRUCTIVE_PACKAGE_REMOVAL",
+			expectedSeverity: "high",
+		},
+	}
+
+	policy := config.PolicyConfig{}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := AnalyzeScript("test.sh", []byte(tt.script), policy)
+
+			found := false
+			for _, f := range findings {
+				if f.Code == tt.expectedCode {
+					found = true
+					if f.Severity != tt.expectedSeverity {
+						t.Errorf("expected severity %s, got %s", tt.expectedSeverity, f.Severity)
+					}
+					break
+				}
+			}
+
+			if !found {
+				t.Fatalf("expected finding %s for script: %s", tt.expectedCode, tt.script)
 			}
 		})
 	}

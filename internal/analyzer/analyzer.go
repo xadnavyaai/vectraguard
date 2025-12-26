@@ -76,8 +76,17 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				"rm -rf /dev",   // System directories
 				"rm -rf /boot",  // System directories
 				"rm -rf /root",  // Root home directory
+				"rm -rf /lib64", // System directories
+				"rm -rf /usr/local",
+				"rm -rf /home",
+				"rm -rf /srv",
+				"rm -rf /var/log",
+				"rm -rf /etc/ssh",
+				"rm -rf /system",
+				"rm -rf /library",
+				"rm -rf /applications",
 			}
-			
+
 			for _, pattern := range rootDeletePatterns {
 				if strings.Contains(lower, pattern) {
 					findings = append(findings, Finding{
@@ -90,7 +99,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 					break // Only report once
 				}
 			}
-			
+
 			// Check for home directory deletion patterns
 			// Pattern: rm -rf ~/* or rm -rf $HOME/* (could delete user's entire home)
 			homeDeletePatterns := []string{
@@ -107,7 +116,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				"rm -rf $home/ *",
 				"rm -r $home/ *",
 			}
-			
+
 			for _, pattern := range homeDeletePatterns {
 				if strings.Contains(lower, pattern) {
 					findings = append(findings, Finding{
@@ -121,6 +130,125 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				}
 			}
 		}
+
+		// Destructive disk operations
+		diskWipeKeywords := []string{
+			"wipefs", "sfdisk", "fdisk", "parted", "sgdisk", "blkdiscard",
+			"pvremove", "vgremove", "lvremove",
+		}
+		if containsAnyWord(lower, diskWipeKeywords) ||
+			(strings.Contains(lower, "cryptsetup") && strings.Contains(lower, "luksformat")) {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "DISK_WIPE",
+				Description:    "Destructive disk or volume operation detected",
+				Line:           lineNum,
+				Recommendation: "BLOCK this command. It can destroy filesystems or volumes irreversibly.",
+			})
+		}
+
+		// Destructive permission changes on system paths
+		if strings.Contains(lower, "chmod -r") || strings.Contains(lower, "chmod -R") {
+			if containsSystemPath(strings.Fields(lower)) {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "DANGEROUS_PERMISSIONS",
+					Description:    "Recursive chmod on system path detected",
+					Line:           lineNum,
+					Recommendation: "Avoid recursive permission changes on system paths. Scope to specific files.",
+				})
+			}
+		}
+		if strings.Contains(lower, "chown -r") || strings.Contains(lower, "chown -R") {
+			if containsSystemPath(strings.Fields(lower)) {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "DANGEROUS_PERMISSIONS",
+					Description:    "Recursive chown on system path detected",
+					Line:           lineNum,
+					Recommendation: "Avoid recursive ownership changes on system paths. Scope to specific files.",
+				})
+			}
+		}
+
+		// Destructive container cleanup operations
+		containerDestructivePatterns := []string{
+			"docker system prune", "docker rm -f", "docker rmi -f",
+			"docker image prune -a", "docker volume rm", "docker volume prune",
+			"docker network prune",
+		}
+		for _, pattern := range containerDestructivePatterns {
+			if strings.Contains(lower, pattern) {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "DESTRUCTIVE_CONTAINER_OP",
+					Description:    "Destructive container operation detected",
+					Line:           lineNum,
+					Recommendation: "Review container cleanup commands; they can delete images, volumes, or networks.",
+				})
+				break
+			}
+		}
+
+		// Destructive Kubernetes operations
+		if strings.Contains(lower, "kubectl delete") &&
+			(strings.Contains(lower, "--all") || strings.Contains(lower, "namespace") ||
+				strings.Contains(lower, "--all-namespaces")) {
+			findings = append(findings, Finding{
+				Severity:       "high",
+				Code:           "DESTRUCTIVE_K8S_OP",
+				Description:    "Destructive Kubernetes delete operation detected",
+				Line:           lineNum,
+				Recommendation: "Avoid bulk delete operations; require approval and verify target namespace.",
+			})
+		}
+
+		// Destructive cloud storage operations
+		if (strings.Contains(lower, "aws s3 rm") && strings.Contains(lower, "--recursive")) ||
+			(strings.Contains(lower, "gsutil rm") && strings.Contains(lower, "-r")) ||
+			strings.Contains(lower, "az storage blob delete-batch") ||
+			strings.Contains(lower, "rclone purge") {
+			findings = append(findings, Finding{
+				Severity:       "high",
+				Code:           "DESTRUCTIVE_CLOUD_STORAGE",
+				Description:    "Destructive cloud storage operation detected",
+				Line:           lineNum,
+				Recommendation: "Use dry runs or retention policies before deleting cloud storage.",
+			})
+		}
+
+		// Destructive infrastructure operations
+		if strings.Contains(lower, "terraform destroy") ||
+			strings.Contains(lower, "pulumi destroy") ||
+			strings.Contains(lower, "helm uninstall") ||
+			strings.Contains(lower, "helm delete") {
+			findings = append(findings, Finding{
+				Severity:       "high",
+				Code:           "DESTRUCTIVE_INFRA",
+				Description:    "Destructive infrastructure operation detected",
+				Line:           lineNum,
+				Recommendation: "Require approval before running infrastructure destroy or uninstall commands.",
+			})
+		}
+
+		// Destructive package removal operations
+		packageRemovalPatterns := []string{
+			"apt-get remove", "apt remove", "apt-get purge", "apt purge",
+			"yum remove", "dnf remove", "pacman -r", "apk del",
+		}
+		for _, pattern := range packageRemovalPatterns {
+			if strings.Contains(lower, pattern) {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "DESTRUCTIVE_PACKAGE_REMOVAL",
+					Description:    "Package removal operation detected",
+					Line:           lineNum,
+					Recommendation: "Ensure package removal is intended and scoped. Use dry runs where possible.",
+				})
+				break
+			}
+		}
+
 		if strings.Contains(lower, "sudo ") {
 			findings = append(findings, Finding{
 				Severity:       "medium",
@@ -202,24 +330,24 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				desc     string
 				rec      string
 			}{
-				"git push --force":     {"high", "Force push detected - can overwrite remote history", "Use --force-with-lease instead or coordinate with team before force pushing."},
-				"git push -f":          {"high", "Force push detected - can overwrite remote history", "Use --force-with-lease instead or coordinate with team before force pushing."},
-				"git reset --hard":     {"medium", "Hard reset detected - will discard local changes", "Ensure you have backups or stash important changes first."},
-				"git clean -fd":        {"medium", "Git clean with force - will delete untracked files", "Review untracked files before cleaning. Consider using -n flag first for dry run."},
-				"git branch -D":        {"medium", "Force branch deletion detected", "Ensure branch is merged or no longer needed before force deleting."},
-				"git branch -d":        {"low", "Branch deletion detected", "Verify branch is fully merged before deletion."},
-				"git rebase":           {"low", "Git rebase detected - will rewrite commit history", "Only rebase local commits. Never rebase published commits."},
-				"git filter-branch":    {"high", "Git filter-branch - rewrites entire repository history", "Extremely dangerous. Coordinate with entire team and backup repository first."},
-				"git filter-repo":      {"high", "Git filter-repo - rewrites entire repository history", "Extremely dangerous. Coordinate with entire team and backup repository first."},
-				"git reflog expire":    {"high", "Reflog expiration - will permanently delete commit references", "Only use if you know what you're doing. Lost commits cannot be recovered."},
-				"git gc --aggressive":  {"medium", "Aggressive garbage collection - may make recovery difficult", "Ensure no important dangling commits exist before running."},
-				"git update-ref -d":    {"high", "Direct ref manipulation detected", "Advanced operation. Ensure you understand git internals before proceeding."},
+				"git push --force":    {"high", "Force push detected - can overwrite remote history", "Use --force-with-lease instead or coordinate with team before force pushing."},
+				"git push -f":         {"high", "Force push detected - can overwrite remote history", "Use --force-with-lease instead or coordinate with team before force pushing."},
+				"git reset --hard":    {"medium", "Hard reset detected - will discard local changes", "Ensure you have backups or stash important changes first."},
+				"git clean -fd":       {"medium", "Git clean with force - will delete untracked files", "Review untracked files before cleaning. Consider using -n flag first for dry run."},
+				"git branch -D":       {"medium", "Force branch deletion detected", "Ensure branch is merged or no longer needed before force deleting."},
+				"git branch -d":       {"low", "Branch deletion detected", "Verify branch is fully merged before deletion."},
+				"git rebase":          {"low", "Git rebase detected - will rewrite commit history", "Only rebase local commits. Never rebase published commits."},
+				"git filter-branch":   {"high", "Git filter-branch - rewrites entire repository history", "Extremely dangerous. Coordinate with entire team and backup repository first."},
+				"git filter-repo":     {"high", "Git filter-repo - rewrites entire repository history", "Extremely dangerous. Coordinate with entire team and backup repository first."},
+				"git reflog expire":   {"high", "Reflog expiration - will permanently delete commit references", "Only use if you know what you're doing. Lost commits cannot be recovered."},
+				"git gc --aggressive": {"medium", "Aggressive garbage collection - may make recovery difficult", "Ensure no important dangling commits exist before running."},
+				"git update-ref -d":   {"high", "Direct ref manipulation detected", "Advanced operation. Ensure you understand git internals before proceeding."},
 			}
-			
+
 			for pattern, info := range gitRiskyOps {
 				if strings.Contains(lower, pattern) {
 					severity := info.severity
-					
+
 					// Elevate severity if production environment detected
 					if policy.DetectProdEnv {
 						for _, env := range policy.ProdEnvPatterns {
@@ -234,12 +362,12 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 							}
 						}
 					}
-					
+
 					// Block force operations if configured
 					if policy.BlockForceGit && (strings.Contains(pattern, "--force") || strings.Contains(pattern, "-f")) {
 						severity = "critical"
 					}
-					
+
 					findings = append(findings, Finding{
 						Severity:       severity,
 						Code:           "RISKY_GIT_OPERATION",
@@ -253,7 +381,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 		}
 
 		// SQL/NoSQL database command detection (refined to only flag destructive operations)
-		dbCommands := []string{"mysql", "psql", "sqlite", "sqlcmd", "mongo", "mongosh", 
+		dbCommands := []string{"mysql", "psql", "sqlite", "sqlcmd", "mongo", "mongosh",
 			"redis-cli", "cassandra", "cql", "dynamodb", "influx", "clickhouse"}
 		if containsAnyWord(lower, dbCommands) {
 			// Check for destructive SQL operations
@@ -265,7 +393,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				"update ", "alter table", "alter database",
 				"grant all", "revoke",
 			}
-			
+
 			isDestructive := false
 			destructiveOp := ""
 			for _, op := range destructiveSQLOps {
@@ -275,12 +403,12 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 					break
 				}
 			}
-			
+
 			// Only flag if destructive OR if OnlyDestructiveSQL is false
 			if isDestructive || !policy.OnlyDestructiveSQL {
 				envSeverity := "medium"
 				envWarning := ""
-				
+
 				// Check for production/staging environment indicators
 				if policy.DetectProdEnv {
 					for _, env := range policy.ProdEnvPatterns {
@@ -291,7 +419,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 						}
 					}
 				}
-				
+
 				if isDestructive {
 					if envSeverity == "high" {
 						envSeverity = "critical"
@@ -299,18 +427,18 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 						envSeverity = "high"
 					}
 				}
-				
+
 				description := "Database command detected"
 				if isDestructive {
 					description = "Destructive database operation detected: " + destructiveOp
 				}
 				description += envWarning
-				
+
 				recommendation := "Review database operation carefully. Use transactions and backups."
 				if envWarning != "" {
 					recommendation += " REQUIRE MANUAL APPROVAL for production changes."
 				}
-				
+
 				findings = append(findings, Finding{
 					Severity:       envSeverity,
 					Code:           "DATABASE_OPERATION",
@@ -327,7 +455,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			if len(envPatterns) == 0 {
 				envPatterns = []string{"prod", "production", "prd", "staging", "stg", "live"}
 			}
-			
+
 			for _, env := range envPatterns {
 				// Look for environment in variable names, paths, URLs, or commands
 				if strings.Contains(lower, env) {
@@ -339,23 +467,23 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 						"ssh", "scp", "rsync", "curl", "wget", "ansible", "terraform",
 						"database", "db", "server", "cluster", "namespace",
 					}
-					
+
 					for _, indicator := range contextIndicators {
 						if strings.Contains(lower, indicator) {
 							inContext = true
 							break
 						}
 					}
-					
+
 					// Also check if env pattern appears in a path-like string
-					if strings.Contains(lower, "/"+env+"/") || 
-					   strings.Contains(lower, "-"+env+"-") ||
-					   strings.Contains(lower, "_"+env+"_") ||
-					   strings.Contains(lower, "."+env+".") ||
-					   strings.Contains(lower, "@"+env) {
+					if strings.Contains(lower, "/"+env+"/") ||
+						strings.Contains(lower, "-"+env+"-") ||
+						strings.Contains(lower, "_"+env+"_") ||
+						strings.Contains(lower, "."+env+".") ||
+						strings.Contains(lower, "@"+env) {
 						inContext = true
 					}
-					
+
 					if inContext {
 						findings = append(findings, Finding{
 							Severity:       "high",
@@ -392,9 +520,9 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			"$db_password", "$database_url", "$private_key", "$auth_token",
 		}
 		for _, pattern := range sensitiveEnvPatterns {
-			if strings.Contains(lower, pattern) || 
-			   strings.Contains(lower, strings.ToUpper(pattern)) ||
-			   strings.Contains(lower, strings.ReplaceAll(pattern, "_", "")) {
+			if strings.Contains(lower, pattern) ||
+				strings.Contains(lower, strings.ToUpper(pattern)) ||
+				strings.Contains(lower, strings.ReplaceAll(pattern, "_", "")) {
 				findings = append(findings, Finding{
 					Severity:       "critical",
 					Code:           "SENSITIVE_ENV_ACCESS",
@@ -408,9 +536,9 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 
 		// .env file operations
 		if (strings.Contains(lower, ".env") || strings.Contains(lower, "dotenv")) &&
-		   (strings.Contains(lower, "cat") || strings.Contains(lower, "less") || 
-		    strings.Contains(lower, "head") || strings.Contains(lower, "tail") ||
-		    strings.Contains(lower, "grep") || strings.Contains(lower, "awk")) {
+			(strings.Contains(lower, "cat") || strings.Contains(lower, "less") ||
+				strings.Contains(lower, "head") || strings.Contains(lower, "tail") ||
+				strings.Contains(lower, "grep") || strings.Contains(lower, "awk")) {
 			findings = append(findings, Finding{
 				Severity:       "critical",
 				Code:           "DOTENV_FILE_READ",
@@ -461,9 +589,31 @@ func containsAnyWord(line string, words []string) bool {
 		cleanWord := strings.TrimFunc(word, func(r rune) bool {
 			return !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_')
 		})
-		
+
 		for _, target := range words {
 			if strings.HasPrefix(strings.ToLower(cleanWord), strings.ToLower(target)) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func containsSystemPath(fields []string) bool {
+	systemPrefixes := []string{
+		"/", "/etc", "/usr", "/bin", "/sbin", "/lib", "/lib64", "/var", "/opt",
+		"/boot", "/root", "/home", "/usr/local", "/var/log", "/srv",
+		"/system", "/library", "/applications",
+	}
+	for _, field := range fields {
+		for _, prefix := range systemPrefixes {
+			if prefix == "/" {
+				if field == "/" {
+					return true
+				}
+				continue
+			}
+			if field == prefix || strings.HasPrefix(field, prefix+"/") {
 				return true
 			}
 		}
