@@ -77,6 +77,27 @@ services:
     networks:
       - test-network
 
+  # Local test service - simulates dev local run (detection only, safe)
+  # Runs in Docker but uses --local mode (only validate, never executes)
+  test-extended-local:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-extended-local
+    volumes:
+      - .:/workspace:rw
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - VECTRA_GUARD_VERSION=test
+      - VECTRAGUARD_CONTAINER=true
+    working_dir: /workspace
+    entrypoint: []
+    command: ["./scripts/test-extended.sh", "--local"]
+    networks:
+      - test-network
+
   # Optional: Test with Docker daemon
   # Note: Docker will automatically build for the host architecture (ARM64 or x86_64)
   test-with-docker:

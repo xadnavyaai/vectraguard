@@ -58,21 +58,52 @@ test-destructive-docker:
 	docker-compose -f docker-compose.test.yml run --rm --no-deps test-destructive
 
 # Extended testing (comprehensive)
+# DEFAULT: Docker mode (safe, isolated)
 test-extended:
+	@echo "⚠️  WARNING: Local testing uses 'validate' only (static analysis, never executes)"
+	@echo "⚠️  For safer testing, use: make test-extended-docker"
+	@echo ""
+	@read -p "Continue with local testing? (y/N) " -n 1 -r; \
+	echo; \
+	if [[ ! $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo "Aborted. Use 'make test-extended-docker' for safe Docker testing."; \
+		exit 1; \
+	fi
 	./scripts/test-extended.sh --local
 
+# SAFE: Docker mode (recommended - all tests in isolated containers)
 test-extended-docker:
 	docker-compose -f docker-compose.test.yml run --rm --no-deps test-extended
 
+# SAFE: Local tests in Docker (simulates dev local run - detection only)
+# Runs in Docker but uses --local mode (only validate, never executes)
+# Perfect for testing detection without execution risks
+test-extended-local-docker:
+	docker-compose -f docker-compose.test.yml run --rm --no-deps test-extended-local
+
+# Alias for convenience
+test-docker-extended: test-extended-docker
+test-local-docker: test-extended-local-docker
+
 test-extended-quick:
+	@echo "⚠️  WARNING: Local testing uses 'validate' only (static analysis, never executes)"
+	@echo "⚠️  For safer testing, use: make test-extended-docker"
+	@echo ""
+	@read -p "Continue with local quick testing? (y/N) " -n 1 -r; \
+	echo; \
+	if [[ ! $$REPLY =~ ^[Yy]$$ ]]; then \
+		echo "Aborted. Use 'make test-extended-docker' for safe Docker testing."; \
+		exit 1; \
+	fi
 	./scripts/test-extended.sh --local --quick
 
+# SAFE: Full two-phase testing (Docker only - no local execution)
 test-extended-full:
 	@echo "Step 1: Testing in Docker (execution verification)..."
-	@make test-extended-docker || (echo "Docker tests failed! Fix issues before local testing." && exit 1)
+	@make test-extended-docker || (echo "Docker tests failed! Fix issues before proceeding." && exit 1)
 	@echo ""
-	@echo "Step 2: Testing locally (detection verification)..."
-	@./scripts/test-extended.sh --local
+	@echo "✅ All Docker tests passed!"
+	@echo "⚠️  Local testing skipped for safety. Use 'make test-extended-docker' for all testing."
 
 # Dev mode setup
 dev-mode:
@@ -102,8 +133,11 @@ help:
 	@echo "  test-destructive - Run destructive test suite locally"
 	@echo "  test-destructive-quick - Run quick destructive tests"
 	@echo "  test-destructive-docker - Run destructive tests in Docker"
-	@echo "  test-extended - Run extended destructive tests locally"
-	@echo "  test-extended-docker - Run extended destructive tests in Docker"
+	@echo "  test-extended - Run extended destructive tests locally (requires confirmation)"
+	@echo "  test-extended-docker - Run extended tests in Docker (execution + detection)"
+	@echo "  test-extended-local-docker - Run local tests in Docker (detection only, safe)"
+	@echo "  test-docker-extended - Alias for test-extended-docker"
+	@echo "  test-local-docker - Alias for test-extended-local-docker"
 	@echo ""
 	@echo "Development:"
 	@echo "  dev-mode      - Setup sandbox-based dev mode (easy setup)"

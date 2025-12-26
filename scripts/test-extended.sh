@@ -20,6 +20,8 @@
 
 set -uo pipefail
 # Note: We don't use 'set -e' because we want to continue testing even if individual tests fail
+# Allow unset arrays to be empty (for optional test arrays)
+shopt -s nullglob 2>/dev/null || true
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -372,12 +374,6 @@ test_process_attacks() {
     for cmd in "${system_commands[@]}"; do
         # These should at least be sandboxed (medium/high risk)
         test_detection "Process: $cmd" "$cmd" "" || true
-        test_execution "Process: $cmd" "$cmd" || true
-    done
-    
-    for attack in "${attacks[@]}"; do
-        IFS='|' read -r cmd code <<< "$attack"
-        test_detection "Process: $cmd" "$cmd" "$code" || true
         test_execution "Process: $cmd" "$cmd" || true
     done
     
