@@ -3,7 +3,7 @@
 
 set -e
 
-VERSION="${1:-v1.0.0}"
+VERSION="${1:-v0.0.1}"
 
 echo "🏗️  Building Vectra Guard $VERSION"
 echo "=================================="

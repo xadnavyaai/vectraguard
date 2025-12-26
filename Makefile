@@ -81,9 +81,21 @@ test-extended-docker:
 test-extended-local-docker:
 	docker-compose -f docker-compose.test.yml run --rm --no-deps test-extended-local
 
+# Release testing - tests the built release binaries in Docker
+# Uses actual release artifacts from dist/ folder
+# Tests Linux binaries inside Docker container (safe, isolated)
+test-release-docker:
+	@if [ ! -d "dist" ] || [ -z "$$(ls -A dist/vectra-guard-linux-* 2>/dev/null)" ]; then \
+		echo "❌ ERROR: Release binaries not found in dist/ folder"; \
+		echo "   Run: ./scripts/build-release.sh v0.0.1"; \
+		exit 1; \
+	fi
+	docker-compose -f docker-compose.test.yml run --rm --no-deps test-release
+
 # Alias for convenience
 test-docker-extended: test-extended-docker
 test-local-docker: test-extended-local-docker
+test-release: test-release-docker
 
 test-extended-quick:
 	@echo "⚠️  WARNING: Local testing uses 'validate' only (static analysis, never executes)"
@@ -149,7 +161,7 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build"
-	@echo "  make build-version VERSION=v0.0.3"
+	@echo "  make build-version VERSION=v0.0.1"
 	@echo "  make test"
 	@echo "  make test-docker"
 	@echo "  make test-docker-security"
