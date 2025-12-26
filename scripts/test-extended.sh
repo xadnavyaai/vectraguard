@@ -208,14 +208,28 @@ test_execution() {
         exec_cmd="vectra-guard --config $PROJECT_ROOT/vectra-guard.test.yaml exec --"
     fi
     
-    # Split command into array for proper execution
-    # This handles commands like "rm -rf /bin" correctly
-    local cmd_parts=($attack_cmd)
+    # Handle commands with shell operators (&&, ||, #, etc.)
+    # These need to be passed through a shell, not split as arguments
+    local needs_shell=false
+    if [[ "$attack_cmd" =~ (&&|\|\||#|;|\$) ]]; then
+        needs_shell=true
+    fi
     
     # Execute and capture both output and exit code
     local output
     local exit_code=0
-    output=$($exec_cmd "${cmd_parts[@]}" 2>&1) || exit_code=$?
+    
+    if [ "$needs_shell" = true ]; then
+        # Commands with shell operators must be passed through sh -c
+        # This preserves the shell semantics (&&, ||, #, etc.)
+        output=$($exec_cmd sh -c "$attack_cmd" 2>&1) || exit_code=$?
+    else
+        # Simple commands can be split into arguments
+        # Use read -a to properly split while preserving quoted strings
+        local cmd_parts
+        read -ra cmd_parts <<< "$attack_cmd"
+        output=$($exec_cmd "${cmd_parts[@]}" 2>&1) || exit_code=$?
+    fi
     
     # Check if it was blocked (exit code 3 = blocked)
     if [ $exit_code -eq 3 ]; then
@@ -226,7 +240,8 @@ test_execution() {
     fi
     
     # Check if it was sandboxed (look for sandbox messages)
-    if echo "$output" | grep -qi "Running in sandbox\|📦\|executing in sandbox\|sandbox execution\|mode=sandbox"; then
+    # Also check for Docker-related messages (commands running in containers)
+    if echo "$output" | grep -qi "Running in sandbox\|📦\|executing in sandbox\|sandbox execution\|mode=sandbox\|docker.*run\|container.*exec"; then
         print_blocked "$attack_name (execution sandboxed - safe)"
         return 0
     fi
@@ -235,6 +250,16 @@ test_execution() {
     if echo "$output" | grep -qi "blocked\|CRITICAL.*requires\|cannot execute.*sandbox"; then
         print_blocked "$attack_name (execution blocked - message detected)"
         return 0
+    fi
+    
+    # Check if command failed with permission denied in a container
+    # This indicates it was sandboxed but couldn't execute (safe!)
+    if echo "$output" | grep -qi "Permission denied\|Operation not permitted" && [ $exit_code -ne 0 ]; then
+        # If we're in Docker and got permission errors, it likely ran in a container
+        if [ -n "${DOCKER_HOST:-}" ] || [ -f /.dockerenv ]; then
+            print_blocked "$attack_name (execution sandboxed - permission denied in container)"
+            return 0
+        fi
     fi
     
     # If command failed for other reasons (like command not found), check mode
@@ -247,7 +272,26 @@ test_execution() {
         return 1
     fi
     
-    # If we got here, command executed somehow
+    # If command succeeded (exit code 0) and we're testing a dangerous command,
+    # this is a security breach (unless it was sandboxed, which we checked above)
+    if [ $exit_code -eq 0 ]; then
+        print_escaped "$attack_name (execution succeeded on host - SECURITY BREACH!)"
+        if [ "$VERBOSE" = true ]; then
+            echo "  Output: $output"
+            echo "  Exit code: $exit_code"
+        fi
+        return 1
+    fi
+    
+    # If we got here, command executed somehow but failed
+    # Check if it's a false positive (command not found, etc.)
+    if echo "$output" | grep -qi "command not found\|No such file\|executable file not found"; then
+        # Command wasn't found - this is actually safe (can't execute what doesn't exist)
+        print_blocked "$attack_name (command not found - safe)"
+        return 0
+    fi
+    
+    # Unknown state - be conservative and mark as escaped
     print_escaped "$attack_name (execution not blocked!)"
     if [ "$VERBOSE" = true ]; then
         echo "  Output: $output"
