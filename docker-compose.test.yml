@@ -55,6 +55,28 @@ services:
     networks:
       - test-network
 
+  # Extended test service - runs the expanded attack vector suite
+  test-extended:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-extended
+    volumes:
+      - .:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - VECTRA_GUARD_VERSION=test
+    privileged: true
+    working_dir: /workspace
+    entrypoint: []
+    command: ["./scripts/test-extended.sh"]
+    networks:
+      - test-network
+
   # Optional: Test with Docker daemon
   # Note: Docker will automatically build for the host architecture (ARM64 or x86_64)
   test-with-docker:
@@ -84,4 +106,3 @@ volumes:
 networks:
   test-network:
     driver: bridge
-

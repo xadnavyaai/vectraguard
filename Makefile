@@ -57,6 +57,13 @@ test-destructive-quick:
 test-destructive-docker:
 	docker-compose -f docker-compose.test.yml run --rm --no-deps test-destructive
 
+# Extended destructive testing
+test-extended:
+	./scripts/test-extended.sh
+
+test-extended-docker:
+	docker-compose -f docker-compose.test.yml run --rm --no-deps test-extended
+
 # Dev mode setup
 dev-mode:
 	./scripts/dev-mode.sh
@@ -85,6 +92,8 @@ help:
 	@echo "  test-destructive - Run destructive test suite locally"
 	@echo "  test-destructive-quick - Run quick destructive tests"
 	@echo "  test-destructive-docker - Run destructive tests in Docker"
+	@echo "  test-extended - Run extended destructive tests locally"
+	@echo "  test-extended-docker - Run extended destructive tests in Docker"
 	@echo ""
 	@echo "Development:"
 	@echo "  dev-mode      - Setup sandbox-based dev mode (easy setup)"
@@ -102,4 +111,3 @@ help:
 	@echo "  make test-docker-security"
 	@echo "  make test-destructive-docker"
 	@echo "  make dev-mode"
-

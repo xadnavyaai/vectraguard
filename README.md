@@ -39,6 +39,9 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 
 > **New to Vectra Guard?** See **[GETTING_STARTED.md](GETTING_STARTED.md)** for a detailed walkthrough!
 
+**One-line safety net:**  
+`vectra-guard exec -- "<your command>"` blocks or sandboxes **200+ risky commands** out of the box.
+
 ### Installation
 
 **Option 1: One-Command Install** (Recommended) ⭐
