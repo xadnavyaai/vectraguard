@@ -15,9 +15,21 @@ build-version:
 	fi
 	go build -ldflags "-X github.com/vectra-guard/vectra-guard/cmd.Version=$(VERSION)" -o vectra-guard .
 
-# Run tests
+# Run tests (local - use with caution)
 test:
 	go test -v ./...
+
+# Run namespace tests (safe - only tests detection logic)
+test-namespace:
+	go test -v ./internal/sandbox/namespace/... ./internal/sandbox/runtime_test.go
+
+# Run namespace tests in Docker (SAFE - recommended)
+test-namespace-docker:
+	docker-compose -f docker-compose.test.yml run --rm --no-deps test-namespace
+
+# Run ALL tests in Docker (SAFE - comprehensive)
+test-all-docker:
+	docker-compose -f docker-compose.test.yml run --rm test-all
 
 # Clean build artifacts
 clean:

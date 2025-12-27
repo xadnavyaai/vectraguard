@@ -1,0 +1,45 @@
+# CI/CD Optimized Configuration
+# Uses Docker for consistency, with caching enabled
+
+guard_level:
+  level: paranoid
+  allow_user_bypass: false
+
+sandbox:
+  enabled: true
+  mode: always              # Always sandbox in CI
+  
+  # Runtime configuration - Docker for consistency
+  runtime: docker           # Use Docker for maximum compatibility
+  image: ubuntu:22.04
+  timeout: 600              # 10 minutes max
+  
+  # Network and caching
+  allow_network: true       # CI often needs network
+  enable_cache: true        # Speed up CI runs
+  
+  # Security (strict for CI)
+  seccomp_profile: strict   # Block all dangerous syscalls
+  capability_set: none      # Drop all capabilities
+  
+  # Observability
+  show_runtime_info: true   # Show what's happening
+  enable_metrics: true
+  log_output: true          # Log all output
+
+policies:
+  monitor_git_ops: true
+  block_force_git: true
+  detect_prod_env: true
+  only_destructive_sql: true
+  
+  # Comprehensive denylist
+  denylist:
+    - "rm -rf /"
+    - "rm -r /*"
+    - "rm -rf /*"
+    - "rm -rf ~/*"
+    - ":(){ :|:& };:"
+    - "curl * | sh"
+    - "wget * | sh"
+

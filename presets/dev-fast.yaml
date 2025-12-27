@@ -1,0 +1,60 @@
+# Fast Development Configuration - Namespace-Based Sandboxing
+# Provides native performance with strong security
+
+guard_level:
+  level: high
+  allow_user_bypass: true
+
+sandbox:
+  enabled: true
+  mode: auto
+  
+  # Runtime configuration - auto-select fastest
+  runtime: auto                # Try bubblewrap → namespace → docker
+  auto_detect_env: true        # Auto-detect dev environment
+  prefer_fast: true            # Prefer fast runtimes
+  
+  # Network and caching
+  allow_network: false         # Block network for safety
+  enable_cache: true           # Essential for dev workflow
+  use_overlayfs: true          # Isolate /tmp with OverlayFS
+  
+  # Security (balanced for dev)
+  seccomp_profile: moderate    # Block dangerous syscalls
+  capability_set: minimal      # Drop dangerous capabilities
+  
+  # Observability
+  show_runtime_info: true      # Show selected runtime
+  enable_metrics: true
+  log_output: false
+
+policies:
+  monitor_git_ops: true
+  block_force_git: true
+  only_destructive_sql: true
+  
+  # Comprehensive denylist
+  denylist:
+    # System destruction
+    - "rm -rf /"
+    - "rm -r /*"
+    - "rm -rf /*"
+    - "rm -rf /bin"
+    - "rm -rf /usr"
+    - "rm -rf /etc"
+    
+    # Home directory
+    - "rm -rf ~/*"
+    - "rm -rf $HOME/*"
+    
+    # Dangerous operations
+    - ":(){ :|:& };:"
+    - "dd if=/dev/zero"
+    - "mkfs"
+    
+    # Network exploits
+    - "curl * | sh"
+    - "curl * | bash"
+    - "wget * | sh"
+    - "wget * | bash"
+

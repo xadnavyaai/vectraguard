@@ -142,6 +142,53 @@ services:
     networks:
       - test-network
 
+  # Namespace testing service - tests the new namespace-based sandboxing
+  # SAFE: Only tests detection and configuration logic
+  # Tests bubblewrap, mount namespaces, seccomp, and runtime selection
+  test-namespace:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+      network: host  # Allow network during build for go mod download
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-namespace
+    volumes:
+      - .:/workspace:rw
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - VECTRA_GUARD_VERSION=test
+      - CI=true  # Force CI environment for consistent testing
+    working_dir: /workspace
+    entrypoint: []
+    command: ["/bin/sh", "-c", "go mod download && go test -v ./internal/sandbox/namespace/... && go test -v ./internal/sandbox/ -run TestRuntime"]
+    networks:
+      - test-network
+
+  # Comprehensive test service - runs ALL tests including namespace tests
+  # SAFE: Isolated in Docker container
+  test-all:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-all
+    volumes:
+      - .:/workspace:rw
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - DOCKER_HOST=unix:///var/run/docker.sock
+      - VECTRA_GUARD_VERSION=test
+      - CI=true
+    privileged: true  # Required for Docker-in-Docker
+    working_dir: /workspace
+    entrypoint: []
+    command: ["go", "test", "-v", "./..."]
+    networks:
+      - test-network
+
 volumes:
   go-mod-cache:
     driver: local

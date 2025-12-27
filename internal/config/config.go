@@ -93,6 +93,17 @@ const (
 	SandboxSecurityParanoid   SandboxSecurityLevel = "paranoid"   // Maximum isolation
 )
 
+// SandboxRuntime specifies the sandbox runtime to use
+type SandboxRuntime string
+
+const (
+	SandboxRuntimeAuto       SandboxRuntime = "auto"       // Auto-detect best runtime
+	SandboxRuntimeBubblewrap SandboxRuntime = "bubblewrap" // Use bubblewrap (fast)
+	SandboxRuntimeNamespace  SandboxRuntime = "namespace"  // Use custom namespaces
+	SandboxRuntimeDocker     SandboxRuntime = "docker"     // Use Docker (compatible)
+	SandboxRuntimePodman     SandboxRuntime = "podman"     // Use Podman
+)
+
 // SandboxConfig controls sandbox execution behavior
 type SandboxConfig struct {
 	// Core settings
@@ -101,19 +112,31 @@ type SandboxConfig struct {
 	SecurityLevel  SandboxSecurityLevel `yaml:"security_level" toml:"security_level" json:"security_level"`
 	
 	// Runtime configuration
-	Runtime        string `yaml:"runtime" toml:"runtime" json:"runtime"` // docker, podman, process
-	Image          string `yaml:"image" toml:"image" json:"image"`
+	Runtime        string `yaml:"runtime" toml:"runtime" json:"runtime"` // auto, bubblewrap, namespace, docker, podman
+	Image          string `yaml:"image" toml:"image" json:"image"`       // Docker/Podman image
 	Timeout        int    `yaml:"timeout" toml:"timeout" json:"timeout"` // seconds
+	
+	// Environment detection
+	AutoDetectEnv  bool   `yaml:"auto_detect_env" toml:"auto_detect_env" json:"auto_detect_env"` // Auto-detect dev/CI
+	PreferFast     bool   `yaml:"prefer_fast" toml:"prefer_fast" json:"prefer_fast"`             // Prefer fast runtimes in dev
 	
 	// Cache configuration
 	EnableCache    bool     `yaml:"enable_cache" toml:"enable_cache" json:"enable_cache"`
 	CacheDirs      []string `yaml:"cache_dirs" toml:"cache_dirs" json:"cache_dirs"`
+	CacheDir       string   `yaml:"cache_dir" toml:"cache_dir" json:"cache_dir"` // Cache directory for namespace runtime
 	
 	// Network configuration
 	NetworkMode    string   `yaml:"network_mode" toml:"network_mode" json:"network_mode"` // none, restricted, full
+	AllowNetwork   bool     `yaml:"allow_network" toml:"allow_network" json:"allow_network"` // Allow network access
+	
+	// Filesystem configuration
+	ReadOnlyPaths  []string `yaml:"read_only_paths" toml:"read_only_paths" json:"read_only_paths"`   // Read-only filesystem paths
+	WorkspaceDir   string   `yaml:"workspace_dir" toml:"workspace_dir" json:"workspace_dir"`         // Workspace directory
 	
 	// Security profiles
-	SeccompProfile string   `yaml:"seccomp_profile" toml:"seccomp_profile" json:"seccomp_profile"`
+	SeccompProfile string   `yaml:"seccomp_profile" toml:"seccomp_profile" json:"seccomp_profile"` // strict, moderate, minimal, none
+	CapabilitySet  string   `yaml:"capability_set" toml:"capability_set" json:"capability_set"`    // none, minimal, normal
+	UseOverlayFS   bool     `yaml:"use_overlayfs" toml:"use_overlayfs" json:"use_overlayfs"`       // Use OverlayFS (namespace only)
 	
 	// Environment
 	EnvWhitelist   []string `yaml:"env_whitelist" toml:"env_whitelist" json:"env_whitelist"`
@@ -124,6 +147,7 @@ type SandboxConfig struct {
 	// Observability
 	EnableMetrics  bool   `yaml:"enable_metrics" toml:"enable_metrics" json:"enable_metrics"`
 	LogOutput      bool   `yaml:"log_output" toml:"log_output" json:"log_output"`
+	ShowRuntimeInfo bool  `yaml:"show_runtime_info" toml:"show_runtime_info" json:"show_runtime_info"` // Show runtime selection
 	
 	// Trust store
 	TrustStorePath string `yaml:"trust_store_path" toml:"trust_store_path" json:"trust_store_path"`
@@ -169,23 +193,33 @@ func DefaultConfig() Config {
 			Keywords: []string{"prod", "production", "prd", "live", "staging", "stg"},
 		},
 		Sandbox: SandboxConfig{
-			Enabled:       true,
-			Mode:          SandboxModeAuto,
-			SecurityLevel: SandboxSecurityBalanced,
-			Runtime:       "docker", // docker, podman, or process
-			Image:         "ubuntu:22.04",
-			Timeout:       300, // 5 minutes
-			EnableCache:   true,
-			CacheDirs:     []string{},
-			NetworkMode:   "restricted",
+			Enabled:         true,
+			Mode:            SandboxModeAuto,
+			SecurityLevel:   SandboxSecurityBalanced,
+			Runtime:         "auto", // auto, bubblewrap, namespace, docker, podman
+			Image:           "ubuntu:22.04",
+			Timeout:         300, // 5 minutes
+			AutoDetectEnv:   true, // Auto-detect dev/CI
+			PreferFast:      true, // Prefer fast runtimes in dev
+			EnableCache:     true,
+			CacheDirs:       []string{},
+			CacheDir:        "", // Will use ~/.cache/vectra-guard by default
+			NetworkMode:     "restricted",
+			AllowNetwork:    false, // Block network by default
+			ReadOnlyPaths:   []string{}, // Will use defaults if empty
+			WorkspaceDir:    "", // Will use current directory by default
+			SeccompProfile:  "moderate", // strict, moderate, minimal, none
+			CapabilitySet:   "minimal",  // none, minimal, normal
+			UseOverlayFS:    true, // Use OverlayFS for /tmp
 			EnvWhitelist: []string{
 				"HOME", "USER", "PATH", "SHELL", "TERM",
 				"LANG", "LC_ALL", "PWD", "OLDPWD",
 			},
-			BindMounts:     []BindMountConfig{},
-			EnableMetrics:  true,
-			LogOutput:      false,
-			TrustStorePath: "",
+			BindMounts:      []BindMountConfig{},
+			EnableMetrics:   true,
+			LogOutput:       false,
+			ShowRuntimeInfo: false, // Don't spam user by default
+			TrustStorePath:  "",
 		},
 	}
 }
@@ -331,8 +365,17 @@ func merge(dst *Config, src Config) {
 	if src.Sandbox.NetworkMode != "" {
 		dst.Sandbox.NetworkMode = src.Sandbox.NetworkMode
 	}
+	if src.Sandbox.CacheDir != "" {
+		dst.Sandbox.CacheDir = src.Sandbox.CacheDir
+	}
+	if src.Sandbox.WorkspaceDir != "" {
+		dst.Sandbox.WorkspaceDir = src.Sandbox.WorkspaceDir
+	}
 	if src.Sandbox.SeccompProfile != "" {
 		dst.Sandbox.SeccompProfile = src.Sandbox.SeccompProfile
+	}
+	if src.Sandbox.CapabilitySet != "" {
+		dst.Sandbox.CapabilitySet = src.Sandbox.CapabilitySet
 	}
 	if src.Sandbox.TrustStorePath != "" {
 		dst.Sandbox.TrustStorePath = src.Sandbox.TrustStorePath
@@ -343,14 +386,22 @@ func merge(dst *Config, src Config) {
 	if len(src.Sandbox.CacheDirs) > 0 {
 		dst.Sandbox.CacheDirs = src.Sandbox.CacheDirs
 	}
+	if len(src.Sandbox.ReadOnlyPaths) > 0 {
+		dst.Sandbox.ReadOnlyPaths = src.Sandbox.ReadOnlyPaths
+	}
 	if len(src.Sandbox.BindMounts) > 0 {
 		dst.Sandbox.BindMounts = src.Sandbox.BindMounts
 	}
 	// Copy boolean fields
 	dst.Sandbox.Enabled = src.Sandbox.Enabled
+	dst.Sandbox.AutoDetectEnv = src.Sandbox.AutoDetectEnv
+	dst.Sandbox.PreferFast = src.Sandbox.PreferFast
 	dst.Sandbox.EnableCache = src.Sandbox.EnableCache
+	dst.Sandbox.AllowNetwork = src.Sandbox.AllowNetwork
+	dst.Sandbox.UseOverlayFS = src.Sandbox.UseOverlayFS
 	dst.Sandbox.EnableMetrics = src.Sandbox.EnableMetrics
 	dst.Sandbox.LogOutput = src.Sandbox.LogOutput
+	dst.Sandbox.ShowRuntimeInfo = src.Sandbox.ShowRuntimeInfo
 }
 
 func exists(path string) bool {
