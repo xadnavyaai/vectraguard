@@ -50,16 +50,38 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				}
 			}
 		}
+
+		// Check for operations targeting protected directories FIRST (before denylist)
+		// This ensures protected directories get critical severity
+		protectedDirFound := false
+		if len(policy.ProtectedDirectories) > 0 {
+			isProtected, protectedDir := ValidateProtectedDirectory(trimmed, policy.ProtectedDirectories)
+			if isProtected {
+				findings = append(findings, Finding{
+					Severity:       "critical",
+					Code:           "PROTECTED_DIRECTORY_ACCESS",
+					Description:    fmt.Sprintf("Command targets protected directory: %s", protectedDir),
+					Line:           lineNum,
+					Recommendation: fmt.Sprintf("BLOCKED: Operations on %s are not allowed. This directory is protected for system safety.", protectedDir),
+				})
+				protectedDirFound = true
+				// Continue to check other patterns for additional findings
+			}
+		}
 		
 		if containsAny(lower, policy.Denylist) {
-			findings = append(findings, Finding{
-				Severity:       "high",
-				Code:           "POLICY_DENYLIST",
-				Description:    "Command matches a denylisted pattern",
-				Line:           lineNum,
-				Recommendation: "Remove or justify this command, or update allowlist with review.",
-			})
-			continue
+			// Only add denylist finding if protected directory wasn't already found
+			// (protected directory takes precedence with critical severity)
+			if !protectedDirFound {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "POLICY_DENYLIST",
+					Description:    "Command matches a denylisted pattern",
+					Line:           lineNum,
+					Recommendation: "Remove or justify this command, or update allowlist with review.",
+				})
+			}
+			// Don't continue here - we want to check other patterns too
 		}
 
 		// Enhanced destructive file operations detection

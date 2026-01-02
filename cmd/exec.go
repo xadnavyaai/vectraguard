@@ -106,8 +106,15 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			})
 		}
 
+		// Resolve auto guard level to concrete level before checking approval
+		effectiveGuardLevel := cfg.GuardLevel.Level
+		if effectiveGuardLevel == config.GuardLevelAuto {
+			// Auto mode: treat as medium for blocking (conservative)
+			effectiveGuardLevel = config.GuardLevelMedium
+		}
+		
 		// Determine if approval is required based on guard level
-		requiresApproval := shouldRequireApproval(riskLevel, cfg.GuardLevel.Level)
+		requiresApproval := shouldRequireApproval(riskLevel, effectiveGuardLevel)
 		
 		// Handle interactive approval or blocking
 		if requiresApproval {
@@ -381,6 +388,9 @@ func shouldRequireApproval(riskLevel string, guardLevel config.GuardLevel) bool 
 		return riskLevel == "critical" || riskLevel == "high"
 	case config.GuardLevelHigh:
 		return riskLevel == "critical" || riskLevel == "high" || riskLevel == "medium"
+	case config.GuardLevelAuto:
+		// Auto mode: treat as medium (conservative)
+		return riskLevel == "critical" || riskLevel == "high"
 	default:
 		return false
 	}

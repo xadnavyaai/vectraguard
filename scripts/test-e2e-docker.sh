@@ -47,31 +47,50 @@ print_failure() { echo -e "${RED}✗ FAIL${NC}: $1"; ((TESTS_FAILED++)); }
 print_skip() { echo -e "${YELLOW}⊘ SKIP${NC}: $1"; ((TESTS_SKIPPED++)); }
 print_info() { echo -e "${CYAN}ℹ${NC} $1"; }
 
-# Get and build binary
+# Get and build binary (SAFE: doesn't overwrite local binary)
 setup_binary() {
     cd "$PROJECT_ROOT" || exit 1
     
-    # Always build in Docker (host binary may be wrong architecture)
-    print_info "Building vectra-guard binary..."
-    if ! go build -o vectra-guard .; then
+    # Check if existing binary works (if running in Docker, it should be Linux)
+    if [ -f "$PROJECT_ROOT/vectra-guard" ]; then
+        if "$PROJECT_ROOT/vectra-guard" version >/dev/null 2>&1; then
+            VECTRA_BINARY="$PROJECT_ROOT/vectra-guard"
+            print_info "Using existing binary: $VECTRA_BINARY"
+            return 0
+        fi
+    fi
+    
+    # Build in a safe temp location to avoid overwriting local binary
+    local temp_binary
+    temp_binary=$(mktemp /tmp/vectra-guard-test.XXXXXX) || {
+        print_failure "Failed to create temp file for binary"
+        exit 1
+    }
+    
+    print_info "Building vectra-guard binary in temp location (safe, won't overwrite local)..."
+    if ! go build -o "$temp_binary" .; then
+        rm -f "$temp_binary"
         print_failure "Failed to build binary"
         exit 1
     fi
     
-    chmod +x vectra-guard 2>/dev/null || true
+    chmod +x "$temp_binary" 2>/dev/null || true
     
-    if [ ! -f "$PROJECT_ROOT/vectra-guard" ]; then
+    if [ ! -f "$temp_binary" ]; then
         print_failure "Binary not found after build"
         exit 1
     fi
     
     # Test if it can run
-    if ! "$PROJECT_ROOT/vectra-guard" version >/dev/null 2>&1; then
+    if ! "$temp_binary" version >/dev/null 2>&1; then
         print_info "Binary may have architecture issues, but will try..."
     fi
     
-    VECTRA_BINARY="$PROJECT_ROOT/vectra-guard"
-    print_info "Using binary: $VECTRA_BINARY"
+    VECTRA_BINARY="$temp_binary"
+    print_info "Using binary: $VECTRA_BINARY (temp location, safe)"
+    
+    # Cleanup temp binary on exit
+    trap "rm -f '$temp_binary'" EXIT
 }
 
 test_command() {
@@ -209,7 +228,11 @@ main() {
     [ $total -gt 0 ] && rate=$((TESTS_PASSED * 100 / total))
     echo -e "\n${CYAN}Success Rate:${NC} ${rate}% (${TESTS_PASSED}/${total})"
     
-    [ -d "$TEST_WORKSPACE" ] && rm -rf "$TEST_WORKSPACE"
+    # Cleanup test workspace (safe - only removes temp directory)
+    if [ -n "${TEST_WORKSPACE:-}" ] && [ -d "$TEST_WORKSPACE" ]; then
+        print_info "Cleaning up test workspace..."
+        rm -rf "$TEST_WORKSPACE"
+    fi
     
     [ $TESTS_FAILED -eq 0 ] && exit 0 || exit 1
 }

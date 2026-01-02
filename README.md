@@ -37,12 +37,32 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 
 ## ⚡ Quick Start
 
-> **New to Vectra Guard?** See **[GETTING_STARTED.md](GETTING_STARTED.md)** for a detailed walkthrough!
+### Install (30 seconds)
 
-**One-line safety net:**  
-`vectra-guard exec -- "<your command>"` blocks or sandboxes **200+ risky commands** out of the box.
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+```
 
-### Installation
+### Use It (3 commands)
+
+```bash
+# 1. Validate scripts (safe - never executes)
+vectra-guard validate my-script.sh
+
+# 2. Execute commands safely
+vectra-guard exec -- npm install
+
+# 3. Explain security risks
+vectra-guard explain risky-script.sh
+```
+
+**That's it!** The tool protects 17+ system directories and detects 200+ risky patterns automatically.
+
+> **Need more details?** See [GETTING_STARTED.md](GETTING_STARTED.md) for a complete walkthrough.
+
+---
+
+## 📦 Installation Options
 
 **Option 1: One-Command Install** (Recommended) ⭐
 
@@ -53,9 +73,8 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 
 This script automatically:
 - ✅ Downloads the latest pre-built binary for your platform
-- ✅ Verifies checksums for security
 - ✅ Installs to `/usr/local/bin/`
-- ✅ Makes it available as `vectra-guard` and `vg`
+- ✅ Makes it available as `vectra-guard`
 
 **Option 2: Download Pre-Built Binary**
 
@@ -288,7 +307,30 @@ You now have:
 
 ---
 
-## 🛡️ Universal Shell Protection (Recommended)
+## 📖 What Gets Protected?
+
+**Protected Directories (17 by default):**
+- System directories: `/bin`, `/sbin`, `/usr`, `/etc`, `/var`, `/lib`, `/opt`
+- Critical paths: `/boot`, `/root`, `/sys`, `/proc`, `/dev`
+- User directories: `/home`, `/srv`
+
+**Risky Commands Detected:**
+- Root deletion: `rm -rf /`, `rm -r /*`
+- System directory operations: `rm -rf /etc`, `chmod -R /bin`
+- Dangerous operations: `sudo`, `mkfs`, `dd if=`
+- Network installs: `curl | sh`, `wget | bash`
+- And 200+ more patterns
+
+**Example:**
+```bash
+$ vectra-guard exec -- rm -rf /etc
+[ERROR] risky command blocked
+high risk command blocked by guard level medium
+```
+
+---
+
+## 🛡️ Universal Shell Protection (Advanced)
 
 Instead of configuring each IDE separately, Vectra Guard integrates at the **shell level** to protect everything automatically.
 

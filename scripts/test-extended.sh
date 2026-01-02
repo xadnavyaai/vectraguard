@@ -128,14 +128,22 @@ check_prerequisites() {
         if ! "$PROJECT_ROOT/vectra-guard" version >/dev/null 2>&1; then
             local version_output
             version_output=$("$PROJECT_ROOT/vectra-guard" version 2>&1 || true)
-            if echo "$version_output" | grep -qi "Exec format error"; then
+            if echo "$version_output" | grep -qi "Exec format error\|cannot execute\|wrong architecture"; then
                 print_info "Binary architecture mismatch - rebuilding..."
+                needs_rebuild=true
+            elif [ -z "$version_output" ] || echo "$version_output" | grep -qi "command not found\|No such file"; then
+                print_info "Binary cannot execute - rebuilding..."
                 needs_rebuild=true
             fi
         fi
         
         # Auto-rebuild if source files are newer than binary
-        if [ "$needs_rebuild" = false ]; then
+        # In Docker, always rebuild to ensure correct architecture
+        if [ -f /.dockerenv ] || [ -n "${VECTRAGUARD_CONTAINER:-}" ]; then
+            print_info "Running in Docker - will rebuild binary for correct architecture"
+            needs_rebuild=true
+        elif [ "$needs_rebuild" = false ]; then
+            # Only check timestamps on host (skip in Docker to avoid stat issues)
             local binary_time=$(stat -f "%m" "$PROJECT_ROOT/vectra-guard" 2>/dev/null || stat -c "%Y" "$PROJECT_ROOT/vectra-guard" 2>/dev/null || echo "0")
             local source_time=0
             
@@ -143,13 +151,16 @@ check_prerequisites() {
             for src_file in "$PROJECT_ROOT/main.go" "$PROJECT_ROOT/internal/analyzer/analyzer.go" "$PROJECT_ROOT/internal/analyzer/python_parser.go"; do
                 if [ -f "$src_file" ]; then
                     local file_time=$(stat -f "%m" "$src_file" 2>/dev/null || stat -c "%Y" "$src_file" 2>/dev/null || echo "0")
-                    if [ "$file_time" -gt "$source_time" ]; then
+                    # Extract just the number (first line, first field)
+                    file_time=$(echo "$file_time" | head -1 | awk '{print $1}' | grep -oE '^[0-9]+' || echo "0")
+                    if [ "$file_time" -gt "$source_time" ] 2>/dev/null; then
                         source_time=$file_time
                     fi
                 fi
             done
             
-            if [ "$source_time" -gt "$binary_time" ]; then
+            binary_time=$(echo "$binary_time" | head -1 | awk '{print $1}' | grep -oE '^[0-9]+' || echo "0")
+            if [ "$source_time" -gt "$binary_time" ] 2>/dev/null; then
                 print_info "Source files are newer than binary - rebuilding..."
                 needs_rebuild=true
             fi

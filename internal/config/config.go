@@ -49,6 +49,7 @@ type GuardLevelConfig struct {
 type PolicyConfig struct {
 	Allowlist           []string `yaml:"allowlist" toml:"allowlist" json:"allowlist"`
 	Denylist            []string `yaml:"denylist" toml:"denylist" json:"denylist"`
+	ProtectedDirectories []string `yaml:"protected_directories" toml:"protected_directories" json:"protected_directories"`
 	MonitorGitOps       bool     `yaml:"monitor_git_ops" toml:"monitor_git_ops" json:"monitor_git_ops"`
 	BlockForceGit       bool     `yaml:"block_force_git" toml:"block_force_git" json:"block_force_git"`
 	DetectProdEnv       bool     `yaml:"detect_prod_env" toml:"detect_prod_env" json:"detect_prod_env"`
@@ -167,6 +168,27 @@ func DefaultConfig() Config {
 		Policies: PolicyConfig{
 			Allowlist:          []string{},
 			Denylist:           []string{"rm -rf /", "sudo ", ":(){ :|:& };:", "mkfs", "dd if="},
+			ProtectedDirectories: []string{
+				"/",           // Root directory
+				"/bin",        // System binaries
+				"/sbin",       // System admin binaries
+				"/usr",        // User programs
+				"/usr/bin",    // User binaries
+				"/usr/sbin",   // User admin binaries
+				"/usr/local",  // Local programs
+				"/etc",        // System configuration
+				"/var",        // Variable data
+				"/lib",        // Libraries
+				"/lib64",      // 64-bit libraries
+				"/opt",        // Optional software
+				"/boot",       // Boot files
+				"/root",       // Root home
+				"/sys",        // System files
+				"/proc",       // Process files
+				"/dev",        // Device files
+				"/home",       // User homes
+				"/srv",        // Service data
+			},
 			MonitorGitOps:      true,
 			BlockForceGit:      true,
 			DetectProdEnv:      true,
@@ -446,6 +468,10 @@ func decodeYAML(data []byte) (Config, error) {
 				if mode == "policies" {
 					listTarget = &cfg.Policies.Denylist
 				}
+			case "protected_directories":
+				if mode == "policies" {
+					listTarget = &cfg.Policies.ProtectedDirectories
+				}
 			case "prod_env_patterns":
 				if mode == "policies" {
 					listTarget = &cfg.Policies.ProdEnvPatterns
@@ -479,6 +505,10 @@ func decodeYAML(data []byte) (Config, error) {
 			}
 			key := strings.TrimSpace(parts[0])
 			value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+			// Strip inline comments (everything after #)
+			if commentIdx := strings.Index(value, "#"); commentIdx >= 0 {
+				value = strings.TrimSpace(value[:commentIdx])
+			}
 			
 			switch mode {
 			case "logging":

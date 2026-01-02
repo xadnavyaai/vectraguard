@@ -2,7 +2,7 @@
 # Vectra Guard: Universal Shell Protection Installer
 # Integrates with bash, zsh, and fish to protect ALL tools
 
-set -e
+set -uo pipefail
 
 echo "🛡️  Vectra Guard - Universal Shell Protection Installer"
 echo "======================================================="
@@ -17,13 +17,22 @@ fi
 
 # Detect available shells
 SHELLS=()
-[[ -f ~/.bashrc ]] && SHELLS+=("bash")
-[[ -f ~/.zshrc ]] && SHELLS+=("zsh")
-[[ -d ~/.config/fish ]] && SHELLS+=("fish")
+# Check for bash (common on Linux)
+if command -v bash &> /dev/null; then
+    SHELLS+=("bash")
+fi
+# Check for zsh (common on macOS)
+if command -v zsh &> /dev/null; then
+    SHELLS+=("zsh")
+fi
+# Check for fish
+if command -v fish &> /dev/null && [ -d ~/.config/fish ]; then
+    SHELLS+=("fish")
+fi
 
 if [ ${#SHELLS[@]} -eq 0 ]; then
-    echo "❌ No shell configuration files found"
-    echo "   Please create ~/.bashrc or ~/.zshrc first"
+    echo "❌ No supported shells found (bash, zsh, or fish)"
+    echo "   Please install bash or zsh first"
     exit 1
 fi
 
@@ -35,16 +44,32 @@ echo "Step 1/4: Backing up existing configurations..."
 for shell in "${SHELLS[@]}"; do
     case $shell in
         bash)
-            cp ~/.bashrc ~/.bashrc.vectra-backup
-            echo "  ✅ Backed up ~/.bashrc"
+            if [ -f ~/.bashrc ]; then
+                cp ~/.bashrc ~/.bashrc.vectra-backup
+                echo "  ✅ Backed up ~/.bashrc"
+            else
+                touch ~/.bashrc
+                echo "  ✅ Created ~/.bashrc"
+            fi
             ;;
         zsh)
-            cp ~/.zshrc ~/.zshrc.vectra-backup
-            echo "  ✅ Backed up ~/.zshrc"
+            if [ -f ~/.zshrc ]; then
+                cp ~/.zshrc ~/.zshrc.vectra-backup
+                echo "  ✅ Backed up ~/.zshrc"
+            else
+                touch ~/.zshrc
+                echo "  ✅ Created ~/.zshrc"
+            fi
             ;;
         fish)
-            cp ~/.config/fish/config.fish ~/.config/fish/config.fish.vectra-backup 2>/dev/null || true
-            echo "  ✅ Backed up ~/.config/fish/config.fish"
+            mkdir -p ~/.config/fish
+            if [ -f ~/.config/fish/config.fish ]; then
+                cp ~/.config/fish/config.fish ~/.config/fish/config.fish.vectra-backup
+                echo "  ✅ Backed up ~/.config/fish/config.fish"
+            else
+                touch ~/.config/fish/config.fish
+                echo "  ✅ Created ~/.config/fish/config.fish"
+            fi
             ;;
     esac
 done
@@ -66,16 +91,16 @@ if command -v vectra-guard &> /dev/null; then
     _vectra_guard_init() {
         if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
             if [ -f ~/.vectra-guard-session ]; then
-                export VECTRAGUARD_SESSION_ID=$(tail -1 ~/.vectra-guard-session)
+                export VECTRAGUARD_SESSION_ID=$(sed -n '$p' ~/.vectra-guard-session 2>/dev/null || echo "")
                 # Verify session is still valid
-                if ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
+                if [ -n "$VECTRAGUARD_SESSION_ID" ] && ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
                     # Session expired, start new one
                     unset VECTRAGUARD_SESSION_ID
                 fi
             fi
             
             if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
-                SESSION=$(vectra-guard session start --agent "${USER}-bash" --workspace "$HOME" 2>/dev/null | tail -1)
+                SESSION=$(vectra-guard session start --agent "${USER}-bash" --workspace "$HOME" 2>/dev/null | sed -n '$p' || echo "")
                 if [ -n "$SESSION" ]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
                     echo $SESSION > ~/.vectra-guard-session
@@ -133,15 +158,15 @@ if command -v vectra-guard &> /dev/null; then
     _vectra_guard_init() {
         if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
             if [[ -f ~/.vectra-guard-session ]]; then
-                export VECTRAGUARD_SESSION_ID=$(tail -1 ~/.vectra-guard-session)
+                export VECTRAGUARD_SESSION_ID=$(sed -n '$p' ~/.vectra-guard-session 2>/dev/null || echo "")
                 # Verify session is still valid
-                if ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
+                if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
                     unset VECTRAGUARD_SESSION_ID
                 fi
             fi
             
             if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
-                SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$HOME" 2>/dev/null | tail -1)
+                SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$HOME" 2>/dev/null | sed -n '$p' || echo "")
                 if [[ -n "$SESSION" ]]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
                     echo $SESSION > ~/.vectra-guard-session
@@ -200,15 +225,15 @@ if command -v vectra-guard > /dev/null
     function _vectra_guard_init
         if not set -q VECTRAGUARD_SESSION_ID
             if test -f ~/.vectra-guard-session
-                set -gx VECTRAGUARD_SESSION_ID (tail -1 ~/.vectra-guard-session)
+                set -gx VECTRAGUARD_SESSION_ID (tail -n 1 ~/.vectra-guard-session 2>/dev/null || echo "")
                 # Verify session
-                if not vectra-guard session show $VECTRAGUARD_SESSION_ID &> /dev/null
+                if test -n "$VECTRAGUARD_SESSION_ID"; and not vectra-guard session show $VECTRAGUARD_SESSION_ID &> /dev/null
                     set -e VECTRAGUARD_SESSION_ID
                 end
             end
             
             if not set -q VECTRAGUARD_SESSION_ID
-                set -gx VECTRAGUARD_SESSION_ID (vectra-guard session start --agent "$USER-fish" --workspace $HOME 2>/dev/null | tail -1)
+                set -gx VECTRAGUARD_SESSION_ID (vectra-guard session start --agent "$USER-fish" --workspace $HOME 2>/dev/null | tail -n 1 || echo "")
                 if test -n "$VECTRAGUARD_SESSION_ID"
                     echo $VECTRAGUARD_SESSION_ID > ~/.vectra-guard-session
                     echo "🛡️  Vectra Guard session: $VECTRAGUARD_SESSION_ID"
@@ -255,9 +280,12 @@ echo ""
 
 # Initialize configuration
 echo "Step 3/4: Initializing vectra-guard..."
-if [ ! -f vectra-guard.yaml ]; then
-    vectra-guard init
-    echo "  ✅ Created vectra-guard.yaml"
+if [ ! -f vectra-guard.yaml ] && [ ! -f ~/.config/vectra-guard/config.yaml ]; then
+    if vectra-guard init &>/dev/null; then
+        echo "  ✅ Created vectra-guard.yaml"
+    else
+        echo "  ℹ️  Config initialization skipped (optional)"
+    fi
 else
     echo "  ℹ️  vectra-guard.yaml already exists"
 fi
@@ -266,7 +294,7 @@ echo ""
 # Optional: Install command aliases
 echo "Step 4/4: Setting up safety aliases (optional)..."
 # Use /dev/tty to read from terminal when piped through curl | bash
-if [ -t 0 ]; then
+if [ -t 0 ] && [ -c /dev/tty ]; then
     read -p "Install safety aliases (wrap dangerous commands)? [y/N] " -n 1 -r < /dev/tty
     echo
 else
@@ -316,7 +344,13 @@ echo "Protected shells: ${SHELLS[*]}"
 echo "Convenience alias: vg (shorthand for vectra-guard)"
 echo ""
 echo "Next steps:"
-echo "1. Restart your terminal (or run: source ~/.bashrc)"
+if [[ " ${SHELLS[*]} " =~ " bash " ]]; then
+    echo "1. Restart your terminal (or run: source ~/.bashrc)"
+elif [[ " ${SHELLS[*]} " =~ " zsh " ]]; then
+    echo "1. Restart your terminal (or run: source ~/.zshrc)"
+elif [[ " ${SHELLS[*]} " =~ " fish " ]]; then
+    echo "1. Restart your terminal (fish will auto-load config)"
+fi
 echo "2. Verify: echo \$VECTRAGUARD_SESSION_ID"
 echo "3. Test: echo 'hello world'"
 echo "4. Check logs: vg session show \$VECTRAGUARD_SESSION_ID"
@@ -330,7 +364,14 @@ echo "  ✅ SSH sessions"
 echo "  ✅ Anywhere!"
 echo ""
 echo "To uninstall: Restore from backups"
-echo "  mv ~/.bashrc.vectra-backup ~/.bashrc"
-echo "  mv ~/.zshrc.vectra-backup ~/.zshrc"
+if [[ " ${SHELLS[*]} " =~ " bash " ]]; then
+    echo "  mv ~/.bashrc.vectra-backup ~/.bashrc"
+fi
+if [[ " ${SHELLS[*]} " =~ " zsh " ]]; then
+    echo "  mv ~/.zshrc.vectra-backup ~/.zshrc"
+fi
+if [[ " ${SHELLS[*]} " =~ " fish " ]]; then
+    echo "  mv ~/.config/fish/config.fish.vectra-backup ~/.config/fish/config.fish"
+fi
 echo ""
 
