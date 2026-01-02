@@ -189,6 +189,29 @@ services:
     networks:
       - test-network
 
+  # End-to-end test service - comprehensive feature testing
+  # Tests all major features: init, validate, exec, session, trust, metrics
+  # SAFE: Isolated in Docker container
+  test-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-e2e
+    volumes:
+      - .:/workspace:rw
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - VECTRA_GUARD_VERSION=test
+      - VECTRAGUARD_CONTAINER=true
+      - CI=true
+    working_dir: /workspace
+    entrypoint: []
+    command: ["bash", "./scripts/test-e2e-docker.sh"]
+    networks:
+      - test-network
+
 volumes:
   go-mod-cache:
     driver: local
