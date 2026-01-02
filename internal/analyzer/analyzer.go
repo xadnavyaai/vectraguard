@@ -68,24 +68,11 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				// Continue to check other patterns for additional findings
 			}
 		}
-		
-		if containsAny(lower, policy.Denylist) {
-			// Only add denylist finding if protected directory wasn't already found
-			// (protected directory takes precedence with critical severity)
-			if !protectedDirFound {
-				findings = append(findings, Finding{
-					Severity:       "high",
-					Code:           "POLICY_DENYLIST",
-					Description:    "Command matches a denylisted pattern",
-					Line:           lineNum,
-					Recommendation: "Remove or justify this command, or update allowlist with review.",
-				})
-			}
-			// Don't continue here - we want to check other patterns too
-		}
 
 		// Enhanced destructive file operations detection
 		// Check for ANY rm command targeting root or system directories
+		// IMPORTANT: This check happens BEFORE denylist to ensure critical findings take precedence
+		criticalDeleteFound := false
 		if strings.Contains(lower, "rm ") {
 			homeDeleteFound := false
 
@@ -120,6 +107,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 						Recommendation: "BLOCKED: This could delete all user data. Never delete from home directory with wildcards.",
 					})
 					homeDeleteFound = true
+					criticalDeleteFound = true
 					break // Only report once
 				}
 			}
@@ -172,10 +160,26 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 							Line:           lineNum,
 							Recommendation: "BLOCKED: This command would destroy the system. Never delete from root or system directories.",
 						})
+						criticalDeleteFound = true
 						break // Only report once
 					}
 				}
 			}
+		}
+		
+		if containsAny(lower, policy.Denylist) {
+			// Only add denylist finding if protected directory or critical delete wasn't already found
+			// (critical findings take precedence with critical severity)
+			if !protectedDirFound && !criticalDeleteFound {
+				findings = append(findings, Finding{
+					Severity:       "high",
+					Code:           "POLICY_DENYLIST",
+					Description:    "Command matches a denylisted pattern",
+					Line:           lineNum,
+					Recommendation: "Remove or justify this command, or update allowlist with review.",
+				})
+			}
+			// Don't continue here - we want to check other patterns too
 		}
 
 		// Destructive find operations (find / -delete)

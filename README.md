@@ -1352,21 +1352,22 @@ For security issues, please email the maintainers directly rather than opening p
 - **[ADVANCED_FEATURES.md](ADVANCED_FEATURES.md)** - Advanced features and capabilities
 
 ### Sandbox & Performance
-- **[SANDBOX.md](SANDBOX.md)** - Docker-based sandbox execution system
-- **[NAMESPACE_SANDBOXING.md](NAMESPACE_SANDBOXING.md)** - ⭐ NEW! Fast namespace-based sandboxing (<1ms overhead)
-- **[CACHING_EXPLAINED.md](CACHING_EXPLAINED.md)** - Cache strategy for 10x faster installs
+- **[SANDBOX.md](SANDBOX.md)** - Complete sandbox guide including:
+  - Docker, Podman, Bubblewrap, and namespace runtimes
+  - Intelligent cache mounting (10x faster installs)
+  - Runtime auto-selection based on environment
+  - Performance optimization tips
 
 ### Security
-- **[SECURITY_MODEL.md](SECURITY_MODEL.md)** - Security architecture for dev and prod
-- **[SECURITY_IMPROVEMENTS.md](SECURITY_IMPROVEMENTS.md)** - Security enhancements and fixes
-- **[SECURITY_TESTING.md](SECURITY_TESTING.md)** - Comprehensive security testing guide
-
-### Testing
-- **[TESTING_SUMMARY.md](TESTING_SUMMARY.md)** - ⭐ NEW! Complete testing guide (95%+ pass rate in Docker)
+- **[SECURITY.md](SECURITY.md)** - Comprehensive security guide including:
+  - Security model for dev and production
+  - Security improvements and incident response
+  - Security testing procedures
+  - Best practices and troubleshooting
 
 ### Release Information
-- **[RELEASE_NOTES_v0.0.1.md](RELEASE_NOTES_v0.0.1.md)** - Current release notes
-- **[RELEASE_CHECKLIST_v0.0.1.md](RELEASE_CHECKLIST_v0.0.1.md)** - Release process checklist
+- **[docs/releases/RELEASE_NOTES_v0.0.1.md](docs/releases/RELEASE_NOTES_v0.0.1.md)** - Release notes
+- **[docs/releases/RELEASE_CHECKLIST_v0.0.1.md](docs/releases/RELEASE_CHECKLIST_v0.0.1.md)** - Release checklist
 
 ---
 
@@ -1403,8 +1404,7 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | **View metrics** | `vg metrics show` |
 | **Sandbox documentation** | See [SANDBOX.md](SANDBOX.md) |
 | **Config examples** | See [CONFIGURATION.md](CONFIGURATION.md) |
-| **Security testing** | See [SECURITY_TESTING.md](SECURITY_TESTING.md) |
-| **Docker testing** | See [DOCKER_TESTING.md](DOCKER_TESTING.md) |
+| **Security guide** | See [SECURITY.md](SECURITY.md) |
 | **Run tests** | `go test ./...` or `./scripts/test-docker.sh` |
 
 ---
