@@ -23,27 +23,6 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		return fmt.Errorf("no command specified")
 	}
 
-	// Check for user bypass
-	bypassEnvVar := cfg.GuardLevel.BypassEnvVar
-	if bypassEnvVar == "" {
-		bypassEnvVar = "VECTRAGUARD_BYPASS"
-	}
-	
-	if cfg.GuardLevel.AllowUserBypass && os.Getenv(bypassEnvVar) != "" {
-		bypassValue := os.Getenv(bypassEnvVar)
-		// Require a specific non-trivial value that agents are unlikely to guess
-		// Users can set: export VECTRAGUARD_BYPASS="$(date +%s | sha256sum | head -c 16)"
-		// Or a simpler approach: export VECTRAGUARD_BYPASS="i-am-human-$(whoami)"
-		if len(bypassValue) >= 10 && !isLikelyAgentBypass(bypassValue) {
-			logger.Info("command executed with user bypass", map[string]any{
-				"command": strings.Join(cmdArgs, " "),
-				"bypass":  "user authenticated",
-			})
-			// Execute without protection
-			return executeCommandDirectly(cmdArgs)
-		}
-	}
-	
 	// Check guard level
 	if cfg.GuardLevel.Level == config.GuardLevelOff {
 		logger.Info("guard level is OFF - executing without protection", map[string]any{
@@ -58,7 +37,8 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	// Build command string for analysis
 	cmdString := strings.Join(cmdArgs, " ")
 
-	// Analyze command for risks
+	// Analyze command for risks FIRST (before any bypass checks)
+	// This ensures critical commands are detected before bypass can be applied
 	findings := analyzer.AnalyzeScript("inline-command", []byte(cmdString), cfg.Policies)
 	
 	riskLevel := "low"
@@ -184,11 +164,15 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		
 		if hasCriticalCode {
 			// CRITICAL: These commands MUST be sandboxed - no bypass allowed
+			// This check happens BEFORE bypass checks to prevent critical commands from bypassing
 			logger.Error("CRITICAL command detected - mandatory sandbox required", map[string]any{
 				"command":    cmdString,
 				"risk_level": riskLevel,
 				"findings":   findingCodes,
 			})
+			
+			// CRITICAL commands CANNOT be bypassed - even with user bypass
+			// This is a hard security requirement
 			
 			// Even if sandbox is disabled, we MUST enforce it for critical commands
 			// This is a safety override that cannot be bypassed
@@ -198,6 +182,64 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					code:    3,
 				}
 			}
+		}
+	}
+
+	// Check for user bypass (AFTER critical command check)
+	// Critical commands cannot be bypassed, but other commands can with proper authentication
+	bypassEnvVar := cfg.GuardLevel.BypassEnvVar
+	if bypassEnvVar == "" {
+		bypassEnvVar = "VECTRAGUARD_BYPASS"
+	}
+	
+	if cfg.GuardLevel.AllowUserBypass && os.Getenv(bypassEnvVar) != "" {
+		// CRITICAL: Do not allow bypass for critical commands
+		if riskLevel == "critical" {
+			criticalCodes := []string{
+				"DANGEROUS_DELETE_ROOT",
+				"DANGEROUS_DELETE_HOME",
+				"FORK_BOMB",
+				"SENSITIVE_ENV_ACCESS",
+				"DOTENV_FILE_READ",
+			}
+			
+			hasCriticalCode := false
+			for _, f := range filteredFindings {
+				for _, code := range criticalCodes {
+					if f.Code == code {
+						hasCriticalCode = true
+						break
+					}
+				}
+				if hasCriticalCode {
+					break
+				}
+			}
+			
+			if hasCriticalCode {
+				logger.Error("CRITICAL command cannot be bypassed", map[string]any{
+					"command":    cmdString,
+					"risk_level": riskLevel,
+					"bypass":     "blocked for critical commands",
+				})
+				return &exitError{
+					message: fmt.Sprintf("CRITICAL: Command '%s' cannot be bypassed. Critical commands require mandatory sandboxing.", cmdString),
+					code:    3,
+				}
+			}
+		}
+		
+		bypassValue := os.Getenv(bypassEnvVar)
+		// Require a specific non-trivial value that agents are unlikely to guess
+		// Users can set: export VECTRAGUARD_BYPASS="$(date +%s | sha256sum | head -c 16)"
+		// Or a simpler approach: export VECTRAGUARD_BYPASS="i-am-human-$(whoami)"
+		if len(bypassValue) >= 10 && !isLikelyAgentBypass(bypassValue) {
+			logger.Info("command executed with user bypass", map[string]any{
+				"command": cmdString,
+				"bypass":  "user authenticated",
+			})
+			// Execute without protection (only for non-critical commands)
+			return executeCommandDirectly(cmdArgs)
 		}
 	}
 	
