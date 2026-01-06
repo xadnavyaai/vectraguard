@@ -23,13 +23,34 @@ build-version:
 # TESTING - DOCKER (Recommended - All Extended Tests)
 # ============================================================================
 
+# Detect docker compose command (newer: "docker compose", older: "docker-compose")
+DOCKER_COMPOSE := $(shell if docker compose version >/dev/null 2>&1; then echo "docker compose"; elif command -v docker-compose >/dev/null 2>&1; then echo "docker-compose"; else echo ""; fi)
+
 # Run all extended tests in Docker (SAFE - isolated, comprehensive)
 # Includes: extended tests, e2e tests, all Go tests
 test-docker:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "❌ Docker is not installed"; \
+		echo ""; \
+		echo "Install Docker:"; \
+		echo "  macOS: brew install --cask docker"; \
+		echo "  Or download from: https://www.docker.com/products/docker-desktop"; \
+		exit 1; \
+	fi
+	@if [ -z "$(DOCKER_COMPOSE)" ]; then \
+		echo "❌ docker-compose is not available"; \
+		echo ""; \
+		echo "Install docker-compose:"; \
+		echo "  macOS: brew install docker-compose"; \
+		echo "  Or use Docker Desktop (includes compose)"; \
+		echo "  Download: https://www.docker.com/products/docker-desktop"; \
+		exit 1; \
+	fi
 	@echo "🚀 Running all extended tests in Docker..."
-	docker-compose -f docker-compose.test.yml run --rm --no-deps test-extended
-	docker-compose -f docker-compose.test.yml run --rm --no-deps test-e2e
-	docker-compose -f docker-compose.test.yml run --rm test-all
+	@echo "ℹ️  Using: $(DOCKER_COMPOSE)"
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-extended
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-e2e
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm test-all
 
 # ============================================================================
 # TESTING - LOCAL MODE

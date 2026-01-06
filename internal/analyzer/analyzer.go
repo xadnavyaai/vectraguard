@@ -71,8 +71,8 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 
 		// Enhanced destructive file operations detection
 		// Check for ANY rm command targeting root or system directories
-		// IMPORTANT: This check happens BEFORE denylist to ensure critical findings take precedence
-		criticalDeleteFound := false
+		// This check happens before denylist so critical findings are still
+		// detected early.
 		if strings.Contains(lower, "rm ") {
 			homeDeleteFound := false
 
@@ -107,7 +107,6 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 						Recommendation: "BLOCKED: This could delete all user data. Never delete from home directory with wildcards.",
 					})
 					homeDeleteFound = true
-					criticalDeleteFound = true
 					break // Only report once
 				}
 			}
@@ -160,7 +159,6 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 							Line:           lineNum,
 							Recommendation: "BLOCKED: This command would destroy the system. Never delete from root or system directories.",
 						})
-						criticalDeleteFound = true
 						break // Only report once
 					}
 				}
@@ -168,9 +166,11 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 		}
 		
 		if containsAny(lower, policy.Denylist) {
-			// Only add denylist finding if protected directory or critical delete wasn't already found
-			// (critical findings take precedence with critical severity)
-			if !protectedDirFound && !criticalDeleteFound {
+			// Always record a policy denylist hit so callers can see that the
+			// command matched an explicit policy rule, even if we also classify it
+			// as a critical destructive operation. Critical findings will still
+			// surface with higher severity, but policy signals remain visible.
+			if !protectedDirFound {
 				findings = append(findings, Finding{
 					Severity:       "high",
 					Code:           "POLICY_DENYLIST",

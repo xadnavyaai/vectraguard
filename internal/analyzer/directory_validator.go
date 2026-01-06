@@ -13,7 +13,7 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 	}
 
 	commandLower := strings.ToLower(command)
-	
+
 	// Extract potential paths from the command
 	// Look for common destructive operations: rm, mv, cp, chmod, chown, etc.
 	destructiveOps := []string{"rm ", "mv ", "cp ", "chmod ", "chown ", "chgrp ", "find ", "tar ", "dd "}
@@ -42,98 +42,90 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 			}
 		}
 	}
-	
+
 	// If no destructive operation, it's safe
 	if !hasDestructiveOp {
 		return false, ""
 	}
 
-	// Check each protected directory
-	for _, protectedDir := range protectedDirs {
-		if protectedDir == "" {
+	// Tokenize the command so we can reason about individual arguments/paths.
+	// This avoids brittle substring matching and ensures we can distinguish
+	// between /usr and /usr/bin, etc.
+	fields := strings.Fields(commandLower)
+
+	// First, try to find the *most specific* protected directory that matches
+	// any of the command arguments. This ensures that for nested directories
+	// like /usr and /usr/bin we return /usr/bin when appropriate.
+	bestMatch := ""
+
+	for _, field := range fields {
+		// Strip common quoting characters
+		fieldTrimmed := strings.Trim(field, "\"'")
+		if fieldTrimmed == "" {
 			continue
 		}
-		
-		protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
-		
-		// Normalize the protected directory path
-		protectedDirNormalized := filepath.Clean(protectedDirLower)
-		if !strings.HasPrefix(protectedDirNormalized, "/") {
-			protectedDirNormalized = "/" + protectedDirNormalized
+
+		// Normalise the potential path.
+		argPath := filepath.Clean(fieldTrimmed)
+		if !strings.HasPrefix(argPath, "/") {
+			// Non-absolute paths aren't considered here – they may be relative
+			// paths that are handled by other logic.
+			continue
 		}
-		
-		// Check for exact match or prefix match
-		// Pattern: rm -rf /etc or rm -rf /etc/...
-		patterns := []string{
-			" " + protectedDirNormalized + " ",      // Space before and after
-			" " + protectedDirNormalized + "/",      // Space before, slash after
-			" " + protectedDirNormalized + "\"",     // Space before, quote after
-			" " + protectedDirNormalized + "'",      // Space before, single quote after
-			" " + protectedDirNormalized + "$",      // Space before, end of line
-			"\"" + protectedDirNormalized + "\"",    // Quoted
-			"'" + protectedDirNormalized + "'",      // Single quoted
-			" " + protectedDirNormalized + "/*",    // With wildcard
-			" " + protectedDirNormalized + "/* ",   // With wildcard and space
-			" " + protectedDirNormalized + "/ *",   // With space and wildcard
-		}
-		
-		// Also check for patterns like /etc/passwd, /etc/shadow, etc.
-		if strings.Contains(commandLower, protectedDirNormalized+"/") {
-			return true, protectedDirNormalized
-		}
-		
-		// Check for patterns like rm -rf /etc
-		for _, pattern := range patterns {
-			if strings.Contains(commandLower, pattern) {
-				return true, protectedDirNormalized
+
+		argPathLower := strings.ToLower(argPath)
+
+		for _, protectedDir := range protectedDirs {
+			if protectedDir == "" {
+				continue
 			}
-		}
-		
-		// Check for root directory patterns (special case)
-		// Root protection should only apply to direct operations on /, not all absolute paths
-		if protectedDirNormalized == "/" {
-			rootPatterns := []string{
-				" rm -rf /",      // Space before rm
-				" rm -r /",       // Without force
-				" rm -rf / ",     // With trailing space
-				" rm -r / ",      // Without force, with space
-				" rm -rf /*",     // With wildcard
-				" rm -r /*",      // Without force, with wildcard
-				" rm -rf /* ",    // With wildcard and space
-				" rm -r /* ",     // Without force, wildcard, space
-				" rm -rf / *",    // Space between / and *
-				" rm -r / *",     // Without force, space between
-				"find / ",        // Find from root
-				"find / -",       // Find from root with dash
-				"find / -delete", // Find from root with delete
+
+			protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
+			protectedDirNormalized := filepath.Clean(protectedDirLower)
+			if !strings.HasPrefix(protectedDirNormalized, "/") {
+				protectedDirNormalized = "/" + protectedDirNormalized
 			}
-			for _, pattern := range rootPatterns {
-				if strings.Contains(commandLower, pattern) {
+
+			// Special handling for root directory. We treat arguments that are
+			// exactly "/" or "/*" as targeting the root directory.
+			if protectedDirNormalized == "/" {
+				if argPathLower == "/" || argPathLower == "/*" {
 					return true, "/"
 				}
+				continue
 			}
-			// Also check if command starts with root operations
-			if strings.HasPrefix(commandLower, "rm -rf /") ||
-				strings.HasPrefix(commandLower, "rm -r /") ||
-				strings.HasPrefix(commandLower, "find /") {
-				// But exclude if it's followed by a specific path (like /tmp)
-				// Only match if it's /, /*, or / with space/wildcard
-				if strings.HasPrefix(commandLower, "rm -rf / ") ||
-					strings.HasPrefix(commandLower, "rm -r / ") ||
-					strings.HasPrefix(commandLower, "rm -rf /*") ||
-					strings.HasPrefix(commandLower, "rm -r /*") ||
-					strings.HasPrefix(commandLower, "rm -rf /\"") ||
-					strings.HasPrefix(commandLower, "rm -r /\"") ||
-					strings.HasPrefix(commandLower, "find / ") ||
-					strings.HasPrefix(commandLower, "find / -") {
-					return true, "/"
+
+			// Exact match: e.g. "rm -rf /etc"
+			if argPathLower == protectedDirNormalized {
+				if len(protectedDirNormalized) > len(bestMatch) {
+					bestMatch = protectedDirNormalized
 				}
+				continue
 			}
-			// Don't match root for other absolute paths - they should be checked against specific protected dirs
-			return false, ""
+
+			// Prefix match: e.g. "rm -rf /etc/passwd" should match /etc
+			if strings.HasPrefix(argPathLower, protectedDirNormalized+"/") {
+				if len(protectedDirNormalized) > len(bestMatch) {
+					bestMatch = protectedDirNormalized
+				}
+				continue
+			}
+
+			// Wildcard-style patterns such as "/etc/*" or "/etc/**"
+			if strings.HasPrefix(argPathLower, protectedDirNormalized+"/*") {
+				if len(protectedDirNormalized) > len(bestMatch) {
+					bestMatch = protectedDirNormalized
+				}
+				continue
+			}
 		}
 	}
-	
+
+	// If we found a specific protected directory match, return it.
+	if bestMatch != "" {
+		return true, bestMatch
+	}
+
 	return false, ""
 }
 
