@@ -7,6 +7,8 @@ set -uo pipefail
 echo "🛡️  Vectra Guard - Universal Shell Protection Installer"
 echo "======================================================="
 echo ""
+echo "For a full walkthrough, see README.md (Universal Shell Protection) and GETTING_STARTED.md."
+echo ""
 
 # Check if vectra-guard is installed
 if ! command -v vectra-guard &> /dev/null; then

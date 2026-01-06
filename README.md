@@ -224,86 +224,16 @@ vectra-guard exec "npm install"
 
 ---
 
-## 🚀 Getting Started with Sandbox (5 Minutes)
+## 🚀 Sandbox overview
 
-### Step 1: Choose Your Preset
+Vectra Guard includes a **smart sandbox** that isolates risky commands (like networked installs) while keeping day‑to‑day workflows fast.
 
-Vectra Guard comes with battle-tested configurations. See [CONFIGURATION.md](CONFIGURATION.md#quick-start-presets) for details.
+- **Presets**: Use `presets/developer.yaml`, `presets/ci-cd.yaml`, or `presets/production.yaml` as starting points (see [CONFIGURATION.md](CONFIGURATION.md#quick-start-presets)).
+- **Auto mode**: Low‑risk commands run on host; medium/high‑risk commands automatically run in a sandbox.
+- **Caching**: Dependency caches (npm, pip, cargo, etc.) are mounted into the sandbox for 10x faster repeated installs.
+- **Trust store**: Frequently used commands can be approved once and then run at full speed on the host.
 
-```bash
-# Developer preset (recommended for most users)
-# Best for local dev: Fast, cached, auto-detects risk
-cp presets/developer.yaml vectra-guard.yaml
-
-# CI/CD preset
-# Best for pipelines: Strict isolation, reproducible
-cp presets/ci-cd.yaml vectra-guard.yaml
-
-# Production preset
-# Best for prod: Paranoid security, zero trust
-cp presets/production.yaml vectra-guard.yaml
-```
-
-### Step 2: Run Your First Command
-
-```bash
-# This command will:
-# 1. Detect it's a networked install (medium risk)
-# 2. Run in sandbox for isolation
-# 3. Build cache for future runs
-# 4. Take ~12s (first time only!)
-
-vg exec "npm install express"
-
-📦 Running in sandbox.
-   Why: medium risk + networked install
-added 50 packages in 12.3s
-```
-
-### Step 3: See the Cache Magic ✨
-
-```bash
-# Run the same command again
-vg exec "npm install express"
-
-📦 Running in sandbox (cached).
-   Why: medium risk + networked install
-added 50 packages in 1.2s
-
-# 🎉 10x FASTER! Cache did its magic!
-```
-
-### Step 4: Trust Common Commands
-
-```bash
-# Run with interactive approval
-vg exec "npm test" --interactive
-
-⚠️  Command requires approval
-Options:
-  y  - Yes, run once
-  r  - Yes, and remember  ← Choose this!
-  n  - No, cancel
-Choose: r
-
-✅ Approved and remembered
-
-# Now it runs on host (instant!)
-vg exec "npm test"
-✓ 42 tests passed (0.8s)
-```
-
-### That's It! 🎉
-
-You now have:
-- ✅ Automatic sandboxing for risky commands
-- ✅ 10x faster installs with caching
-- ✅ Trusted commands running at full speed
-
-**Next Steps:**
-- Read [SANDBOX.md](SANDBOX.md) for advanced configuration
-- Customize security levels for your needs
-- Share your config with your team!
+For a full walkthrough (modes, cache strategy, performance benchmarks, and examples), see **[SANDBOX.md](SANDBOX.md)**.
 
 ---
 

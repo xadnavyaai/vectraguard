@@ -15,39 +15,14 @@ This document describes the advanced features and enhancements added to Vectra G
 
 ## Guard Levels
 
-Vectra Guard now supports configurable guard levels that determine how aggressively the tool protects your system.
+This document focuses on **advanced behaviors and examples**; the canonical reference for guard levels and their semantics lives in **[CONFIGURATION.md](CONFIGURATION.md#guard-level-auto-detection)**.
 
-### Available Guard Levels
+At a high level:
+- `off` → no protection (testing only, not recommended)
+- `low` / `medium` / `high` → progressively stricter blocking of risky commands
+- `paranoid` → everything requires approval
 
-| Level | Description | Blocks |
-|-------|-------------|--------|
-| `off` | No protection - commands execute without checks | Nothing |
-| `low` | Only critical issues blocked | Critical severity issues |
-| `medium` | **Default** - Critical and high severity blocked | Critical + High severity |
-| `high` | Strict protection | Critical + High + Medium severity |
-| `paranoid` | Maximum protection - everything requires approval | All findings, even low severity |
-
-### Configuration
-
-Add to your `vectra-guard.yaml`:
-
-```yaml
-guard_level:
-  level: medium  # off, low, medium, high, paranoid
-  allow_user_bypass: true
-  bypass_env_var: VECTRAGUARD_BYPASS
-  require_approval_above: medium
-```
-
-### Usage
-
-```bash
-# Set guard level in config or environment
-export VECTRA_GUARD_LEVEL=high
-
-# Or configure in vectra-guard.yaml
-vectra-guard exec npm install
-```
+Use this file for recipes (e.g. combining guard levels with git monitoring, SQL detection, and production detection); use `CONFIGURATION.md` when you need the full option matrix and default values.
 
 ---
 

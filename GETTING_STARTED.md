@@ -18,31 +18,14 @@ After following this guide:
 
 ### Step 1: Install Vectra Guard
 
-**Easiest method** - one command:
+**Recommended – one command:**
 
 ```bash
 # Automatically downloads and installs latest release
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-**Or download manually:**
-
-```bash
-# macOS ARM64 (M1/M2/M3)
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-darwin-arm64
-chmod +x vectra-guard-darwin-arm64
-sudo mv vectra-guard-darwin-arm64 /usr/local/bin/vectra-guard
-
-# macOS Intel
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-darwin-amd64
-chmod +x vectra-guard-darwin-amd64
-sudo mv vectra-guard-darwin-amd64 /usr/local/bin/vectra-guard
-
-# Linux (replace with your architecture)
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-linux-amd64
-chmod +x vectra-guard-linux-amd64
-sudo mv vectra-guard-linux-amd64 /usr/local/bin/vectra-guard
-```
+For alternative installation methods (manual binaries, Homebrew, Go install, build from source), see the **Installation Options** section in `README.md`.
 
 ### Step 2: Install Universal Protection
 
