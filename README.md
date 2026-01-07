@@ -62,119 +62,41 @@ vectra-guard explain risky-script.sh
 
 ---
 
-## 📦 Installation Options
+## 📦 Installation
 
-**Option 1: One-Command Install** (Recommended) ⭐
+### Recommended (one line)
 
 ```bash
-# macOS & Linux - installs latest release
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-This script automatically:
-- ✅ Downloads the latest pre-built binary for your platform
-- ✅ Installs to `/usr/local/bin/`
-- ✅ Makes it available as `vectra-guard`
+- **Platform**: macOS & Linux  
+- **What it does**: downloads latest release → installs to `/usr/local/bin` → makes `vectra-guard` available
 
-**Option 2: Download Pre-Built Binary**
-
-Download for your platform from the [latest release](https://github.com/xadnavyaai/vectra-guard/releases/latest):
+### Enable Universal Shell Protection (optional but recommended)
 
 ```bash
-# macOS ARM64 (M1/M2/M3)
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-darwin-arm64
-chmod +x vectra-guard-darwin-arm64
-sudo mv vectra-guard-darwin-arm64 /usr/local/bin/vectra-guard
-
-# macOS Intel
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-darwin-amd64
-chmod +x vectra-guard-darwin-amd64
-sudo mv vectra-guard-darwin-amd64 /usr/local/bin/vectra-guard
-
-# Linux ARM64
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-linux-arm64
-chmod +x vectra-guard-linux-arm64
-sudo mv vectra-guard-linux-arm64 /usr/local/bin/vectra-guard
-
-# Linux AMD64
-curl -LO https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-linux-amd64
-chmod +x vectra-guard-linux-amd64
-sudo mv vectra-guard-linux-amd64 /usr/local/bin/vectra-guard
-
-# Windows
-# Download vectra-guard-windows-amd64.exe from releases page
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
 ```
 
-**Option 3: Homebrew** (macOS/Linux)
+Then restart your terminal or run:
 
 ```bash
-# Coming soon
-brew install vectra-guard
+exec $SHELL
 ```
 
-**Option 4: Go Install** (for Go developers)
+### Other ways to install
+
+- **Pre-built binaries**: see the [latest release](https://github.com/xadnavyaai/vectra-guard/releases/latest) page  
+- **Go developers**: `go install github.com/xadnavyaai/vectra-guard@latest`  
+- **Build from source / advanced options**: see **[GETTING_STARTED.md](GETTING_STARTED.md)** (“Installation options” section)
+
+### Upgrade
 
 ```bash
-go install github.com/xadnavyaai/vectra-guard@latest
-```
-
-**Option 5: Build from Source** (for contributors/developers)
-
-```bash
-# Clone repository
-git clone https://github.com/xadnavyaai/vectra-guard.git
-cd vectra-guard
-
-# Build
-go build -o vectra-guard
-
-# Install
-sudo cp vectra-guard /usr/local/bin/
-
-# Run tests
-go test ./...
-```
-
-**Verify Installation:**
-
-```bash
-vectra-guard --help
-# or
-vg --help
-
-# Check version
-vectra-guard version  # Coming in next release
-```
-
-### Upgrade to Latest Version
-
-**Easiest Method:**
-
-```bash
-# Automatic upgrade (detects existing installation)
+# Re-run the installer to upgrade to latest
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
-
-**Alternative Methods:**
-
-```bash
-# Use dedicated update script
-curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/update.sh | bash
-
-# Or manually download latest release
-# Visit: https://github.com/xadnavyaai/vectra-guard/releases/latest
-# Download appropriate binary for your platform
-# Replace existing binary in /usr/local/bin/
-
-# If installed via Go
-go install github.com/xadnavyaai/vectra-guard@latest
-```
-
-The installer automatically:
-- ✅ Detects your current version
-- ✅ Downloads the latest release
-- ✅ Backs up your current binary
-- ✅ Verifies the new installation
 
 ### Uninstall
 

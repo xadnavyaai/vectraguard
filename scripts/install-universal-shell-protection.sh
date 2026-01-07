@@ -106,7 +106,6 @@ if command -v vectra-guard &> /dev/null; then
                 if [ -n "$SESSION" ]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
                     echo $SESSION > ~/.vectra-guard-session
-                    echo "🛡️  Vectra Guard session: $SESSION"
                 fi
             fi
         fi
@@ -172,7 +171,6 @@ if command -v vectra-guard &> /dev/null; then
                 if [[ -n "$SESSION" ]]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
                     echo $SESSION > ~/.vectra-guard-session
-                    echo "🛡️  Vectra Guard session: $SESSION"
                 fi
             fi
         fi
@@ -238,7 +236,6 @@ if command -v vectra-guard > /dev/null
                 set -gx VECTRAGUARD_SESSION_ID (vectra-guard session start --agent "$USER-fish" --workspace $HOME 2>/dev/null | tail -n 1 || echo "")
                 if test -n "$VECTRAGUARD_SESSION_ID"
                     echo $VECTRAGUARD_SESSION_ID > ~/.vectra-guard-session
-                    echo "🛡️  Vectra Guard session: $VECTRAGUARD_SESSION_ID"
                 end
             end
         end
