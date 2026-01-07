@@ -232,15 +232,30 @@ Instead of configuring each IDE separately, Vectra Guard integrates at the **she
 
 ### One Installation, Universal Protection
 
+**macOS / Linux (bash, zsh, fish):**
+
 ```bash
 ./scripts/install-universal-shell-protection.sh
+```
+
+**Windows (PowerShell):**
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+./scripts/install-powershell-protection.ps1
+```
+
+Or use the remote one-liner from the **Installation** section:
+
+```powershell
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-powershell-protection.ps1 | iex
 ```
 
 **Result**: Automatic protection in:
 - ✅ Cursor IDE
 - ✅ VSCode
 - ✅ Any IDE or editor
-- ✅ Terminal (iTerm, Terminal.app, etc.)
+- ✅ Terminal (iTerm, Terminal.app, Windows Terminal, etc.)
 - ✅ SSH sessions
 - ✅ Scripts and automation
 
