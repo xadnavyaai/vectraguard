@@ -75,25 +75,14 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 - **Platform**: macOS & Linux  
 - **What it does**: downloads latest release → installs to `/usr/local/bin` → makes `vectra-guard` available
 
-### Windows Native (PowerShell)
-
-**Step 1 – Download the Windows binary**
+### Windows Native (PowerShell, one line)
 
 ```powershell
-$releaseUrl = "https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-windows-amd64.exe"
-$dest = "C:\Program Files\VectraGuard\vectra-guard.exe"
-New-Item -ItemType Directory -Force "C:\Program Files\VectraGuard" | Out-Null
-Invoke-WebRequest -Uri $releaseUrl -OutFile $dest
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
 ```
 
-**Step 2 – Add to PATH (for the current session)**
-
-```powershell
-$env:PATH = "C:\Program Files\VectraGuard;$env:PATH"
-vectra-guard --help
-```
-
-Optionally add `C:\Program Files\VectraGuard` to the **System PATH** to make it permanent.
+- **What it does**: downloads latest Windows binary → installs to `C:\Program Files\VectraGuard` → adds to User `PATH`
 
 ### Enable Universal Shell Protection (optional but recommended)
 
