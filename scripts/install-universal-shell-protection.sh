@@ -120,10 +120,8 @@ if command -v vectra-guard &> /dev/null; then
     _vectra_guard_precmd() {
         local exit_code=$?
         if [ -n "$VECTRA_LAST_CMD" ] && [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-            # Log command asynchronously (don't block prompt)
-            (
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null
-            ) &
+            # Log command synchronously to avoid background job notifications
+            vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null
         fi
         unset VECTRA_LAST_CMD
     }
@@ -184,10 +182,8 @@ if command -v vectra-guard &> /dev/null; then
     _vectra_guard_precmd() {
         local exit_code=$?
         if [[ -n "$VECTRA_LAST_CMD" && -n "$VECTRAGUARD_SESSION_ID" ]]; then
-            # Log asynchronously
-            (
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null
-            ) &
+            # Log command synchronously to avoid background job notifications
+            vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null
         fi
         unset VECTRA_LAST_CMD
     }
@@ -248,8 +244,8 @@ if command -v vectra-guard > /dev/null
     
     function _vectra_guard_postexec --on-event fish_postexec
         if set -q VECTRA_LAST_CMD; and set -q VECTRAGUARD_SESSION_ID
-            # Log asynchronously
-            fish -c "vectra-guard exec --session $VECTRAGUARD_SESSION_ID -- echo 'logged: $VECTRA_LAST_CMD' &> /dev/null" &
+            # Log command synchronously to avoid background job notifications
+            fish -c "vectra-guard exec --session $VECTRAGUARD_SESSION_ID -- echo 'logged: $VECTRA_LAST_CMD' &> /dev/null"
         end
     end
     
