@@ -43,6 +43,8 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
+On **Windows native (PowerShell)**, install the `.exe` and add it to your `PATH` (see below).
+
 ### Use It (3 commands)
 
 ```bash
@@ -64,7 +66,7 @@ vectra-guard explain risky-script.sh
 
 ## 📦 Installation
 
-### Recommended (one line)
+### Recommended (one line, macOS & Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
@@ -72,6 +74,26 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 
 - **Platform**: macOS & Linux  
 - **What it does**: downloads latest release → installs to `/usr/local/bin` → makes `vectra-guard` available
+
+### Windows Native (PowerShell)
+
+**Step 1 – Download the Windows binary**
+
+```powershell
+$releaseUrl = "https://github.com/xadnavyaai/vectra-guard/releases/latest/download/vectra-guard-windows-amd64.exe"
+$dest = "C:\Program Files\VectraGuard\vectra-guard.exe"
+New-Item -ItemType Directory -Force "C:\Program Files\VectraGuard" | Out-Null
+Invoke-WebRequest -Uri $releaseUrl -OutFile $dest
+```
+
+**Step 2 – Add to PATH (for the current session)**
+
+```powershell
+$env:PATH = "C:\Program Files\VectraGuard;$env:PATH"
+vectra-guard --help
+```
+
+Optionally add `C:\Program Files\VectraGuard` to the **System PATH** to make it permanent.
 
 ### Enable Universal Shell Protection (optional but recommended)
 
@@ -83,6 +105,28 @@ Then restart your terminal or run:
 
 ```bash
 exec $SHELL
+```
+
+#### Windows Native (PowerShell) Protection
+
+On Windows, you can enable **PowerShell profile integration** for automatic sessions and command logging:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-powershell-protection.ps1 | iex
+```
+
+Then restart PowerShell (or run `. $PROFILE`) and verify:
+
+```powershell
+echo $env:VECTRAGUARD_SESSION_ID
+vectra-guard session show $env:VECTRAGUARD_SESSION_ID
+```
+
+You also get a `vg` alias:
+
+```powershell
+vg exec -- npm install
 ```
 
 ### Other ways to install
