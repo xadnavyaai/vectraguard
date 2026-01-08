@@ -270,7 +270,16 @@ func Load(configPath string, workdir string) (Config, []string, error) {
 func resolvePaths(explicit, workdir string) ([]string, error) {
 	var paths []string
 	// Lowest precedence first.
-	if home, err := os.UserHomeDir(); err == nil {
+	// Check HOME environment variable first (works on all platforms for testing)
+	// Then fall back to os.UserHomeDir()
+	var home string
+	if homeEnv := os.Getenv("HOME"); homeEnv != "" {
+		home = homeEnv
+	} else if homeDir, err := os.UserHomeDir(); err == nil {
+		home = homeDir
+	}
+	
+	if home != "" {
 		candidateYAML := filepath.Join(home, ".config", "vectra-guard", "config.yaml")
 		candidateTOML := filepath.Join(home, ".config", "vectra-guard", "config.toml")
 		if exists(candidateYAML) {

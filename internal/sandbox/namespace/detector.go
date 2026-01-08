@@ -1,10 +1,12 @@
 package namespace
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"runtime"
 	"strings"
+	"time"
 )
 
 // RuntimeType represents the type of sandbox runtime available
@@ -98,8 +100,14 @@ func DetectCapabilities() Capabilities {
 
 	// Check for Docker
 	if _, err := exec.LookPath("docker"); err == nil {
-		// Verify Docker daemon is running
-		if cmd := exec.Command("docker", "info"); cmd.Run() == nil {
+		// Verify Docker daemon is running with timeout (prevents hanging on Windows)
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		
+		cmd := exec.CommandContext(ctx, "docker", "info")
+		cmd.Stdout = nil
+		cmd.Stderr = nil
+		if err := cmd.Run(); err == nil {
 			caps.Docker = true
 		}
 	}

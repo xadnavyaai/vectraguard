@@ -1,7 +1,6 @@
 package analyzer
 
 import (
-	"path/filepath"
 	"strings"
 )
 
@@ -65,14 +64,23 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 			continue
 		}
 
-		// Normalise the potential path.
-		argPath := filepath.Clean(fieldTrimmed)
-		if !strings.HasPrefix(argPath, "/") {
+		// Check if it's a Unix-style absolute path (starts with /)
+		// We handle Unix paths specially to work cross-platform
+		if !strings.HasPrefix(fieldTrimmed, "/") {
 			// Non-absolute paths aren't considered here – they may be relative
 			// paths that are handled by other logic.
 			continue
 		}
 
+		// For Unix-style absolute paths, normalize manually to preserve the leading /
+		// This works cross-platform (even on Windows, we want to detect Unix paths in commands)
+		argPath := strings.TrimRight(fieldTrimmed, "/")
+		if argPath == "" {
+			argPath = "/"
+		}
+		// Remove any double slashes but keep the leading one
+		argPath = "/" + strings.TrimLeft(strings.ReplaceAll(argPath, "//", "/"), "/")
+		
 		argPathLower := strings.ToLower(argPath)
 
 		for _, protectedDir := range protectedDirs {
@@ -81,9 +89,20 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 			}
 
 			protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
-			protectedDirNormalized := filepath.Clean(protectedDirLower)
-			if !strings.HasPrefix(protectedDirNormalized, "/") {
-				protectedDirNormalized = "/" + protectedDirNormalized
+			// Normalize Unix-style paths manually (works cross-platform)
+			var protectedDirNormalized string
+			if strings.HasPrefix(protectedDirLower, "/") {
+				// Unix-style path - normalize manually
+				protectedDirNormalized = strings.TrimRight(protectedDirLower, "/")
+				if protectedDirNormalized == "" {
+					protectedDirNormalized = "/"
+				} else {
+					// Remove double slashes but keep leading /
+					protectedDirNormalized = "/" + strings.TrimLeft(strings.ReplaceAll(protectedDirNormalized, "//", "/"), "/")
+				}
+			} else {
+				// Relative path - make it absolute
+				protectedDirNormalized = "/" + strings.TrimLeft(protectedDirLower, "/")
 			}
 
 			// Special handling for root directory. We treat arguments that are
@@ -144,14 +163,20 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 		return false
 	}
 	
-	pathNormalized := filepath.Clean(strings.ToLower(pathTrimmed))
-	if !strings.HasPrefix(pathNormalized, "/") {
-		// Only normalize to absolute if it's not a relative path
-		if !strings.HasPrefix(pathNormalized, ".") && !strings.HasPrefix(pathNormalized, "~") {
-			pathNormalized = "/" + pathNormalized
+	// Normalize path - handle Unix-style paths cross-platform
+	pathLower := strings.ToLower(pathTrimmed)
+	var pathNormalized string
+	if strings.HasPrefix(pathLower, "/") {
+		// Unix-style absolute path - normalize manually
+		pathNormalized = strings.TrimRight(pathLower, "/")
+		if pathNormalized == "" {
+			pathNormalized = "/"
 		} else {
-			return false // Relative paths are not protected
+			pathNormalized = "/" + strings.TrimLeft(strings.ReplaceAll(pathNormalized, "//", "/"), "/")
 		}
+	} else {
+		// Not an absolute Unix path - not protected
+		return false
 	}
 	
 	for _, protectedDir := range protectedDirs {
@@ -159,9 +184,19 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 			continue
 		}
 		
-		protectedDirNormalized := filepath.Clean(strings.ToLower(strings.TrimSpace(protectedDir)))
-		if !strings.HasPrefix(protectedDirNormalized, "/") {
-			protectedDirNormalized = "/" + protectedDirNormalized
+		protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
+		var protectedDirNormalized string
+		if strings.HasPrefix(protectedDirLower, "/") {
+			// Unix-style path - normalize manually
+			protectedDirNormalized = strings.TrimRight(protectedDirLower, "/")
+			if protectedDirNormalized == "" {
+				protectedDirNormalized = "/"
+			} else {
+				protectedDirNormalized = "/" + strings.TrimLeft(strings.ReplaceAll(protectedDirNormalized, "//", "/"), "/")
+			}
+		} else {
+			// Relative path - make it absolute
+			protectedDirNormalized = "/" + strings.TrimLeft(protectedDirLower, "/")
 		}
 		
 		// Exact match
