@@ -127,8 +127,12 @@ if command -v vectra-guard &> /dev/null; then
         
         # Quick check for obviously dangerous patterns (fast path)
         # Note: Fork bomb check removed - vectra-guard validate will catch it
-        if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+[/\*] ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]]; then
+        # Pattern 1: rm -rf / or rm -r / (matches / at end)
+        # Pattern 2: rm -rf /* or rm -r /* (matches / followed by *)
+        # Pattern 3: rm -rf / * (matches / followed by space and *)
+        if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
+           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
+           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
             # Definitely dangerous - BLOCK immediately (critical commands should never execute)
             echo "❌ BLOCKED: Critical command detected: $cmd" >&2
             echo "   This command would delete system files and is blocked for safety." >&2
@@ -252,20 +256,25 @@ if command -v vectra-guard &> /dev/null; then
         
         # Quick check for obviously dangerous patterns (fast path)
         # Note: Fork bomb check removed - vectra-guard validate will catch it
-        if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+[/\*] ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]]; then
+        # Pattern 1: rm -rf / or rm -r / (matches / at end)
+        # Pattern 2: rm -rf /* or rm -r /* (matches / followed by *)
+        # Pattern 3: rm -rf / * (matches / followed by space and *)
+        if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
+           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
+           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
             # Definitely dangerous - intercept
+            echo "❌ BLOCKED: Critical command detected: $cmd" >&2
+            echo "   This command would delete system files and is blocked for safety." >&2
             if [[ -n "$VECTRAGUARD_SESSION_ID" ]]; then
-                # Execute through vectra-guard exec (will block if needed)
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- $=cmd
-                # Prevent original command execution by modifying the command array
-                # In zsh preexec, we can't easily prevent, but vectra-guard exec will block it
-            else
-                # No session - block critical commands
-                echo "❌ BLOCKED: Dangerous command detected: $cmd" >&2
-                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                # Try to prevent execution by clearing the command
-                # Note: This may not work in all zsh versions
+                echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
+                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
+            fi
+            echo "   Use 'vectra-guard exec -- <command>' if you really need to run this." >&2
+            # In zsh, we can't easily prevent execution, but vectra-guard exec will block it
+            # Try to prevent by executing a safe command instead
+            if [[ -n "$VECTRAGUARD_SESSION_ID" ]]; then
+                # Route through vectra-guard exec which will block
+                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
             fi
             VECTRA_LAST_CMD="$cmd"
             return
