@@ -142,10 +142,9 @@ if command -v vectra-guard &> /dev/null; then
                 vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
             fi
             echo "   Use 'vectra-guard exec -- <command>' if you really need to run this." >&2
-            # Replace with a no-op command to prevent execution
-            BASH_COMMAND=":"
+            # Return 1 to prevent command execution (with extdebug, this skips execution)
             VECTRA_LAST_CMD="$cmd"
-            return 0
+            return 1
         fi
         
         # Validate command through vectra-guard (for other dangerous patterns)
@@ -166,8 +165,9 @@ if command -v vectra-guard &> /dev/null; then
                     echo "❌ BLOCKED: Critical command detected: $cmd" >&2
                     echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
                     echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                    # Replace with no-op to prevent execution
-                    BASH_COMMAND=":"
+                    # Return 1 to prevent command execution (with extdebug, this skips execution)
+                    VECTRA_LAST_CMD="$cmd"
+                    return 1
                 else
                     # Non-critical risky command - allow but will be logged
                     VECTRA_LAST_CMD="$cmd"
