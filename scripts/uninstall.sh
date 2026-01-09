@@ -58,26 +58,65 @@ else
     echo "  ℹ️  Binary not found"
 fi
 
-# 2. Remove shell integration
+# 2. Remove shell integration and restore from backups
 echo ""
 echo "2/4: Removing shell integration..."
 REMOVED_INTEGRATION=false
+RESTORED_FROM_BACKUP=false
 
+# Process each shell config file
 for shell_rc in ~/.bashrc ~/.zshrc ~/.config/fish/config.fish; do
-    if [ -f "$shell_rc" ]; then
+    # Expand tilde to actual path
+    shell_rc_expanded=$(eval echo "$shell_rc")
+    
+    # Determine backup file path
+    case "$shell_rc" in
+        ~/.bashrc)
+            backup_file="$HOME/.bashrc.vectra-backup"
+            ;;
+        ~/.zshrc)
+            backup_file="$HOME/.zshrc.vectra-backup"
+            ;;
+        ~/.config/fish/config.fish)
+            backup_file="$HOME/.config/fish/config.fish.vectra-backup"
+            ;;
+        *)
+            backup_file=""
+            ;;
+    esac
+    
+    if [ -f "$shell_rc_expanded" ]; then
         # Check if integration exists
-        if grep -q "Vectra Guard Integration" "$shell_rc" 2>/dev/null; then
-            # Remove Vectra Guard section
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-                # macOS (BSD sed)
-                sed -i '' '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc"
+        if grep -q "Vectra Guard Integration" "$shell_rc_expanded" 2>/dev/null; then
+            # If backup exists, restore from backup
+            if [ -f "$backup_file" ]; then
+                echo "  ✅ Restoring $(basename $shell_rc_expanded) from backup"
+                cp "$backup_file" "$shell_rc_expanded"
+                # Remove the backup file after successful restore
+                rm -f "$backup_file"
+                RESTORED_FROM_BACKUP=true
+                REMOVED_INTEGRATION=true
             else
-                # Linux (GNU sed)
-                sed -i '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc"
+                # No backup, just remove the integration section
+                if [[ "$OSTYPE" == "darwin"* ]]; then
+                    # macOS (BSD sed)
+                    sed -i '' '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc_expanded"
+                else
+                    # Linux (GNU sed)
+                    sed -i '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc_expanded"
+                fi
+                echo "  ✅ Removed from $(basename $shell_rc_expanded)"
+                REMOVED_INTEGRATION=true
             fi
-            echo "  ✅ Removed from $(basename $shell_rc)"
-            REMOVED_INTEGRATION=true
         fi
+    elif [ -f "$backup_file" ]; then
+        # Config file doesn't exist but backup does - restore it
+        echo "  ✅ Restoring $(basename $shell_rc_expanded) from backup"
+        # Ensure directory exists
+        mkdir -p "$(dirname "$shell_rc_expanded")"
+        cp "$backup_file" "$shell_rc_expanded"
+        rm -f "$backup_file"
+        RESTORED_FROM_BACKUP=true
     fi
 done
 
@@ -105,20 +144,22 @@ else
     echo "  ℹ️  No data directory found"
 fi
 
-# 5. Check for backups
+# 5. Check for remaining backups (should be none if restored)
 echo ""
-echo "Checking for backups..."
+echo "Checking for remaining backups..."
 FOUND_BACKUPS=false
 
 for backup in ~/.bashrc.vectra-backup ~/.zshrc.vectra-backup ~/.config/fish/config.fish.vectra-backup; do
     if [ -f "$backup" ]; then
-        echo "  ℹ️  Backup found: $backup"
-        echo "     Restore with: cp $backup ${backup%.vectra-backup}"
+        echo "  ℹ️  Backup still exists: $backup"
+        echo "     (This backup was not used - config may have been manually modified)"
         FOUND_BACKUPS=true
     fi
 done
 
-if [ "$FOUND_BACKUPS" = false ]; then
+if [ "$FOUND_BACKUPS" = false ] && [ "$RESTORED_FROM_BACKUP" = true ]; then
+    echo "  ✅ All backups restored and cleaned up"
+elif [ "$FOUND_BACKUPS" = false ]; then
     echo "  ℹ️  No backups found"
 fi
 
@@ -141,9 +182,12 @@ if [ -d ~/.vectra-guard ]; then
     echo ""
 fi
 
-if [ "$FOUND_BACKUPS" = true ]; then
-    echo "ℹ️  Backup files preserved"
-    echo "   Restore manually if desired (see paths above)"
+if [ "$RESTORED_FROM_BACKUP" = true ]; then
+    echo "✅ Shell configs restored from backups"
+    echo ""
+elif [ "$FOUND_BACKUPS" = true ]; then
+    echo "ℹ️  Some backup files still exist (configs may have been manually modified)"
+    echo "   These backups were not automatically restored"
     echo ""
 fi
 
