@@ -258,7 +258,7 @@ guard_level:
 
 sandbox:
   enabled: true
-  mode: auto
+  mode: always  # Default: maximum security with caching
   security_level: balanced
   enable_cache: true
 ```

@@ -20,8 +20,24 @@ This document provides detailed configuration options and preset examples for Ve
 
 For most users, copying one of these presets into your `vectra-guard.yaml` is all you need.
 
-### 1. Developer Preset (Recommended) 👩‍💻
-*Best for local development. Fast, unobtrusive, but safe.*
+### 1. Default Configuration (Recommended) ⭐
+*Maximum security with intelligent caching. All commands sandboxed by default.*
+
+```yaml
+guard_level:
+  level: auto             # Auto-detect context (low in dev, high in prod)
+  allow_user_bypass: true # Allow overriding with env var
+
+sandbox:
+  enabled: true
+  mode: always            # Default: All commands sandboxed (maximum security)
+  security_level: balanced # Good isolation, allows outbound network
+  enable_cache: true      # Default: 10x faster subsequent runs
+  # Comprehensive cache directories auto-mounted (npm, pip, cargo, go, etc.)
+```
+
+### 2. Developer Preset (Balanced) 👩‍💻
+*For local development. Fast, unobtrusive, but safe.*
 
 ```yaml
 guard_level:
@@ -35,7 +51,7 @@ sandbox:
   enable_cache: true      # 10x faster subsequent runs
 ```
 
-### 2. CI/CD Pipeline 🤖
+### 3. CI/CD Pipeline 🤖
 *For automated testing and builds.*
 
 ```yaml
@@ -49,7 +65,7 @@ sandbox:
   enable_cache: true      # Speed up builds
 ```
 
-### 3. Production / Zero Trust 🔒
+### 4. Production / Zero Trust 🔒
 *Maximum security for production environments.*
 
 ```yaml
@@ -79,9 +95,10 @@ Vectra Guard has three main "knobs" to control security. Understanding how they 
 
 ### 2. Sandbox Mode (`sandbox.mode`)
 **Controls "Where does the command run?"**
+- `always`: **Default** - Everything -> Sandbox (maximum security with caching)
 - `auto`: Safe commands -> Host. Risky commands -> Sandbox.
-- `always`: Everything -> Sandbox.
 - `risky`: Only High/Critical risk -> Sandbox.
+- `never`: Never sandbox (except critical commands which cannot be bypassed)
 
 ### 3. Sandbox Security Level (`sandbox.security_level`)
 **Controls "How locked down is the sandbox?"**
@@ -93,8 +110,9 @@ Vectra Guard has three main "knobs" to control security. Understanding how they 
 **Example Scenario:**
 If you run `npm install`:
 - `guard_level: auto` sees "npm install" is medium risk -> Approves execution.
-- `sandbox.mode: auto` sees "npm install" modifies files/network -> Sends to Sandbox.
+- `sandbox.mode: always` (default) -> Sends to Sandbox automatically.
 - `sandbox.security_level: balanced` -> Sandbox allows downloading packages.
+- `enable_cache: true` (default) -> Mounts `~/.npm` cache for 10x speedup on subsequent runs.
 
 ---
 
@@ -278,6 +296,78 @@ policies:
 ```
 
 **Wildcard matching**: Use `*` for flexible patterns.
+
+---
+
+## Sandbox Configuration
+
+### Default Behavior (Maximum Security)
+
+By default, Vectra Guard runs **all commands in sandbox** with intelligent caching:
+
+```yaml
+sandbox:
+  enabled: true
+  mode: always  # Default: all commands sandboxed
+  enable_cache: true  # Default: 10x speedup with caching
+  security_level: balanced
+  runtime: auto  # Auto-detect best runtime
+```
+
+**Benefits:**
+- ✅ Maximum security - complete isolation
+- ✅ 10x faster on repeated runs (comprehensive caching)
+- ✅ 30+ cache directories auto-mounted (npm, pip, cargo, go, etc.)
+- ✅ Works out of the box - no configuration needed
+
+### Disabling Sandbox
+
+You can disable sandbox if needed:
+
+**Option 1: Disable completely**
+```yaml
+sandbox:
+  enabled: false
+```
+
+**Option 2: Use "never" mode**
+```yaml
+sandbox:
+  enabled: true
+  mode: never  # Never sandbox (except critical commands)
+```
+
+**Option 3: Use "auto" mode (balanced)**
+```yaml
+sandbox:
+  enabled: true
+  mode: auto  # Only sandbox risky commands
+```
+
+**Important:** Critical commands (like `rm -rf /`) **cannot be bypassed** - they will still be blocked even if sandbox is disabled.
+
+### Cache Configuration
+
+Caching is enabled by default and automatically mounts common package manager caches:
+
+```yaml
+sandbox:
+  enable_cache: true  # Default: enabled
+  cache_dirs:  # Optional: add custom cache directories
+    - ~/.npm
+    - ~/.cargo
+    - ~/custom-cache
+```
+
+**Supported caches (auto-detected):**
+- Node.js: `~/.npm`, `~/.yarn`, `~/.pnpm`
+- Python: `~/.cache/pip`, `~/.cache/pip3`
+- Rust: `~/.cargo`, `~/.rustup`
+- Go: `~/go/pkg`, `~/.cache/go-build`
+- Java: `~/.m2`, `~/.gradle`
+- Ruby: `~/.gem`
+- PHP: `~/.cache/composer`
+- And more...
 
 ---
 

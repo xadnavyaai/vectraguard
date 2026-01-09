@@ -111,6 +111,55 @@ if command -v vectra-guard &> /dev/null; then
         fi
     }
     
+    # Helper function to check if command targets protected system directories
+    # This comprehensive pattern matches system directories across Linux, macOS, and Windows (WSL)
+    _vectra_guard_is_protected_path() {
+        local cmd="$1"
+        local cmd_lower="${cmd,,}"  # Convert to lowercase (bash 4.0+)
+        
+        # If bash version < 4.0, use tr for lowercase conversion
+        if [ "${BASH_VERSION%%.*}" -lt 4 ] 2>/dev/null; then
+            cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
+        fi
+        
+        # Pattern 1: Root deletion patterns
+        # Matches: rm -rf /, rm -r /, rm -rf /*, rm -rf / *, etc.
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
+           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
+           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+            return 0  # Protected
+        fi
+        
+        # Pattern 2: Unix/Linux system directories (FHS standard)
+        # Core system directories
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(bin|sbin|usr|etc|var|lib|lib64|lib32|opt|boot|root|sys|proc|dev|home|srv|run|mnt|media|snap|flatpak|lost\+found)(/|$|[[:space:]]) ]]; then
+            return 0  # Protected
+        fi
+        
+        # Pattern 3: macOS specific directories
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(applications|library|system|private|cores|users|volumes|network)(/|$|[[:space:]]) ]]; then
+            return 0  # Protected
+        fi
+        
+        # Pattern 4: Windows paths (WSL and native)
+        # WSL paths: /mnt/c/Windows, /mnt/c/Program Files, etc.
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/mnt/[a-z]/(windows|program[[:space:]]+files|programdata|users)(/|$|[[:space:]]) ]]; then
+            return 0  # Protected
+        fi
+        # Windows native paths: C:\Windows, C:\Program Files, etc.
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+[a-z]:\\(windows|program[[:space:]]+files|programdata|users)(\\|$|[[:space:]]) ]]; then
+            return 0  # Protected
+        fi
+        
+        # Pattern 5: Common nested system paths
+        # /usr/bin, /usr/sbin, /usr/lib, /usr/local, /var/log, /var/lib, etc.
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(usr/(bin|sbin|lib|lib64|local)|var/(log|lib|cache)|system/(library|applications)|private/(etc|var|tmp))(/|$|[[:space:]]) ]]; then
+            return 0  # Protected
+        fi
+        
+        return 1  # Not protected
+    }
+    
     # Command interception hook - runs BEFORE command executes
     _vectra_guard_preexec() {
         local cmd="$BASH_COMMAND"
@@ -126,13 +175,8 @@ if command -v vectra-guard &> /dev/null; then
         fi
         
         # Quick check for obviously dangerous patterns (fast path)
-        # Note: Fork bomb check removed - vectra-guard validate will catch it
-        # Pattern 1: rm -rf / or rm -r / (matches / at end)
-        # Pattern 2: rm -rf /* or rm -r /* (matches / followed by *)
-        # Pattern 3: rm -rf / * (matches / followed by space and *)
-        if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+        # Use comprehensive system directory detection
+        if _vectra_guard_is_protected_path "$cmd"; then
             # Definitely dangerous - BLOCK immediately (critical commands should never execute)
             echo "❌ BLOCKED: Critical command detected: $cmd" >&2
             echo "   This command would delete system files and is blocked for safety." >&2
@@ -238,30 +282,48 @@ if command -v vectra-guard &> /dev/null; then
         fi
     }
     
-    # Command interception hook - runs BEFORE command executes
-    _vectra_guard_preexec() {
-        local cmd="$1"
-        
-        # Skip if command is vectra-guard itself (avoid recursion)
-        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
-            VECTRA_LAST_CMD="$cmd"
-            return
-        fi
-        
-        # Skip empty commands, comments, and variable assignments
-        if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
-            VECTRA_LAST_CMD="$cmd"
-            return
-        fi
+    # Helper function to check if command targets protected system directories
+    # This comprehensive pattern matches system directories across Linux, macOS, and Windows (WSL)
+    _vectra_guard_is_protected_path() {
+            local cmd="$1"
+            local cmd_lower="${cmd:l}"  # zsh lowercase conversion
+            
+            # Pattern 1: Root deletion patterns
+            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
+               [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
+               [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+                return 0  # Protected
+            fi
+            
+            # Pattern 2: Unix/Linux system directories (FHS standard)
+            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(bin|sbin|usr|etc|var|lib|lib64|lib32|opt|boot|root|sys|proc|dev|home|srv|run|mnt|media|snap|flatpak|lost\+found)(/|$|[[:space:]]) ]]; then
+                return 0  # Protected
+            fi
+            
+            # Pattern 3: macOS specific directories
+            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(applications|library|system|private|cores|users|volumes|network)(/|$|[[:space:]]) ]]; then
+                return 0  # Protected
+            fi
+            
+            # Pattern 4: Windows paths (WSL and native)
+            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/mnt/[a-z]/(windows|program[[:space:]]+files|programdata|users)(/|$|[[:space:]]) ]]; then
+                return 0  # Protected
+            fi
+            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+[a-z]:\\(windows|program[[:space:]]+files|programdata|users)(\\|$|[[:space:]]) ]]; then
+                return 0  # Protected
+            fi
+            
+            # Pattern 5: Common nested system paths
+            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(usr/(bin|sbin|lib|lib64|local)|var/(log|lib|cache)|system/(library|applications)|private/(etc|var|tmp))(/|$|[[:space:]]) ]]; then
+                return 0  # Protected
+            fi
+            
+            return 1  # Not protected
+        }
         
         # Quick check for obviously dangerous patterns (fast path)
-        # Note: Fork bomb check removed - vectra-guard validate will catch it
-        # Pattern 1: rm -rf / or rm -r / (matches / at end)
-        # Pattern 2: rm -rf /* or rm -r /* (matches / followed by *)
-        # Pattern 3: rm -rf / * (matches / followed by space and *)
-        if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+        # Use comprehensive system directory detection
+        if _vectra_guard_is_protected_path "$cmd"; then
             # Definitely dangerous - intercept
             echo "❌ BLOCKED: Critical command detected: $cmd" >&2
             echo "   This command would delete system files and is blocked for safety." >&2

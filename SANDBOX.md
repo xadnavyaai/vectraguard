@@ -14,10 +14,17 @@ Vectra Guard's sandbox system provides transparent, fast, and secure isolation f
 ```yaml
 sandbox:
   enabled: true
-  mode: auto  # auto, always, risky, never
+  mode: always  # Default: always (maximum security)
+                # Options: always, auto, risky, never
 ```
 
-**Decision Logic:**
+**Decision Logic (Default - Always Mode):**
+- ✅ **All commands** → sandbox execution (maximum security)
+- 🚀 **Caching enabled** → 10x speedup on repeated runs
+- 📝 Trusted commands → can be remembered to skip sandbox
+- 🔒 Critical commands → always sandboxed (cannot bypass)
+
+**Decision Logic (Auto Mode):**
 - ✅ Low-risk commands → host execution
 - ⚠️ Medium/high-risk → sandbox execution
 - 🔒 Networked installs → automatic sandboxing

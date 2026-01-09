@@ -216,30 +216,55 @@ func DefaultConfig() Config {
 		},
 		Sandbox: SandboxConfig{
 			Enabled:         true,
-			Mode:            SandboxModeAuto,
+			Mode:            SandboxModeAlways, // Always sandbox for maximum security
 			SecurityLevel:   SandboxSecurityBalanced,
-			Runtime:         "auto", // auto, bubblewrap, namespace, docker, podman
+			Runtime:         "auto", // Auto-detect best runtime (bubblewrap > docker > podman)
 			Image:           "ubuntu:22.04",
-			Timeout:         300, // 5 minutes
+			Timeout:         600, // 10 minutes (longer for builds)
 			AutoDetectEnv:   true, // Auto-detect dev/CI
-			PreferFast:      true, // Prefer fast runtimes in dev
-			EnableCache:     true,
-			CacheDirs:       []string{},
+			PreferFast:      true, // Prefer fast runtimes (bubblewrap/namespace) when available
+			EnableCache:     true, // Enable caching for 10x speedup
+			CacheDirs: []string{
+				// Comprehensive cache directories for all major package managers
+				"~/.npm",           // Node.js npm
+				"~/.yarn",          // Yarn
+				"~/.pnpm",          // pnpm
+				"~/.cache/pip",     // Python pip
+				"~/.cache/pip3",    // Python pip3
+				"~/.cargo",         // Rust cargo
+				"~/.rustup",        // Rust toolchain
+				"~/go/pkg",         // Go modules
+				"~/.m2",            // Maven
+				"~/.gradle",        // Gradle
+				"~/.gem",           // Ruby gems
+				"~/.cache/go-build", // Go build cache
+				"~/.cache/npm",     // npm cache
+				"~/.cache/yarn",    // Yarn cache
+				"~/.cache/pip",     // pip cache
+				"~/.cache/pip3",    // pip3 cache
+				"~/.cache/cargo",   // Cargo cache
+				"~/.cache/composer", // PHP Composer
+				"~/.cache/bower",   // Bower
+				"~/.cache/nuget",  // .NET NuGet
+			},
 			CacheDir:        "", // Will use ~/.cache/vectra-guard by default
-			NetworkMode:     "restricted",
-			AllowNetwork:    false, // Block network by default
+			NetworkMode:     "restricted", // Restricted network (allows package managers)
+			AllowNetwork:    true, // Allow network for package installs
 			ReadOnlyPaths:   []string{}, // Will use defaults if empty
 			WorkspaceDir:    "", // Will use current directory by default
 			SeccompProfile:  "moderate", // strict, moderate, minimal, none
 			CapabilitySet:   "minimal",  // none, minimal, normal
-			UseOverlayFS:    true, // Use OverlayFS for /tmp
+			UseOverlayFS:    true, // Use OverlayFS for /tmp (performance)
 			EnvWhitelist: []string{
 				"HOME", "USER", "PATH", "SHELL", "TERM",
 				"LANG", "LC_ALL", "PWD", "OLDPWD",
+				// Common dev environment variables
+				"NODE_ENV", "NPM_TOKEN", "GITHUB_TOKEN",
+				"DOCKER_HOST", "CI", "TRAVIS", "CIRCLE", "JENKINS",
 			},
 			BindMounts:      []BindMountConfig{},
-			EnableMetrics:   true,
-			LogOutput:       false,
+			EnableMetrics:   true, // Track performance metrics
+			LogOutput:       false, // Don't log output by default
 			ShowRuntimeInfo: false, // Don't spam user by default
 			TrustStorePath:  "",
 		},

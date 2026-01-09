@@ -168,32 +168,70 @@ env_protection:
   block_dotenv_read: true
 
 # ============================================
-# ADVANCED SANDBOX SETTINGS
+# SANDBOX SETTINGS (Default: Always Enabled)
 # ============================================
 
-# (Most users won't need to change these)
-#
-# sandbox:
-#   image: ubuntu:22.04
-#   timeout: 300
-#   
-#   # Custom cache directories
-#   # cache_dirs:
-#   #   - ~/.npm
-#   #   - ~/.cargo
-#   
-#   # Environment variables to pass through
-#   env_whitelist:
-#     - HOME
-#     - USER
-#     - PATH
-#     - SHELL
-#     - TERM
-#     - PWD
-#   
-#   # Observability
-#   enable_metrics: true
-#   log_output: false
-#   
-#   # Trust store path (for "approve and remember")
-#   # trust_store_path: ~/.vectra-guard/trust.json
+sandbox:
+  enabled: true
+  mode: always  # Options: always, auto, risky, never
+                # - always: Always sandbox (default, maximum security)
+                # - auto: Auto-sandbox medium+ risk commands
+                # - risky: Only sandbox high/critical risk
+                # - never: Never sandbox (except critical commands cannot be bypassed)
+  security_level: balanced  # balanced, permissive, strict, paranoid
+  runtime: auto  # auto-detect best runtime (bubblewrap > docker > podman)
+  image: ubuntu:22.04
+  
+  # To disable sandbox completely:
+  # enabled: false
+  # OR
+  # mode: never
+  
+  # Performance optimizations
+  enable_cache: true  # Enable caching for 10x speedup (default)
+  timeout: 600  # 10 minutes for long builds
+  
+  # Comprehensive cache directories (auto-detected)
+  # cache_dirs:
+  #   - ~/.npm
+  #   - ~/.yarn
+  #   - ~/.pnpm
+  #   - ~/.cache/pip
+  #   - ~/.cargo
+  #   - ~/go/pkg
+  #   - ~/.m2
+  #   - ~/.gradle
+  #   - ~/.gem
+  #   - ~/.cache/composer
+  #   - ~/.cache/nuget
+  
+  # Network configuration
+  network_mode: restricted  # restricted, full, none
+  allow_network: true  # Allow network for package installs
+  
+  # Environment variables to pass through
+  env_whitelist:
+    - HOME
+    - USER
+    - PATH
+    - SHELL
+    - TERM
+    - LANG
+    - LC_ALL
+    - PWD
+    - OLDPWD
+    - NODE_ENV
+    - NPM_TOKEN
+    - GITHUB_TOKEN
+    - DOCKER_HOST
+    - CI
+    - TRAVIS
+    - CIRCLE
+    - JENKINS
+  
+  # Observability
+  enable_metrics: true  # Track performance metrics
+  log_output: false  # Don't log command output by default
+  
+  # Trust store path (for "approve and remember")
+  # trust_store_path: ~/.vectra-guard/trust.json

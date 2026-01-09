@@ -580,9 +580,15 @@ func (e *Executor) isNetworkedInstall(cmdString string) bool {
 }
 
 // shouldEnableCache determines if caching should be enabled for this command
+// With always-sandbox mode, we enable caching for all commands to maximize performance
 func (e *Executor) shouldEnableCache(cmdArgs []string) bool {
 	if !e.config.Sandbox.EnableCache {
 		return false
+	}
+	
+	// If always-sandbox mode is enabled, cache everything for maximum performance
+	if e.config.Sandbox.Mode == config.SandboxModeAlways {
+		return true
 	}
 	
 	cmdString := strings.ToLower(strings.Join(cmdArgs, " "))
@@ -590,13 +596,16 @@ func (e *Executor) shouldEnableCache(cmdArgs []string) bool {
 	// Enable cache for package managers and build tools
 	cacheableCommands := []string{
 		"npm", "yarn", "pnpm",
-		"pip", "pip3",
-		"cargo",
-		"go",
-		"gem",
-		"composer",
+		"pip", "pip3", "python", "python3",
+		"cargo", "rustc", "rustup",
+		"go", "golang",
+		"gem", "bundle", "rake",
+		"composer", "php",
 		"maven", "mvn",
 		"gradle",
+		"bower", "nuget", "dotnet",
+		"apt", "apt-get", "yum", "dnf", "pacman",
+		"brew", "port",
 	}
 	
 	for _, cmd := range cacheableCommands {
@@ -616,6 +625,7 @@ func (e *Executor) generateCacheKey(cmdArgs []string) string {
 }
 
 // getCacheMounts returns cache mount specifications
+// Comprehensive cache directory mapping for all major package managers
 func (e *Executor) getCacheMounts() []string {
 	mounts := []string{}
 	homeDir, err := os.UserHomeDir()
@@ -623,20 +633,50 @@ func (e *Executor) getCacheMounts() []string {
 		return mounts
 	}
 	
-	// Common cache directories
+	// Expand user cache directories from config if provided
+	if len(e.config.Sandbox.CacheDirs) > 0 {
+		for _, cacheDir := range e.config.Sandbox.CacheDirs {
+			// Expand ~ to home directory
+			expandedDir := strings.Replace(cacheDir, "~", homeDir, 1)
+			expandedDir = os.ExpandEnv(expandedDir)
+			
+			// Use same path in container
+			if _, err := os.Stat(expandedDir); err == nil {
+				mounts = append(mounts, fmt.Sprintf("%s:%s", expandedDir, expandedDir))
+			}
+		}
+	}
+	
+	// Common cache directories (comprehensive list)
 	cacheDirs := map[string]string{
 		// Node.js
-		filepath.Join(homeDir, ".npm"):     "/.npm",
-		filepath.Join(homeDir, ".yarn"):    "/.yarn",
-		filepath.Join(homeDir, ".pnpm"):    "/.pnpm",
+		filepath.Join(homeDir, ".npm"):                    "/.npm",
+		filepath.Join(homeDir, ".yarn"):                   "/.yarn",
+		filepath.Join(homeDir, ".pnpm"):                   "/.pnpm",
+		filepath.Join(homeDir, ".cache", "npm"):          "/.cache/npm",
+		filepath.Join(homeDir, ".cache", "yarn"):         "/.cache/yarn",
 		// Python
-		filepath.Join(homeDir, ".cache", "pip"): "/.cache/pip",
+		filepath.Join(homeDir, ".cache", "pip"):          "/.cache/pip",
+		filepath.Join(homeDir, ".cache", "pip3"):         "/.cache/pip3",
 		// Go
-		filepath.Join(homeDir, "go", "pkg"): "/go/pkg",
+		filepath.Join(homeDir, "go", "pkg"):               "/go/pkg",
+		filepath.Join(homeDir, ".cache", "go-build"):    "/.cache/go-build",
 		// Rust
-		filepath.Join(homeDir, ".cargo"): "/.cargo",
+		filepath.Join(homeDir, ".cargo"):                 "/.cargo",
+		filepath.Join(homeDir, ".rustup"):                "/.rustup",
+		filepath.Join(homeDir, ".cache", "cargo"):        "/.cache/cargo",
+		// Java
+		filepath.Join(homeDir, ".m2"):                    "/.m2",
+		filepath.Join(homeDir, ".gradle"):                "/.gradle",
 		// Ruby
-		filepath.Join(homeDir, ".gem"): "/.gem",
+		filepath.Join(homeDir, ".gem"):                   "/.gem",
+		// PHP
+		filepath.Join(homeDir, ".cache", "composer"):    "/.cache/composer",
+		// Other
+		filepath.Join(homeDir, ".cache", "bower"):       "/.cache/bower",
+		filepath.Join(homeDir, ".cache", "nuget"):       "/.cache/nuget",
+		// System package managers (if accessible)
+		filepath.Join(homeDir, ".cache", "apt"):         "/.cache/apt",
 	}
 	
 	for hostPath, containerPath := range cacheDirs {

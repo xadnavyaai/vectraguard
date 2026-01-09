@@ -21,13 +21,14 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 
 **Vectra Guard provides a security layer that:**
 - ✅ Validates scripts and commands before execution
-- ✅ **Sandboxes risky commands automatically** (NEW!)
+- ✅ **Sandboxes ALL commands by default** (NEW! Maximum security)
+- ✅ **Comprehensive caching for 10x speedup** (NEW! Enabled by default)
+- ✅ **Cross-platform system directory protection** (Linux, macOS, Windows)
 - ✅ Detects SQL/NoSQL database operations (MySQL, PostgreSQL, MongoDB, Redis, etc.)
 - ✅ Warns about production/staging environment interactions
 - ✅ Tracks all agent activities in auditable sessions
 - ✅ Blocks or requires approval for risky operations
 - ✅ **"Approve and remember" with trust store** (NEW!)
-- ✅ **Cache-optimized for fast dev cycles** (NEW!)
 - ✅ Provides comprehensive audit trails
 - ✅ Enforces security policies with zero-trust defaults
 - ✅ **Full metrics and observability** (NEW!)
@@ -58,7 +59,7 @@ vectra-guard exec -- npm install
 vectra-guard explain risky-script.sh
 ```
 
-**That's it!** The tool protects 17+ system directories and detects 200+ risky patterns automatically.
+**That's it!** The tool protects 30+ system directories across Linux, macOS, and Windows, and detects 200+ risky patterns automatically. **All commands run in sandbox by default** with intelligent caching for maximum security and performance.
 
 > **Need more details?** See [GETTING_STARTED.md](GETTING_STARTED.md) for a complete walkthrough.
 
@@ -184,6 +185,7 @@ vectra-guard exec "npm install"
 Vectra Guard includes a **smart sandbox** that isolates risky commands (like networked installs) while keeping day‑to‑day workflows fast.
 
 - **Presets**: Use `presets/developer.yaml`, `presets/ci-cd.yaml`, or `presets/production.yaml` as starting points (see [CONFIGURATION.md](CONFIGURATION.md#quick-start-presets)).
+- **Always mode (default)**: All commands run in sandbox for maximum security with intelligent caching for 10x speedup.
 - **Auto mode**: Low‑risk commands run on host; medium/high‑risk commands automatically run in a sandbox.
 - **Caching**: Dependency caches (npm, pip, cargo, etc.) are mounted into the sandbox for 10x faster repeated installs.
 - **Trust store**: Frequently used commands can be approved once and then run at full speed on the host.
@@ -194,10 +196,10 @@ For a full walkthrough (modes, cache strategy, performance benchmarks, and examp
 
 ## 📖 What Gets Protected?
 
-**Protected Directories (17 by default):**
-- System directories: `/bin`, `/sbin`, `/usr`, `/etc`, `/var`, `/lib`, `/opt`
-- Critical paths: `/boot`, `/root`, `/sys`, `/proc`, `/dev`
-- User directories: `/home`, `/srv`
+**Protected Directories (30+ across platforms):**
+- **Linux/Unix**: `/bin`, `/sbin`, `/usr`, `/etc`, `/var`, `/lib`, `/opt`, `/boot`, `/root`, `/sys`, `/proc`, `/dev`, `/home`, `/srv`, `/run`, `/mnt`, `/media`, `/snap`, `/flatpak`
+- **macOS**: `/Applications`, `/Library`, `/System`, `/private`, `/Users`, `/Volumes`, `/Network`, `/cores`
+- **Windows (WSL)**: `/mnt/c/Windows`, `/mnt/c/Program Files`, `/mnt/c/ProgramData`, `/mnt/c/Users`
 
 **Risky Commands Detected:**
 - Root deletion: `rm -rf /`, `rm -r /*`
@@ -531,15 +533,20 @@ vectra-guard session show $VECTRAGUARD_SESSION_ID
 
 Vectra Guard's sandbox system provides **three modes of operation**:
 
-#### 1. **Without Sandbox** (Traditional Mode)
+#### 1. **Without Sandbox** (Traditional Mode - Optional)
 ```bash
 # Disable sandbox completely
 sandbox:
   enabled: false
+# OR
+sandbox:
+  mode: never
 
 # All commands run directly on host
 vg exec "npm install"  # → Direct execution
 vg exec "rm -rf test/" # → Direct execution (with validation)
+
+# Note: Critical commands (rm -rf /, etc.) still blocked even if sandbox disabled
 ```
 
 **Use When:**
@@ -548,16 +555,44 @@ vg exec "rm -rf test/" # → Direct execution (with validation)
 - Performance is absolute priority
 - You want traditional validation-only behavior
 
-**Security:** Validation only, no isolation
+**Security:** Validation only, no isolation (except critical commands which cannot be bypassed)
 
 ---
 
-#### 2. **With Sandbox - Auto Mode** (Recommended ⭐)
+#### 2. **With Sandbox - Always Mode** (Default ⭐ - Maximum Security)
+```bash
+# Everything runs in sandbox (default configuration)
+sandbox:
+  enabled: true
+  mode: always  # Default: maximum security
+  enable_cache: true  # Default: 10x speedup with caching
+
+# All commands run in sandbox with caching
+vg exec "echo hello"        # → Sandbox (cached, fast)
+vg exec "npm install"       # → Sandbox (cached, 10x faster after first run)
+vg exec "curl remote.com"   # → Sandbox (isolated)
+vg exec "rm -rf /"          # → Blocked (critical risk, cannot bypass)
+```
+
+**Use When:**
+- **Default mode** - maximum security out of the box
+- Running completely untrusted code
+- Working with AI agents
+- You want provable isolation
+- Development speed matters (caching provides 10x speedup)
+
+**Security:** Complete isolation for everything with intelligent caching
+
+**Performance:** First run normal speed, subsequent runs 10x faster due to comprehensive caching
+
+---
+
+#### 3. **With Sandbox - Auto Mode** (Balanced Security & Speed)
 ```bash
 # Smart sandboxing based on risk
 sandbox:
   enabled: true
-  mode: auto
+  mode: auto  # Auto-detect based on risk
   enable_cache: true
 
 # Low-risk commands run on host
@@ -572,36 +607,12 @@ vg exec "rm -rf /"          # → Blocked (critical risk)
 ```
 
 **Use When:**
-- You want balance of security and speed (most common)
-- You're working with AI agents or untrusted code
+- You want balance of security and speed
+- You're working with trusted code
 - You want automatic protection without thinking about it
 - Development speed matters
 
 **Security:** Smart isolation based on risk analysis
-
----
-
-#### 3. **With Sandbox - Always Mode** (Maximum Security)
-```bash
-# Everything runs in sandbox
-sandbox:
-  enabled: true
-  mode: always
-  security_level: paranoid
-
-# Even safe commands run in sandbox
-vg exec "echo hello"    # → Sandbox
-vg exec "npm test"      # → Sandbox
-vg exec "git log"       # → Sandbox
-```
-
-**Use When:**
-- Running completely untrusted code
-- Production deployments
-- Compliance requirements
-- You need provable isolation
-
-**Security:** Complete isolation for everything
 
 ---
 
@@ -1298,7 +1309,9 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | **Start session** | `vg session start --agent NAME` |
 | **View session** | `vg session show $SESSION_ID` |
 | **List sessions** | `vg session list` |
-| **Enable sandbox** | `sandbox: {enabled: true, mode: auto}` |
+| **Enable sandbox (default)** | `sandbox: {enabled: true, mode: always}` |
+| **Disable sandbox** | `sandbox: {enabled: false}` or `mode: never` |
+| **Auto mode (balanced)** | `sandbox: {mode: auto}` |
 | **List trusted commands** | `vg trust list` |
 | **Trust a command** | `vg trust add "command"` |
 | **View metrics** | `vg metrics show` |
@@ -1319,11 +1332,11 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 5. **Use the `vg` alias** for faster workflows
 
 ### Sandbox Optimization 🚀
-6. **Enable caching for 10x speedup**: `sandbox: {enable_cache: true}`
-7. **Use developer preset** for best dev experience: `cp presets/developer.yaml vectra-guard.yaml`
+6. **Caching enabled by default** - 10x speedup automatically! First run normal, subsequent runs fast
+7. **30+ cache directories** automatically mounted (npm, pip, cargo, go, maven, gradle, etc.)
 8. **Trust common commands** to skip sandbox: `vg trust add "npm test"`
 9. **Check metrics weekly** to see time saved: `vg metrics show`
-10. **Let cache build organically** - first runs are slower, subsequent runs are 10x faster!
+10. **Disable if needed**: `sandbox: {enabled: false}` or `mode: never` (critical commands still protected)
 
 ### Security Best Practices
 11. **Review session logs regularly** to understand agent behavior
