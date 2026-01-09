@@ -67,10 +67,11 @@ sandbox:
   enabled: true
   
   # WHEN to sandbox:
-  # - auto:   Sandbox only medium/high risk commands (Recommended)
-  # - always: Sandbox everything (Safest)
+  # - always: Sandbox everything (Recommended - Maximum security with caching)
+  # - auto:   Sandbox only medium/high risk commands
   # - risky:  Sandbox only high/critical risk
-  mode: auto
+  # - never:  Never sandbox (except critical commands cannot be bypassed)
+  mode: always  # Default: always (maximum security with 10x speedup from caching)
   
   # HOW STRICT the sandbox is:
   # - permissive: Fast, shares host network
@@ -86,7 +87,8 @@ sandbox:
   
   # PERFORMANCE:
   # Enable caching to speed up installs (npm, pip, go, etc.)
-  enable_cache: true
+  # In "always" mode, cache is enabled for ALL commands (10x speedup)
+  enable_cache: true  # Default: true (enabled for maximum performance)
   
   # Network access for sandbox
   network_mode: restricted
