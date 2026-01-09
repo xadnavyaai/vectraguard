@@ -126,9 +126,9 @@ if command -v vectra-guard &> /dev/null; then
         fi
         
         # Quick check for obviously dangerous patterns (fast path)
+        # Note: Fork bomb check removed - vectra-guard validate will catch it
         if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+[/\*] ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
-           [[ "$cmd" =~ :\(\)\{[[:space:]]*:[|:&][[:space:]]*\};: ]]; then
+           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]]; then
             # Definitely dangerous - intercept immediately
             if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
                 # Replace BASH_COMMAND to route through vectra-guard exec
@@ -252,9 +252,9 @@ if command -v vectra-guard &> /dev/null; then
         fi
         
         # Quick check for obviously dangerous patterns (fast path)
+        # Note: Fork bomb check removed - vectra-guard validate will catch it
         if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+[/\*] ]] || \
-           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
-           [[ "$cmd" =~ :\(\)\{[[:space:]]*:[|:&][[:space:]]*\};: ]]; then
+           [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]]; then
             # Definitely dangerous - intercept
             if [[ -n "$VECTRAGUARD_SESSION_ID" ]]; then
                 # Execute through vectra-guard exec (will block if needed)
