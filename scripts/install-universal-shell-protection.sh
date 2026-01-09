@@ -129,18 +129,17 @@ if command -v vectra-guard &> /dev/null; then
         # Note: Fork bomb check removed - vectra-guard validate will catch it
         if [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+[/\*] ]] || \
            [[ "$cmd" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]]; then
-            # Definitely dangerous - intercept immediately
+            # Definitely dangerous - BLOCK immediately (critical commands should never execute)
+            echo "❌ BLOCKED: Critical command detected: $cmd" >&2
+            echo "   This command would delete system files and is blocked for safety." >&2
             if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-                # Replace BASH_COMMAND to route through vectra-guard exec
-                # Properly quote the command to handle special characters
-                BASH_COMMAND="vectra-guard exec --session '$VECTRAGUARD_SESSION_ID' -- $(printf '%q' "$cmd")"
-            else
-                # No session - block critical commands
-                echo "❌ BLOCKED: Dangerous command detected: $cmd" >&2
-                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                # Replace with a no-op command to prevent execution
-                BASH_COMMAND=":"
+                echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
+                # Log the blocked command
+                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
             fi
+            echo "   Use 'vectra-guard exec -- <command>' if you really need to run this." >&2
+            # Replace with a no-op command to prevent execution
+            BASH_COMMAND=":"
             VECTRA_LAST_CMD="$cmd"
             return 0
         fi
