@@ -42,8 +42,38 @@ echo "Detected shells: ${SHELLS[*]}"
 echo ""
 
 # Backup existing configs
-echo "Step 1/4: Backing up existing configurations..."
-for shell in "${SHELLS[@]}"; do
+SELECTED_SHELLS=("${SHELLS[@]}")
+
+# Optional interactive shell selection
+if [ -t 0 ] && [ -c /dev/tty ]; then
+    read -p "Install protection for all detected shells? [Y/n] " -n 1 -r < /dev/tty
+    echo
+    if [[ $REPLY =~ ^[Nn]$ ]]; then
+        echo "Available shells: ${SHELLS[*]}"
+        read -p "Enter shells to enable (space-separated, e.g., 'bash zsh'): " -r < /dev/tty
+        if [ -n "$REPLY" ]; then
+            SELECTED_SHELLS=()
+            for shell in $REPLY; do
+                for detected in "${SHELLS[@]}"; do
+                    if [ "$shell" = "$detected" ]; then
+                        SELECTED_SHELLS+=("$shell")
+                    fi
+                done
+            done
+            if [ ${#SELECTED_SHELLS[@]} -eq 0 ]; then
+                echo "❌ No valid shells selected, using all detected shells."
+                SELECTED_SHELLS=("${SHELLS[@]}")
+            fi
+        fi
+    fi
+else
+    echo "  ℹ️  Non-interactive mode: installing for all detected shells"
+fi
+echo ""
+
+# Backup existing configs
+echo "Step 1/5: Backing up existing configurations..."
+for shell in "${SELECTED_SHELLS[@]}"; do
     case $shell in
         bash)
             if [ -f ~/.bashrc ]; then
@@ -78,7 +108,7 @@ done
 echo ""
 
 # Install shell integrations
-echo "Step 2/4: Installing shell integrations..."
+echo "Step 2/5: Installing shell integrations..."
 
 # Function to add bash integration
 install_bash() {
@@ -448,7 +478,7 @@ FISH_EOF
 }
 
 # Install for each detected shell
-for shell in "${SHELLS[@]}"; do
+for shell in "${SELECTED_SHELLS[@]}"; do
     case $shell in
         bash) install_bash ;;
         zsh) install_zsh ;;
@@ -458,7 +488,7 @@ done
 echo ""
 
 # Initialize configuration
-echo "Step 3/4: Initializing vectra-guard..."
+echo "Step 3/5: Initializing vectra-guard..."
 if [ ! -f vectra-guard.yaml ] && [ ! -f ~/.config/vectra-guard/config.yaml ]; then
     if vectra-guard init &>/dev/null; then
         echo "  ✅ Created vectra-guard.yaml"
@@ -470,8 +500,33 @@ else
 fi
 echo ""
 
+# Optional: IDE integration setup (Cursor/VS Code)
+echo "Step 4/5: IDE integration (optional)..."
+if [ -t 0 ] && [ -c /dev/tty ]; then
+    read -p "Configure Cursor/VS Code integration? [y/N] " -n 1 -r < /dev/tty
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        if [ -f "$(dirname "$0")/setup-cursor-protection.sh" ]; then
+            read -p "Workspace path for IDE integration [$(pwd)]: " -r < /dev/tty
+            WORKSPACE_PATH="${REPLY:-$(pwd)}"
+            if [ ! -d "$WORKSPACE_PATH" ]; then
+                echo "❌ Workspace path does not exist: $WORKSPACE_PATH"
+                echo "   Skipping IDE integration."
+            else
+                echo "  ✅ Running Cursor/VS Code setup for: $WORKSPACE_PATH"
+                WORKSPACE="$WORKSPACE_PATH" "$(dirname "$0")/setup-cursor-protection.sh"
+            fi
+        else
+            echo "  ⚠️  setup-cursor-protection.sh not found, skipping"
+        fi
+    fi
+else
+    echo "  ℹ️  Skipping IDE integration in non-interactive mode"
+fi
+echo ""
+
 # Optional: Install command aliases
-echo "Step 4/4: Setting up safety aliases (optional)..."
+echo "Step 5/5: Setting up safety aliases (optional)..."
 # Use /dev/tty to read from terminal when piped through curl | bash
 if [ -t 0 ] && [ -c /dev/tty ]; then
     read -p "Install safety aliases (wrap dangerous commands)? [y/N] " -n 1 -r < /dev/tty
@@ -482,7 +537,7 @@ else
     echo "  ℹ️  Skipping in non-interactive mode"
 fi
 if [[ $REPLY =~ ^[Yy]$ ]]; then
-    for shell in "${SHELLS[@]}"; do
+    for shell in "${SELECTED_SHELLS[@]}"; do
         case $shell in
             bash|zsh)
                 cat >> ~/."${shell}rc" << 'ALIAS_EOF'
@@ -519,15 +574,15 @@ echo "=========================================="
 echo "✅ Universal Shell Protection Installed!"
 echo "=========================================="
 echo ""
-echo "Protected shells: ${SHELLS[*]}"
+echo "Protected shells: ${SELECTED_SHELLS[*]}"
 echo "Convenience alias: vg (shorthand for vectra-guard)"
 echo ""
 echo "Next steps:"
-if [[ " ${SHELLS[*]} " =~ " bash " ]]; then
+if [[ " ${SELECTED_SHELLS[*]} " =~ " bash " ]]; then
     echo "1. Restart your terminal (or run: source ~/.bashrc)"
-elif [[ " ${SHELLS[*]} " =~ " zsh " ]]; then
+elif [[ " ${SELECTED_SHELLS[*]} " =~ " zsh " ]]; then
     echo "1. Restart your terminal (or run: source ~/.zshrc)"
-elif [[ " ${SHELLS[*]} " =~ " fish " ]]; then
+elif [[ " ${SELECTED_SHELLS[*]} " =~ " fish " ]]; then
     echo "1. Restart your terminal (fish will auto-load config)"
 fi
 echo "2. Verify: echo \$VECTRAGUARD_SESSION_ID"
@@ -543,14 +598,13 @@ echo "  ✅ SSH sessions"
 echo "  ✅ Anywhere!"
 echo ""
 echo "To uninstall: Restore from backups"
-if [[ " ${SHELLS[*]} " =~ " bash " ]]; then
+if [[ " ${SELECTED_SHELLS[*]} " =~ " bash " ]]; then
     echo "  mv ~/.bashrc.vectra-backup ~/.bashrc"
 fi
-if [[ " ${SHELLS[*]} " =~ " zsh " ]]; then
+if [[ " ${SELECTED_SHELLS[*]} " =~ " zsh " ]]; then
     echo "  mv ~/.zshrc.vectra-backup ~/.zshrc"
 fi
-if [[ " ${SHELLS[*]} " =~ " fish " ]]; then
+if [[ " ${SELECTED_SHELLS[*]} " =~ " fish " ]]; then
     echo "  mv ~/.config/fish/config.fish.vectra-backup ~/.config/fish/config.fish"
 fi
 echo ""
-
