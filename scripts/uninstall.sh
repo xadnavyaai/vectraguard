@@ -46,7 +46,7 @@ echo "📋 Uninstalling components..."
 echo ""
 
 # 1. Remove binary
-echo "1/4: Removing binary..."
+echo "1/5: Removing binary..."
 if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
     if [ -w "$INSTALL_DIR" ]; then
         rm -f "$INSTALL_DIR/$BINARY_NAME"
@@ -58,9 +58,11 @@ else
     echo "  ℹ️  Binary not found"
 fi
 
+DATA_REMOVED=false
+
 # 2. Remove shell integration and restore from backups
 echo ""
-echo "2/4: Removing shell integration..."
+echo "2/5: Removing shell integration..."
 REMOVED_INTEGRATION=false
 RESTORED_FROM_BACKUP=false
 
@@ -97,13 +99,17 @@ for shell_rc in ~/.bashrc ~/.zshrc ~/.config/fish/config.fish; do
                 RESTORED_FROM_BACKUP=true
                 REMOVED_INTEGRATION=true
             else
-                # No backup, just remove the integration section
+                # No backup, just remove the integration section and safety aliases
                 if [[ "$OSTYPE" == "darwin"* ]]; then
                     # macOS (BSD sed)
                     sed -i '' '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc_expanded"
+                    sed -i '' '/# Vectra Guard Safety Aliases/,/fi/d' "$shell_rc_expanded"
+                    sed -i '' '/# Vectra Guard Safety Aliases/,/end/d' "$shell_rc_expanded"
                 else
                     # Linux (GNU sed)
                     sed -i '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc_expanded"
+                    sed -i '/# Vectra Guard Safety Aliases/,/fi/d' "$shell_rc_expanded"
+                    sed -i '/# Vectra Guard Safety Aliases/,/end/d' "$shell_rc_expanded"
                 fi
                 echo "  ✅ Removed from $(basename $shell_rc_expanded)"
                 REMOVED_INTEGRATION=true
@@ -126,7 +132,7 @@ fi
 
 # 3. Remove session file
 echo ""
-echo "3/4: Cleaning up session data..."
+echo "3/5: Cleaning up session data..."
 if [ -f ~/.vectra-guard-session ]; then
     rm -f ~/.vectra-guard-session
     echo "  ✅ Session file removed"
@@ -134,17 +140,56 @@ else
     echo "  ℹ️  No session file found"
 fi
 
-# 4. Ask about data directory
+# 4. Remove configs and data
 echo ""
-echo "4/4: Configuration and session data..."
-if [ -d ~/.vectra-guard ]; then
-    echo "  ℹ️  Data directory found: ~/.vectra-guard"
-    echo "  ℹ️  Keeping data directory (remove manually if desired: rm -rf ~/.vectra-guard)"
+echo "4/5: Configuration and data cleanup..."
+if [ -c /dev/tty ]; then
+    read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r < /dev/tty
 else
-    echo "  ℹ️  No data directory found"
+    read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r
+fi
+echo
+if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+    if [ -d ~/.vectra-guard ]; then
+        rm -rf ~/.vectra-guard
+        echo "  ✅ Removed data directory: ~/.vectra-guard"
+    else
+        echo "  ℹ️  No data directory found"
+    fi
+    if [ -d ~/.config/vectra-guard ]; then
+        rm -rf ~/.config/vectra-guard
+        echo "  ✅ Removed config directory: ~/.config/vectra-guard"
+    else
+        echo "  ℹ️  No config directory found"
+    fi
+    if [ -f ~/vectra-guard.yaml ]; then
+        rm -f ~/vectra-guard.yaml
+        echo "  ✅ Removed user config: ~/vectra-guard.yaml"
+    fi
+    if [ -f ~/.vectra-guard-session ]; then
+        rm -f ~/.vectra-guard-session
+        echo "  ✅ Removed session file: ~/.vectra-guard-session"
+    fi
+    DATA_REMOVED=true
+else
+    echo "  ℹ️  Kept configs/data (remove manually if desired)."
 fi
 
-# 5. Check for remaining backups (should be none if restored)
+# 5. Remove pre-commit hook (current repo only if present)
+echo ""
+echo "5/6: Removing git pre-commit hook (current repo if present)..."
+if [ -d .git ] && [ -f .git/hooks/pre-commit ]; then
+    if grep -q "Vectra Guard Pre-commit Hook" .git/hooks/pre-commit 2>/dev/null; then
+        rm -f .git/hooks/pre-commit
+        echo "  ✅ Removed Vectra Guard pre-commit hook from .git/hooks/pre-commit"
+    else
+        echo "  ℹ️  Pre-commit hook exists but not created by Vectra Guard (left untouched)"
+    fi
+else
+    echo "  ℹ️  No git pre-commit hook found in current directory"
+fi
+
+# 6. Check for remaining backups (should be none if restored)
 echo ""
 echo "Checking for remaining backups..."
 FOUND_BACKUPS=false
@@ -176,9 +221,12 @@ if [ "$REMOVED_INTEGRATION" = true ]; then
     echo ""
 fi
 
-if [ -d ~/.vectra-guard ]; then
-    echo "ℹ️  Data directory preserved at: ~/.vectra-guard"
-    echo "   Remove manually if desired: rm -rf ~/.vectra-guard"
+if [ "$DATA_REMOVED" = true ]; then
+    echo "✅ Config/data removed (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)"
+    echo ""
+else
+    echo "ℹ️  Config/data kept. To remove manually:"
+    echo "   rm -rf ~/.config/vectra-guard ~/.vectra-guard ~/.vectra-guard-session ~/vectra-guard.yaml"
     echo ""
 fi
 

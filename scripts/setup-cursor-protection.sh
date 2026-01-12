@@ -171,12 +171,13 @@ chmod +x "$WORKSPACE/.vectra-guard/init.sh"
 echo "✅ Created .vectra-guard/init.sh"
 echo ""
 
-echo "Step 4/6: Setting up git hooks..."
-echo "--------------------------------------"
+echo "Step 4/6: Setting up git hooks (disabled by default)..."
+echo "------------------------------------------------------"
 if [ -d "$WORKSPACE/.git" ]; then
-    mkdir -p "$WORKSPACE/.git/hooks"
-    
-    cat > "$WORKSPACE/.git/hooks/pre-commit" << 'HOOKEOF'
+    if [ "${VG_ENABLE_PRECOMMIT:-0}" = "1" ]; then
+        mkdir -p "$WORKSPACE/.git/hooks"
+        
+        cat > "$WORKSPACE/.git/hooks/pre-commit" << 'HOOKEOF'
 #!/bin/bash
 # Vectra Guard Pre-commit Hook
 # Validates all scripts before commit
@@ -214,9 +215,12 @@ fi
 
 exit 0
 HOOKEOF
-    
-    chmod +x "$WORKSPACE/.git/hooks/pre-commit"
-    echo "✅ Created git pre-commit hook"
+        
+        chmod +x "$WORKSPACE/.git/hooks/pre-commit"
+        echo "✅ Created git pre-commit hook (VG_ENABLE_PRECOMMIT=1)"
+    else
+        echo "ℹ️  Skipping pre-commit hook (set VG_ENABLE_PRECOMMIT=1 to enable)"
+    fi
 else
     echo "⚠️  No .git directory found, skipping git hooks"
 fi
