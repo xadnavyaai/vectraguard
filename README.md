@@ -8,6 +8,15 @@
 
 Vectra Guard is a comprehensive security tool that protects systems from risky shell commands and AI agent activities. It validates scripts, monitors command execution, detects database operations, tracks agent sessions, and enforces security policies with real-time protection including production environment warnings.
 
+**Agentic development boost:** Vectra Guard now includes **context summarization** and **roadmap planning** so agents can quickly map a repo, capture intent, and move faster without leaving your machine.
+
+**Why it helps agent workflows**
+- **Safety by default**: risky commands are analyzed before they run.
+- **Sandbox + cache**: isolate unknown code, reuse cached dependencies.
+- **Context summaries**: quickly surface key functions or doc sentences.
+- **Roadmap planning**: capture intent, status, and notes per repo.
+- **Repo-local config**: keep workspace settings and cache local (safe to commit config, ignore cache).
+
 ---
 
 ## 🎯 Why Vectra Guard?
@@ -167,6 +176,9 @@ Use Vectra Guard commands directly:
 ```bash
 # Initialize configuration
 vectra-guard init
+
+# Initialize repo-local config + cache
+vectra-guard init --local
 
 # Validate a script (use 'vg' as shorthand if you have universal protection)
 vectra-guard validate your-script.sh
@@ -437,6 +449,9 @@ sandbox:
 # Initialize configuration
 vectra-guard init
 
+# Initialize repo-local config + cache
+vectra-guard init --local
+
 # Validate a shell script
 vectra-guard validate deploy.sh
 
@@ -489,6 +504,49 @@ vg trust remove "npm install express"
 
 # Clean expired entries
 vg trust clean
+```
+
+### Context Summaries
+
+```bash
+# Summarize code with lightweight heuristics
+vg context summarize code cmd/root.go --max 5
+
+# Summarize docs/text with extractive sentences
+vg context summarize docs README.md --max 3
+
+# Advanced Go mode: AST-based function summaries with call graph signals
+vg context summarize advanced cmd/root.go --max 3
+```
+
+### Help Topics
+
+```bash
+# Show available help topics
+vg help
+
+# Get detailed usage for roadmap and context
+vg help roadmap
+vg help context
+```
+
+### Roadmap Planning (NEW!)
+
+```bash
+# Add a roadmap item for agent + human planning
+vg roadmap add --title "Improve cache heuristics" --summary "Tune cache hit scoring" --tags "agent,performance"
+
+# List recent roadmap items
+vg roadmap list
+
+# Show a roadmap item with logs
+vg roadmap show rm-123456789
+
+# Update status
+vg roadmap status rm-123456789 in-progress
+
+# Attach a log entry (optionally link a session)
+vg roadmap log rm-123456789 --note "Investigated cache hit rate" --session $VECTRAGUARD_SESSION_ID
 ```
 
 ### Sandbox Metrics (NEW!)

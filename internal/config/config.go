@@ -12,12 +12,12 @@ import (
 
 // Config represents the merged configuration for vectra-guard.
 type Config struct {
-	Logging              LoggingConfig            `yaml:"logging" toml:"logging" json:"logging"`
-	Policies             PolicyConfig             `yaml:"policies" toml:"policies" json:"policies"`
-	EnvProtection        EnvProtectionConfig      `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
-	GuardLevel           GuardLevelConfig         `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
+	Logging              LoggingConfig              `yaml:"logging" toml:"logging" json:"logging"`
+	Policies             PolicyConfig               `yaml:"policies" toml:"policies" json:"policies"`
+	EnvProtection        EnvProtectionConfig        `yaml:"env_protection" toml:"env_protection" json:"env_protection"`
+	GuardLevel           GuardLevelConfig           `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
 	ProductionIndicators ProductionIndicatorsConfig `yaml:"production_indicators" toml:"production_indicators" json:"production_indicators"`
-	Sandbox              SandboxConfig            `yaml:"sandbox" toml:"sandbox" json:"sandbox"`
+	Sandbox              SandboxConfig              `yaml:"sandbox" toml:"sandbox" json:"sandbox"`
 }
 
 // LoggingConfig controls output formatting.
@@ -47,14 +47,14 @@ type GuardLevelConfig struct {
 
 // PolicyConfig captures simple allow/deny rules applied during analysis.
 type PolicyConfig struct {
-	Allowlist           []string `yaml:"allowlist" toml:"allowlist" json:"allowlist"`
-	Denylist            []string `yaml:"denylist" toml:"denylist" json:"denylist"`
+	Allowlist            []string `yaml:"allowlist" toml:"allowlist" json:"allowlist"`
+	Denylist             []string `yaml:"denylist" toml:"denylist" json:"denylist"`
 	ProtectedDirectories []string `yaml:"protected_directories" toml:"protected_directories" json:"protected_directories"`
-	MonitorGitOps       bool     `yaml:"monitor_git_ops" toml:"monitor_git_ops" json:"monitor_git_ops"`
-	BlockForceGit       bool     `yaml:"block_force_git" toml:"block_force_git" json:"block_force_git"`
-	DetectProdEnv       bool     `yaml:"detect_prod_env" toml:"detect_prod_env" json:"detect_prod_env"`
-	ProdEnvPatterns     []string `yaml:"prod_env_patterns" toml:"prod_env_patterns" json:"prod_env_patterns"`
-	OnlyDestructiveSQL  bool     `yaml:"only_destructive_sql" toml:"only_destructive_sql" json:"only_destructive_sql"`
+	MonitorGitOps        bool     `yaml:"monitor_git_ops" toml:"monitor_git_ops" json:"monitor_git_ops"`
+	BlockForceGit        bool     `yaml:"block_force_git" toml:"block_force_git" json:"block_force_git"`
+	DetectProdEnv        bool     `yaml:"detect_prod_env" toml:"detect_prod_env" json:"detect_prod_env"`
+	ProdEnvPatterns      []string `yaml:"prod_env_patterns" toml:"prod_env_patterns" json:"prod_env_patterns"`
+	OnlyDestructiveSQL   bool     `yaml:"only_destructive_sql" toml:"only_destructive_sql" json:"only_destructive_sql"`
 }
 
 // EnvProtectionConfig controls environment variable protection and masking.
@@ -78,7 +78,7 @@ type ProductionIndicatorsConfig struct {
 type SandboxMode string
 
 const (
-	SandboxModeAuto  SandboxMode = "auto"  // Auto-detect based on risk
+	SandboxModeAuto   SandboxMode = "auto"   // Auto-detect based on risk
 	SandboxModeAlways SandboxMode = "always" // Always sandbox
 	SandboxModeRisky  SandboxMode = "risky"  // Only high/critical risk
 	SandboxModeNever  SandboxMode = "never"  // Never sandbox
@@ -108,48 +108,48 @@ const (
 // SandboxConfig controls sandbox execution behavior
 type SandboxConfig struct {
 	// Core settings
-	Enabled        bool                 `yaml:"enabled" toml:"enabled" json:"enabled"`
-	Mode           SandboxMode          `yaml:"mode" toml:"mode" json:"mode"`
-	SecurityLevel  SandboxSecurityLevel `yaml:"security_level" toml:"security_level" json:"security_level"`
-	
+	Enabled       bool                 `yaml:"enabled" toml:"enabled" json:"enabled"`
+	Mode          SandboxMode          `yaml:"mode" toml:"mode" json:"mode"`
+	SecurityLevel SandboxSecurityLevel `yaml:"security_level" toml:"security_level" json:"security_level"`
+
 	// Runtime configuration
-	Runtime        string `yaml:"runtime" toml:"runtime" json:"runtime"` // auto, bubblewrap, namespace, docker, podman
-	Image          string `yaml:"image" toml:"image" json:"image"`       // Docker/Podman image
-	Timeout        int    `yaml:"timeout" toml:"timeout" json:"timeout"` // seconds
-	
+	Runtime string `yaml:"runtime" toml:"runtime" json:"runtime"` // auto, bubblewrap, namespace, docker, podman
+	Image   string `yaml:"image" toml:"image" json:"image"`       // Docker/Podman image
+	Timeout int    `yaml:"timeout" toml:"timeout" json:"timeout"` // seconds
+
 	// Environment detection
-	AutoDetectEnv  bool   `yaml:"auto_detect_env" toml:"auto_detect_env" json:"auto_detect_env"` // Auto-detect dev/CI
-	PreferFast     bool   `yaml:"prefer_fast" toml:"prefer_fast" json:"prefer_fast"`             // Prefer fast runtimes in dev
-	
+	AutoDetectEnv bool `yaml:"auto_detect_env" toml:"auto_detect_env" json:"auto_detect_env"` // Auto-detect dev/CI
+	PreferFast    bool `yaml:"prefer_fast" toml:"prefer_fast" json:"prefer_fast"`             // Prefer fast runtimes in dev
+
 	// Cache configuration
-	EnableCache    bool     `yaml:"enable_cache" toml:"enable_cache" json:"enable_cache"`
-	CacheDirs      []string `yaml:"cache_dirs" toml:"cache_dirs" json:"cache_dirs"`
-	CacheDir       string   `yaml:"cache_dir" toml:"cache_dir" json:"cache_dir"` // Cache directory for namespace runtime
-	
+	EnableCache bool     `yaml:"enable_cache" toml:"enable_cache" json:"enable_cache"`
+	CacheDirs   []string `yaml:"cache_dirs" toml:"cache_dirs" json:"cache_dirs"`
+	CacheDir    string   `yaml:"cache_dir" toml:"cache_dir" json:"cache_dir"` // Cache directory for namespace runtime
+
 	// Network configuration
-	NetworkMode    string   `yaml:"network_mode" toml:"network_mode" json:"network_mode"` // none, restricted, full
-	AllowNetwork   bool     `yaml:"allow_network" toml:"allow_network" json:"allow_network"` // Allow network access
-	
+	NetworkMode  string `yaml:"network_mode" toml:"network_mode" json:"network_mode"`    // none, restricted, full
+	AllowNetwork bool   `yaml:"allow_network" toml:"allow_network" json:"allow_network"` // Allow network access
+
 	// Filesystem configuration
-	ReadOnlyPaths  []string `yaml:"read_only_paths" toml:"read_only_paths" json:"read_only_paths"`   // Read-only filesystem paths
-	WorkspaceDir   string   `yaml:"workspace_dir" toml:"workspace_dir" json:"workspace_dir"`         // Workspace directory
-	
+	ReadOnlyPaths []string `yaml:"read_only_paths" toml:"read_only_paths" json:"read_only_paths"` // Read-only filesystem paths
+	WorkspaceDir  string   `yaml:"workspace_dir" toml:"workspace_dir" json:"workspace_dir"`       // Workspace directory
+
 	// Security profiles
-	SeccompProfile string   `yaml:"seccomp_profile" toml:"seccomp_profile" json:"seccomp_profile"` // strict, moderate, minimal, none
-	CapabilitySet  string   `yaml:"capability_set" toml:"capability_set" json:"capability_set"`    // none, minimal, normal
-	UseOverlayFS   bool     `yaml:"use_overlayfs" toml:"use_overlayfs" json:"use_overlayfs"`       // Use OverlayFS (namespace only)
-	
+	SeccompProfile string `yaml:"seccomp_profile" toml:"seccomp_profile" json:"seccomp_profile"` // strict, moderate, minimal, none
+	CapabilitySet  string `yaml:"capability_set" toml:"capability_set" json:"capability_set"`    // none, minimal, normal
+	UseOverlayFS   bool   `yaml:"use_overlayfs" toml:"use_overlayfs" json:"use_overlayfs"`       // Use OverlayFS (namespace only)
+
 	// Environment
-	EnvWhitelist   []string `yaml:"env_whitelist" toml:"env_whitelist" json:"env_whitelist"`
-	
+	EnvWhitelist []string `yaml:"env_whitelist" toml:"env_whitelist" json:"env_whitelist"`
+
 	// Custom mounts
-	BindMounts     []BindMountConfig `yaml:"bind_mounts" toml:"bind_mounts" json:"bind_mounts"`
-	
+	BindMounts []BindMountConfig `yaml:"bind_mounts" toml:"bind_mounts" json:"bind_mounts"`
+
 	// Observability
-	EnableMetrics  bool   `yaml:"enable_metrics" toml:"enable_metrics" json:"enable_metrics"`
-	LogOutput      bool   `yaml:"log_output" toml:"log_output" json:"log_output"`
-	ShowRuntimeInfo bool  `yaml:"show_runtime_info" toml:"show_runtime_info" json:"show_runtime_info"` // Show runtime selection
-	
+	EnableMetrics   bool `yaml:"enable_metrics" toml:"enable_metrics" json:"enable_metrics"`
+	LogOutput       bool `yaml:"log_output" toml:"log_output" json:"log_output"`
+	ShowRuntimeInfo bool `yaml:"show_runtime_info" toml:"show_runtime_info" json:"show_runtime_info"` // Show runtime selection
+
 	// Trust store
 	TrustStorePath string `yaml:"trust_store_path" toml:"trust_store_path" json:"trust_store_path"`
 }
@@ -166,28 +166,28 @@ func DefaultConfig() Config {
 	return Config{
 		Logging: LoggingConfig{Format: "text"},
 		Policies: PolicyConfig{
-			Allowlist:          []string{},
-			Denylist:           []string{"rm -rf /", "sudo ", ":(){ :|:& };:", "mkfs", "dd if="},
+			Allowlist: []string{},
+			Denylist:  []string{"rm -rf /", "sudo ", ":(){ :|:& };:", "mkfs", "dd if="},
 			ProtectedDirectories: []string{
-				"/",           // Root directory
-				"/bin",        // System binaries
-				"/sbin",       // System admin binaries
-				"/usr",        // User programs
-				"/usr/bin",    // User binaries
-				"/usr/sbin",   // User admin binaries
-				"/usr/local",  // Local programs
-				"/etc",        // System configuration
-				"/var",        // Variable data
-				"/lib",        // Libraries
-				"/lib64",      // 64-bit libraries
-				"/opt",        // Optional software
-				"/boot",       // Boot files
-				"/root",       // Root home
-				"/sys",        // System files
-				"/proc",       // Process files
-				"/dev",        // Device files
-				"/home",       // User homes
-				"/srv",        // Service data
+				"/",          // Root directory
+				"/bin",       // System binaries
+				"/sbin",      // System admin binaries
+				"/usr",       // User programs
+				"/usr/bin",   // User binaries
+				"/usr/sbin",  // User admin binaries
+				"/usr/local", // Local programs
+				"/etc",       // System configuration
+				"/var",       // Variable data
+				"/lib",       // Libraries
+				"/lib64",     // 64-bit libraries
+				"/opt",       // Optional software
+				"/boot",      // Boot files
+				"/root",      // Root home
+				"/sys",       // System files
+				"/proc",      // Process files
+				"/dev",       // Device files
+				"/home",      // User homes
+				"/srv",       // Service data
 			},
 			MonitorGitOps:      true,
 			BlockForceGit:      true,
@@ -215,46 +215,46 @@ func DefaultConfig() Config {
 			Keywords: []string{"prod", "production", "prd", "live", "staging", "stg"},
 		},
 		Sandbox: SandboxConfig{
-			Enabled:         true,
-			Mode:            SandboxModeAlways, // Always sandbox for maximum security
-			SecurityLevel:   SandboxSecurityBalanced,
-			Runtime:         "auto", // Auto-detect best runtime (bubblewrap > docker > podman)
-			Image:           "ubuntu:22.04",
-			Timeout:         600, // 10 minutes (longer for builds)
-			AutoDetectEnv:   true, // Auto-detect dev/CI
-			PreferFast:      true, // Prefer fast runtimes (bubblewrap/namespace) when available
-			EnableCache:     true, // Enable caching for 10x speedup
+			Enabled:       true,
+			Mode:          SandboxModeAlways, // Always sandbox for maximum security
+			SecurityLevel: SandboxSecurityBalanced,
+			Runtime:       "auto", // Auto-detect best runtime (bubblewrap > docker > podman)
+			Image:         "ubuntu:22.04",
+			Timeout:       600,  // 10 minutes (longer for builds)
+			AutoDetectEnv: true, // Auto-detect dev/CI
+			PreferFast:    true, // Prefer fast runtimes (bubblewrap/namespace) when available
+			EnableCache:   true, // Enable caching for 10x speedup
 			CacheDirs: []string{
 				// Comprehensive cache directories for all major package managers
-				"~/.npm",           // Node.js npm
-				"~/.yarn",          // Yarn
-				"~/.pnpm",          // pnpm
-				"~/.cache/pip",     // Python pip
-				"~/.cache/pip3",    // Python pip3
-				"~/.cargo",         // Rust cargo
-				"~/.rustup",        // Rust toolchain
-				"~/go/pkg",         // Go modules
-				"~/.m2",            // Maven
-				"~/.gradle",        // Gradle
-				"~/.gem",           // Ruby gems
+				"~/.npm",            // Node.js npm
+				"~/.yarn",           // Yarn
+				"~/.pnpm",           // pnpm
+				"~/.cache/pip",      // Python pip
+				"~/.cache/pip3",     // Python pip3
+				"~/.cargo",          // Rust cargo
+				"~/.rustup",         // Rust toolchain
+				"~/go/pkg",          // Go modules
+				"~/.m2",             // Maven
+				"~/.gradle",         // Gradle
+				"~/.gem",            // Ruby gems
 				"~/.cache/go-build", // Go build cache
-				"~/.cache/npm",     // npm cache
-				"~/.cache/yarn",    // Yarn cache
-				"~/.cache/pip",     // pip cache
-				"~/.cache/pip3",    // pip3 cache
-				"~/.cache/cargo",   // Cargo cache
+				"~/.cache/npm",      // npm cache
+				"~/.cache/yarn",     // Yarn cache
+				"~/.cache/pip",      // pip cache
+				"~/.cache/pip3",     // pip3 cache
+				"~/.cache/cargo",    // Cargo cache
 				"~/.cache/composer", // PHP Composer
-				"~/.cache/bower",   // Bower
-				"~/.cache/nuget",  // .NET NuGet
+				"~/.cache/bower",    // Bower
+				"~/.cache/nuget",    // .NET NuGet
 			},
-			CacheDir:        "", // Will use ~/.cache/vectra-guard by default
-			NetworkMode:     "restricted", // Restricted network (allows package managers)
-			AllowNetwork:    true, // Allow network for package installs
-			ReadOnlyPaths:   []string{}, // Will use defaults if empty
-			WorkspaceDir:    "", // Will use current directory by default
-			SeccompProfile:  "moderate", // strict, moderate, minimal, none
-			CapabilitySet:   "minimal",  // none, minimal, normal
-			UseOverlayFS:    true, // Use OverlayFS for /tmp (performance)
+			CacheDir:       "",           // Will use ~/.cache/vectra-guard by default
+			NetworkMode:    "restricted", // Restricted network (allows package managers)
+			AllowNetwork:   true,         // Allow network for package installs
+			ReadOnlyPaths:  []string{},   // Will use defaults if empty
+			WorkspaceDir:   "",           // Will use current directory by default
+			SeccompProfile: "moderate",   // strict, moderate, minimal, none
+			CapabilitySet:  "minimal",    // none, minimal, normal
+			UseOverlayFS:   true,         // Use OverlayFS for /tmp (performance)
 			EnvWhitelist: []string{
 				"HOME", "USER", "PATH", "SHELL", "TERM",
 				"LANG", "LC_ALL", "PWD", "OLDPWD",
@@ -263,7 +263,7 @@ func DefaultConfig() Config {
 				"DOCKER_HOST", "CI", "TRAVIS", "CIRCLE", "JENKINS",
 			},
 			BindMounts:      []BindMountConfig{},
-			EnableMetrics:   true, // Track performance metrics
+			EnableMetrics:   true,  // Track performance metrics
 			LogOutput:       false, // Don't log output by default
 			ShowRuntimeInfo: false, // Don't spam user by default
 			TrustStorePath:  "",
@@ -303,7 +303,7 @@ func resolvePaths(explicit, workdir string) ([]string, error) {
 	} else if homeDir, err := os.UserHomeDir(); err == nil {
 		home = homeDir
 	}
-	
+
 	if home != "" {
 		candidateYAML := filepath.Join(home, ".config", "vectra-guard", "config.yaml")
 		candidateTOML := filepath.Join(home, ".config", "vectra-guard", "config.toml")
@@ -318,11 +318,19 @@ func resolvePaths(explicit, workdir string) ([]string, error) {
 	if workdir != "" {
 		projectYAML := filepath.Join(workdir, "vectra-guard.yaml")
 		projectTOML := filepath.Join(workdir, "vectra-guard.toml")
+		localYAML := filepath.Join(workdir, ".vectra-guard", "config.yaml")
+		localTOML := filepath.Join(workdir, ".vectra-guard", "config.toml")
 		if exists(projectYAML) {
 			paths = append(paths, projectYAML)
 		}
 		if exists(projectTOML) {
 			paths = append(paths, projectTOML)
+		}
+		if exists(localYAML) {
+			paths = append(paths, localYAML)
+		}
+		if exists(localTOML) {
+			paths = append(paths, localTOML)
 		}
 	}
 
@@ -371,17 +379,17 @@ func merge(dst *Config, src Config) {
 	if len(src.Policies.Denylist) > 0 {
 		dst.Policies.Denylist = src.Policies.Denylist
 	}
-	
+
 	// Merge policy booleans (false is a valid value, so we don't check for zero)
 	dst.Policies.MonitorGitOps = src.Policies.MonitorGitOps
 	dst.Policies.BlockForceGit = src.Policies.BlockForceGit
 	dst.Policies.DetectProdEnv = src.Policies.DetectProdEnv
 	dst.Policies.OnlyDestructiveSQL = src.Policies.OnlyDestructiveSQL
-	
+
 	if len(src.Policies.ProdEnvPatterns) > 0 {
 		dst.Policies.ProdEnvPatterns = src.Policies.ProdEnvPatterns
 	}
-	
+
 	// Merge guard level
 	if src.GuardLevel.Level != "" {
 		dst.GuardLevel.Level = src.GuardLevel.Level
@@ -393,7 +401,7 @@ func merge(dst *Config, src Config) {
 		dst.GuardLevel.RequireApprovalAbove = src.GuardLevel.RequireApprovalAbove
 	}
 	dst.GuardLevel.AllowUserBypass = src.GuardLevel.AllowUserBypass
-	
+
 	// Merge production indicators
 	if len(src.ProductionIndicators.Branches) > 0 {
 		dst.ProductionIndicators.Branches = src.ProductionIndicators.Branches
@@ -401,7 +409,7 @@ func merge(dst *Config, src Config) {
 	if len(src.ProductionIndicators.Keywords) > 0 {
 		dst.ProductionIndicators.Keywords = src.ProductionIndicators.Keywords
 	}
-	
+
 	// Merge sandbox configuration
 	if src.Sandbox.Mode != "" {
 		dst.Sandbox.Mode = src.Sandbox.Mode
@@ -543,7 +551,7 @@ func decodeYAML(data []byte) (Config, error) {
 			if commentIdx := strings.Index(value, "#"); commentIdx >= 0 {
 				value = strings.TrimSpace(value[:commentIdx])
 			}
-			
+
 			switch mode {
 			case "logging":
 				if key == "format" {
@@ -685,10 +693,10 @@ func FromContext(ctx context.Context) Config {
 
 // DetectionContext holds information about the execution context
 type DetectionContext struct {
-	Command      string
-	GitBranch    string
-	WorkingDir   string
-	Environment  map[string]string
+	Command     string
+	GitBranch   string
+	WorkingDir  string
+	Environment map[string]string
 }
 
 // DetectGuardLevel analyzes the context and returns the appropriate guard level
@@ -699,14 +707,14 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 	if cfg.GuardLevel.Level != GuardLevelAuto {
 		return cfg.GuardLevel.Level
 	}
-	
+
 	// Auto-detection logic: be safe, choose most protective level when in doubt
 	indicators := cfg.ProductionIndicators
 	if len(indicators.Branches) == 0 && len(indicators.Keywords) == 0 {
 		// Use defaults if not configured
 		indicators = DefaultConfig().ProductionIndicators
 	}
-	
+
 	// Check git branch first (strongest signal for production)
 	if ctx.GitBranch != "" {
 		branchLower := strings.ToLower(ctx.GitBranch)
@@ -722,12 +730,12 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 			}
 		}
 	}
-	
+
 	// Check command string for production indicators
 	if ctx.Command != "" {
 		cmdLower := strings.ToLower(ctx.Command)
 		highRiskKeywords := []string{}
-		
+
 		for _, keyword := range indicators.Keywords {
 			if strings.Contains(cmdLower, strings.ToLower(keyword)) {
 				// Check if in meaningful context
@@ -736,11 +744,11 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 				}
 			}
 		}
-		
+
 		if len(highRiskKeywords) > 0 {
 			return GuardLevelHigh // Production in command = high
 		}
-		
+
 		// Check for deployment-related commands
 		deploymentKeywords := []string{"deploy", "release", "publish", "ship"}
 		for _, keyword := range deploymentKeywords {
@@ -749,7 +757,7 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 			}
 		}
 	}
-	
+
 	// Check working directory for indicators
 	if ctx.WorkingDir != "" {
 		dirLower := strings.ToLower(ctx.WorkingDir)
@@ -759,12 +767,12 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 			}
 		}
 	}
-	
+
 	// Check environment variables
 	for key, value := range ctx.Environment {
 		keyLower := strings.ToLower(key)
 		valueLower := strings.ToLower(value)
-		
+
 		// Check for environment indicators in variable names or values
 		envIndicators := []string{"env", "environment", "stage", "tier"}
 		isEnvVar := false
@@ -774,7 +782,7 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 				break
 			}
 		}
-		
+
 		if isEnvVar {
 			for _, keyword := range indicators.Keywords {
 				if strings.Contains(valueLower, strings.ToLower(keyword)) {
@@ -783,7 +791,7 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 			}
 		}
 	}
-	
+
 	// Default: medium (safe default, not too restrictive, not too permissive)
 	return GuardLevelMedium
 }
@@ -793,7 +801,7 @@ func DetectGuardLevel(cfg Config, ctx DetectionContext) GuardLevel {
 func isInMeaningfulContext(text, keyword string) bool {
 	lower := strings.ToLower(text)
 	keyLower := strings.ToLower(keyword)
-	
+
 	// Check if keyword appears with typical delimiters (either side)
 	contexts := []string{
 		"/" + keyLower + "/",
@@ -818,27 +826,27 @@ func isInMeaningfulContext(text, keyword string) bool {
 		" " + keyLower + "/",
 		":" + keyLower,
 	}
-	
+
 	for _, ctx := range contexts {
 		if strings.Contains(lower, ctx) {
 			return true
 		}
 	}
-	
+
 	// Also check if at start or end with delimiter
-	if strings.HasPrefix(lower, keyLower+" ") || 
-	   strings.HasPrefix(lower, keyLower+"-") ||
-	   strings.HasPrefix(lower, keyLower+"_") ||
-	   strings.HasPrefix(lower, keyLower+".") ||
-	   strings.HasPrefix(lower, keyLower+"/") ||
-	   strings.HasSuffix(lower, " "+keyLower) ||
-	   strings.HasSuffix(lower, "-"+keyLower) ||
-	   strings.HasSuffix(lower, "_"+keyLower) ||
-	   strings.HasSuffix(lower, "."+keyLower) ||
-	   strings.HasSuffix(lower, "/"+keyLower) {
+	if strings.HasPrefix(lower, keyLower+" ") ||
+		strings.HasPrefix(lower, keyLower+"-") ||
+		strings.HasPrefix(lower, keyLower+"_") ||
+		strings.HasPrefix(lower, keyLower+".") ||
+		strings.HasPrefix(lower, keyLower+"/") ||
+		strings.HasSuffix(lower, " "+keyLower) ||
+		strings.HasSuffix(lower, "-"+keyLower) ||
+		strings.HasSuffix(lower, "_"+keyLower) ||
+		strings.HasSuffix(lower, "."+keyLower) ||
+		strings.HasSuffix(lower, "/"+keyLower) {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -850,12 +858,12 @@ func GetCurrentGitBranch(workdir string) string {
 	if err != nil {
 		return ""
 	}
-	
+
 	content := strings.TrimSpace(string(data))
 	// Format: ref: refs/heads/branch-name
 	if strings.HasPrefix(content, "ref: refs/heads/") {
 		return strings.TrimPrefix(content, "ref: refs/heads/")
 	}
-	
+
 	return ""
 }

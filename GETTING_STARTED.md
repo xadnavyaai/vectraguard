@@ -11,6 +11,7 @@ After following this guide:
 - ✅ Risky commands will be caught automatically
 - ✅ Full audit trail of everything executed
 - ✅ Works transparently - no workflow changes needed
+- ✅ Optional agent helpers: context summaries + roadmap planning
 
 ---
 
@@ -55,6 +56,45 @@ echo $VECTRAGUARD_SESSION_ID
 ```
 
 **Expected output**: `session-1234567890...`
+
+---
+
+## 🧭 Optional: Supercharge Agent Workflows
+
+### 1) Repo-local config + cache
+
+```bash
+# Create repo-scoped config and cache directory
+vg init --local
+```
+
+This writes `.vectra-guard/config.yaml` and creates `.vectra-guard/cache` (ignored in git). Use it for per-repo settings without polluting global config.
+
+### 2) Context summaries (quick code mapping)
+
+```bash
+# Summarize key functions in a Go file
+vg context summarize advanced cmd/root.go --max 3
+
+# Summarize docs quickly
+vg context summarize docs README.md --max 3
+```
+
+### 3) Roadmap planning
+
+```bash
+# Capture a plan item and add logs as you work
+vg roadmap add --title "Investigate sandbox cache" --summary "Check hit rate on CI"
+vg roadmap log rm-123456789 --note "Checked cache stats in metrics"
+```
+
+### 4) Built-in help
+
+```bash
+vg help
+vg help context
+vg help roadmap
+```
 
 ---
 

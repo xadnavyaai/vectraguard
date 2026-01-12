@@ -58,14 +58,21 @@ func execute(args []string) error {
 	subArgs := root.Args()[1:]
 
 	switch subcommand {
+	case "help":
+		topic := ""
+		if len(subArgs) > 0 {
+			topic = subArgs[0]
+		}
+		return runHelp(ctx, topic)
 	case "init":
 		subFlags := flag.NewFlagSet("init", flag.ContinueOnError)
 		force := subFlags.Bool("force", false, "Overwrite existing config file")
 		asTOML := subFlags.Bool("toml", false, "Write config as TOML instead of YAML")
+		local := subFlags.Bool("local", false, "Write config under .vectra-guard/ with repo-local cache")
 		if err := subFlags.Parse(subArgs); err != nil {
 			return err
 		}
-		return runInit(ctx, *force, *asTOML)
+		return runInit(ctx, *force, *asTOML, *local)
 	case "validate":
 		subFlags := flag.NewFlagSet("validate", flag.ContinueOnError)
 		if err := subFlags.Parse(subArgs); err != nil {
@@ -101,7 +108,7 @@ func execute(args []string) error {
 		}
 		sessionCmd := subArgs[0]
 		sessionArgs := subArgs[1:]
-		
+
 		switch sessionCmd {
 		case "start":
 			subFlags := flag.NewFlagSet("session-start", flag.ContinueOnError)
@@ -132,7 +139,7 @@ func execute(args []string) error {
 		}
 		trustCmd := subArgs[0]
 		trustArgs := subArgs[1:]
-		
+
 		switch trustCmd {
 		case "list":
 			return runTrustList(ctx)
@@ -163,7 +170,7 @@ func execute(args []string) error {
 		}
 		metricsCmd := subArgs[0]
 		metricsArgs := subArgs[1:]
-		
+
 		switch metricsCmd {
 		case "show":
 			subFlags := flag.NewFlagSet("metrics-show", flag.ContinueOnError)
@@ -174,6 +181,77 @@ func execute(args []string) error {
 			return runMetricsShow(ctx, *jsonOutput)
 		case "reset":
 			return runMetricsReset(ctx)
+		default:
+			return usageError()
+		}
+	case "roadmap":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		roadmapCmd := subArgs[0]
+		roadmapArgs := subArgs[1:]
+
+		switch roadmapCmd {
+		case "add":
+			subFlags := flag.NewFlagSet("roadmap-add", flag.ContinueOnError)
+			title := subFlags.String("title", "", "Roadmap item title")
+			summary := subFlags.String("summary", "", "Roadmap item summary")
+			status := subFlags.String("status", "planned", "Roadmap item status")
+			tags := subFlags.String("tags", "", "Comma-separated tags")
+			if err := subFlags.Parse(roadmapArgs); err != nil {
+				return err
+			}
+			return runRoadmapAdd(ctx, *title, *summary, *status, splitCSV(*tags))
+		case "list":
+			subFlags := flag.NewFlagSet("roadmap-list", flag.ContinueOnError)
+			status := subFlags.String("status", "", "Filter by status")
+			if err := subFlags.Parse(roadmapArgs); err != nil {
+				return err
+			}
+			return runRoadmapList(ctx, *status)
+		case "show":
+			if len(roadmapArgs) < 1 {
+				return usageError()
+			}
+			return runRoadmapShow(ctx, roadmapArgs[0])
+		case "status":
+			if len(roadmapArgs) < 2 {
+				return usageError()
+			}
+			return runRoadmapStatus(ctx, roadmapArgs[0], roadmapArgs[1])
+		case "log":
+			if len(roadmapArgs) < 1 {
+				return usageError()
+			}
+			subFlags := flag.NewFlagSet("roadmap-log", flag.ContinueOnError)
+			note := subFlags.String("note", "", "Log note")
+			sessionID := subFlags.String("session", "", "Session ID to reference")
+			source := subFlags.String("source", "manual", "Log source")
+			if err := subFlags.Parse(roadmapArgs[1:]); err != nil {
+				return err
+			}
+			return runRoadmapLog(ctx, roadmapArgs[0], *note, *sessionID, *source)
+		default:
+			return usageError()
+		}
+	case "context":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		contextCmd := subArgs[0]
+		contextArgs := subArgs[1:]
+
+		switch contextCmd {
+		case "summarize":
+			subFlags := flag.NewFlagSet("context-summarize", flag.ContinueOnError)
+			maxItems := subFlags.Int("max", 5, "Maximum number of lines or sentences")
+			if err := subFlags.Parse(contextArgs); err != nil {
+				return err
+			}
+			if subFlags.NArg() != 2 {
+				return usageError()
+			}
+			return runContextSummarize(ctx, subFlags.Arg(0), subFlags.Arg(1), *maxItems)
 		default:
 			return usageError()
 		}
@@ -213,6 +291,13 @@ Commands:
   trust clean                  Clean expired entries
   metrics show [--json]        Show sandbox metrics
   metrics reset                Reset metrics
+  roadmap add                  Add a roadmap item
+  roadmap list                 List roadmap items
+  roadmap show <id>            Show a roadmap item
+  roadmap status <id> <status> Update roadmap item status
+  roadmap log <id>             Append a log entry to a roadmap item
+  context summarize <mode>     Summarize text or code context (code, docs, advanced)
+  help [topic]                 Show help for a command or topic
   version                      Show version information
 `, name)
 	return fmt.Errorf("%s", usage)
