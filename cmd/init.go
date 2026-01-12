@@ -11,7 +11,7 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 )
 
-func runInit(ctx context.Context, force bool, tomlFormat bool) error {
+func runInit(ctx context.Context, force bool, tomlFormat bool, local bool) error {
 	logger := logging.FromContext(ctx)
 	cfg := config.DefaultConfig()
 	cfg.Policies.Allowlist = []string{"echo \"safe\"", "touch /tmp/ok"}
@@ -24,6 +24,21 @@ func runInit(ctx context.Context, force bool, tomlFormat bool) error {
 	target := filepath.Join(workdir, "vectra-guard.yaml")
 	if tomlFormat {
 		target = filepath.Join(workdir, "vectra-guard.toml")
+	}
+	if local {
+		target = filepath.Join(workdir, ".vectra-guard", "config.yaml")
+		if tomlFormat {
+			target = filepath.Join(workdir, ".vectra-guard", "config.toml")
+		}
+		cacheDir := filepath.Join(workdir, ".vectra-guard", "cache")
+		cfg.Sandbox.CacheDir = cacheDir
+		cfg.Sandbox.WorkspaceDir = workdir
+		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
+			return fmt.Errorf("create local config directory: %w", err)
+		}
+		if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+			return fmt.Errorf("create local cache directory: %w", err)
+		}
 	}
 
 	if _, err := os.Stat(target); err == nil && !force {
@@ -55,6 +70,9 @@ func encodeTOML(cfg config.Config) (string, error) {
 	builder.WriteString("[policies]\n")
 	builder.WriteString(formatArray("allowlist", cfg.Policies.Allowlist))
 	builder.WriteString(formatArray("denylist", cfg.Policies.Denylist))
+	builder.WriteString("\n[sandbox]\n")
+	builder.WriteString(fmt.Sprintf("cache_dir = \"%s\"\n", cfg.Sandbox.CacheDir))
+	builder.WriteString(fmt.Sprintf("workspace_dir = \"%s\"\n", cfg.Sandbox.WorkspaceDir))
 	builder.WriteString("\n[env_protection]\n")
 	builder.WriteString(fmt.Sprintf("enabled = %t\n", cfg.EnvProtection.Enabled))
 	builder.WriteString(fmt.Sprintf("masking_mode = \"%s\"  # Options: full, partial, hash, fake\n", cfg.EnvProtection.MaskingMode))
@@ -77,6 +95,9 @@ func encodeYAML(cfg config.Config) (string, error) {
 	for _, item := range cfg.Policies.Denylist {
 		builder.WriteString(fmt.Sprintf("    - %s\n", item))
 	}
+	builder.WriteString("sandbox:\n")
+	builder.WriteString(fmt.Sprintf("  cache_dir: %s\n", cfg.Sandbox.CacheDir))
+	builder.WriteString(fmt.Sprintf("  workspace_dir: %s\n", cfg.Sandbox.WorkspaceDir))
 	builder.WriteString("env_protection:\n")
 	builder.WriteString(fmt.Sprintf("  enabled: %t\n", cfg.EnvProtection.Enabled))
 	builder.WriteString(fmt.Sprintf("  masking_mode: %s  # Options: full, partial, hash, fake\n", cfg.EnvProtection.MaskingMode))

@@ -45,6 +45,9 @@ dist/
 vectra-guard.yaml
 vectra-guard.toml
 
+# Repo-local cache data
+.vectra-guard/cache/
+
 # Development/internal documentation
 roadmap.md
 *_ACTION_PLAN.md
