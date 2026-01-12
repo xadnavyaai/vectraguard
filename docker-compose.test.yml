@@ -212,6 +212,29 @@ services:
     networks:
       - test-network
 
+  # Context summarize test service - tests context summarize features
+  # Tests: single file, repo-wide, JSON output, change detection, caching, advanced mode
+  # SAFE: Isolated in Docker container
+  test-context-summarize:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    image: vectra-guard-test:latest
+    container_name: vectra-guard-test-context
+    volumes:
+      - ${PWD}:/workspace:rw,cached
+      - go-mod-cache:/go/pkg/mod
+    environment:
+      - GO_ENV=test
+      - VECTRA_GUARD_VERSION=test
+      - VECTRAGUARD_CONTAINER=true
+      - CI=true
+    working_dir: /workspace
+    entrypoint: []
+    command: ["bash", "./scripts/test-context-summarize.sh"]
+    networks:
+      - test-network
+
 volumes:
   go-mod-cache:
     driver: local

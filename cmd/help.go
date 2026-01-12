@@ -23,11 +23,27 @@ Topics:
 	case "context":
 		return printHelp(`Context summaries:
 
-  vg context summarize code <file> --max 5
-  vg context summarize docs <file> --max 3
-  vg context summarize advanced <file> --max 3
+  vg context summarize code <file|directory> [--max 5] [--output text|json] [--since <commit|date>]
+  vg context summarize docs <file|directory> [--max 3] [--output text|json] [--since <commit|date>]
+  vg context summarize advanced <file|directory> [--max 3] [--output text|json] [--since <commit|date>]
+
+Summarize a single file or entire repository. When given a directory, processes all
+relevant files and groups results by file. Results are cached in .vectra-guard/cache/
+for faster subsequent runs.
 
 Advanced mode parses Go files and surfaces high-impact functions with call-graph signals.
+
+Options:
+  --max N          Maximum number of summary lines per file (default: 5)
+  --output FORMAT  Output format: text (default) or json
+  --since REF      Only process files changed since commit/date (e.g., HEAD~1, 2024-01-01)
+
+Examples:
+  vg context summarize code cmd/root.go
+  vg context summarize code . --output json              # JSON output for agents
+  vg context summarize code . --since HEAD~1             # Only changed files
+  vg context summarize code . --since 2024-01-01         # Since date
+  vg context summarize advanced internal/ --max 10        # More summary lines
 `)
 	case "roadmap":
 		return printHelp(`Roadmap planning:

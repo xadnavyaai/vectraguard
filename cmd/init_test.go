@@ -14,7 +14,7 @@ func TestRunInitCreatesConfig(t *testing.T) {
 	defer chdir(t, dir)()
 
 	ctx := logging.WithLogger(context.Background(), logging.NewLogger("text", os.Stdout))
-	if err := runInit(ctx, false, false); err != nil {
+	if err := runInit(ctx, false, false, false); err != nil {
 		t.Fatalf("runInit: %v", err)
 	}
 
@@ -29,7 +29,7 @@ func TestRunInitRespectsTomlFlag(t *testing.T) {
 	defer chdir(t, dir)()
 
 	ctx := logging.WithLogger(context.Background(), logging.NewLogger("text", os.Stdout))
-	if err := runInit(ctx, false, true); err != nil {
+	if err := runInit(ctx, false, true, false); err != nil {
 		t.Fatalf("runInit toml: %v", err)
 	}
 
@@ -49,10 +49,10 @@ func TestRunInitRequiresForce(t *testing.T) {
 	}
 
 	ctx := logging.WithLogger(context.Background(), logging.NewLogger("text", os.Stdout))
-	if err := runInit(ctx, false, false); err == nil {
+	if err := runInit(ctx, false, false, false); err == nil {
 		t.Fatalf("expected error when file exists without --force")
 	}
-	if err := runInit(ctx, true, false); err != nil {
+	if err := runInit(ctx, true, false, false); err != nil {
 		t.Fatalf("force overwrite: %v", err)
 	}
 }

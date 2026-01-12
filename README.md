@@ -17,6 +17,14 @@ Vectra Guard is a comprehensive security tool that protects systems from risky s
 - **Roadmap planning**: capture intent, status, and notes per repo.
 - **Repo-local config**: keep workspace settings and cache local (safe to commit config, ignore cache).
 
+## 🆕 What's new (PR #7)
+- **Advanced Go summaries**: `vg context summarize advanced <file|directory> --max N` uses Go AST + call-graph signals to surface high-impact functions; caches results for repeat runs.
+- **Repo-wide summarization**: `vg context summarize code .` processes entire repositories and caches results in `.vectra-guard/cache/` for faster subsequent runs.
+- **JSON output & change detection**: `--output json` for structured data, `--since <commit|date>` to only process changed files (perfect for AI agents and PR reviews).
+- **Roadmap CLI**: `vg roadmap add|list|show|status|log` tracks per-workspace plans under `~/.vectra-guard/roadmaps` (workspace is hashed for isolation).
+- **Repo-local init**: `vg init --local` writes `.vectra-guard/config.(yaml|toml)` and a repo-scoped cache directory `.vectra-guard/cache` (already gitignored).
+- **Built-in help topics**: `vg help [context|roadmap|init]` prints focused usage for the new flows.
+
 ---
 
 ## 🎯 Why Vectra Guard?
@@ -509,14 +517,25 @@ vg trust clean
 ### Context Summaries
 
 ```bash
-# Summarize code with lightweight heuristics
+# Summarize a single file
 vg context summarize code cmd/root.go --max 5
-
-# Summarize docs/text with extractive sentences
 vg context summarize docs README.md --max 3
 
-# Advanced Go mode: AST-based function summaries with call graph signals
-vg context summarize advanced cmd/root.go --max 3
+# Summarize entire repository (works across repo after init)
+vg context summarize code . --max 5
+vg context summarize docs . --max 3
+vg context summarize advanced internal/ --max 3
+
+# JSON output for programmatic use (perfect for AI agents!)
+vg context summarize code . --output json --max 10
+
+# Only process changed files (great for PR reviews)
+vg context summarize code . --since HEAD~1
+vg context summarize code . --since 2024-01-01  # Since date
+vg context summarize code . --since abc123def   # Since commit
+
+# Results are cached in .vectra-guard/cache/ for faster subsequent runs
+# Run 'vg init --local' first to set up repo-local cache
 ```
 
 ### Help Topics

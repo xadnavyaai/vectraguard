@@ -81,6 +81,33 @@ test-namespace:
 	go test -v ./internal/sandbox/namespace/... ./internal/sandbox/runtime_test.go
 
 # ============================================================================
+# CONTEXT SUMMARIZE TESTS
+# ============================================================================
+
+# Test context summarize features (local, quick)
+test-context:
+	@echo "🧪 Testing context summarize features..."
+	@./scripts/test-context-summarize.sh --quick
+
+# Test context summarize features (local, extensive)
+test-context-extensive:
+	@echo "🧪 Running extensive context summarize tests..."
+	@./scripts/test-context-summarize.sh
+
+# Test context summarize features (Docker, isolated)
+test-context-docker:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "❌ Docker is not installed"; \
+		exit 1; \
+	fi
+	@if [ -z "$(DOCKER_COMPOSE)" ]; then \
+		echo "❌ docker-compose is not available"; \
+		exit 1; \
+	fi
+	@echo "🚀 Running context summarize tests in Docker..."
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-context-summarize
+
+# ============================================================================
 # UTILITIES
 # ============================================================================
 
@@ -119,6 +146,11 @@ help:
 	@echo "  test-local-quick      - Quick local tests (detection only, safe)"
 	@echo "  test-local-extensive  - Extensive local tests (detection only, safe)"
 	@echo ""
+	@echo "Context Summarize Tests:"
+	@echo "  test-context          - Quick context summarize tests (local)"
+	@echo "  test-context-extensive - Extensive context summarize tests (local)"
+	@echo "  test-context-docker   - Context summarize tests in Docker (isolated)"
+	@echo ""
 	@echo "Basic Testing:"
 	@echo "  test          - Run Go unit tests (local)"
 	@echo "  test-namespace - Run namespace tests (local, safe)"
@@ -136,3 +168,5 @@ help:
 	@echo "  make test-docker          # Recommended: All tests in Docker"
 	@echo "  make test-local-quick     # Quick local validation"
 	@echo "  make test-local-extensive # Full local validation"
+	@echo "  make test-context         # Test context summarize features"
+	@echo "  make test-context-docker  # Test context summarize in Docker"

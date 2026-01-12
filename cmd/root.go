@@ -245,13 +245,15 @@ func execute(args []string) error {
 		case "summarize":
 			subFlags := flag.NewFlagSet("context-summarize", flag.ContinueOnError)
 			maxItems := subFlags.Int("max", 5, "Maximum number of lines or sentences")
+			outputFormat := subFlags.String("output", "text", "Output format: text or json")
+			since := subFlags.String("since", "", "Only process files changed since commit/time (e.g., HEAD~1, 2024-01-01)")
 			if err := subFlags.Parse(contextArgs); err != nil {
 				return err
 			}
-			if subFlags.NArg() != 2 {
+			if subFlags.NArg() < 2 {
 				return usageError()
 			}
-			return runContextSummarize(ctx, subFlags.Arg(0), subFlags.Arg(1), *maxItems)
+			return runContextSummarize(ctx, subFlags.Arg(0), subFlags.Arg(1), *maxItems, *outputFormat, *since)
 		default:
 			return usageError()
 		}
@@ -296,7 +298,7 @@ Commands:
   roadmap show <id>            Show a roadmap item
   roadmap status <id> <status> Update roadmap item status
   roadmap log <id>             Append a log entry to a roadmap item
-  context summarize <mode>     Summarize text or code context (code, docs, advanced)
+  context summarize <mode> <path>  Summarize file or repo (code, docs, advanced)
   help [topic]                 Show help for a command or topic
   version                      Show version information
 `, name)

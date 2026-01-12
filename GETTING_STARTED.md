@@ -73,12 +73,29 @@ This writes `.vectra-guard/config.yaml` and creates `.vectra-guard/cache` (ignor
 ### 2) Context summaries (quick code mapping)
 
 ```bash
-# Summarize key functions in a Go file
+# Summarize a single file
 vg context summarize advanced cmd/root.go --max 3
-
-# Summarize docs quickly
 vg context summarize docs README.md --max 3
+
+# Summarize entire repository (works across repo after init)
+vg context summarize code . --max 5
+vg context summarize docs . --max 3
+
+# JSON output for programmatic use (perfect for AI agents!)
+vg context summarize code . --output json --max 10
+
+# Only process changed files (great for PR reviews)
+vg context summarize code . --since HEAD~1
+vg context summarize code . --since 2024-01-01  # Since date
 ```
+
+**Features:**
+- **Advanced mode** parses Go files and uses call-graph signals to surface the most connected functions
+- **Repo-wide** processing: pass a directory (`.`, `cmd/`, `internal/`) to summarize all relevant files
+- **JSON output** (`--output json`) for structured data that agents can parse
+- **Change detection** (`--since <commit|date>`) to only process files changed since a commit or date
+- **Caching**: Results are cached in `.vectra-guard/cache/` so re-running on the same files is instant
+- Run `vg init --local` first to set up repo-local cache
 
 ### 3) Roadmap planning
 
@@ -87,6 +104,7 @@ vg context summarize docs README.md --max 3
 vg roadmap add --title "Investigate sandbox cache" --summary "Check hit rate on CI"
 vg roadmap log rm-123456789 --note "Checked cache stats in metrics"
 ```
+Roadmaps live per workspace at `~/.vectra-guard/roadmaps` (workspace path is hashed). List and filter by status (`planned`, `in-progress`, `done`) with `vg roadmap list --status planned`, and update status with `vg roadmap status <id> <status>`.
 
 ### 4) Built-in help
 
