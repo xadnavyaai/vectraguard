@@ -389,7 +389,21 @@ if command -v vectra-guard &> /dev/null; then
             fi
             
             return 1  # Not protected
-        }
+    }
+    
+    # Command interception hook - runs BEFORE command executes
+    _vectra_guard_preexec() {
+        local cmd="$1"
+        
+        # Skip if command is vectra-guard itself (avoid recursion)
+        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
+            return 0
+        fi
+        
+        # Skip empty commands, comments, and variable assignments
+        if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+            return 0
+        fi
         
         # Quick check for obviously dangerous patterns (fast path)
         # Use comprehensive system directory detection
