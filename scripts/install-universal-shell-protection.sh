@@ -4,6 +4,33 @@
 
 set -uo pipefail
 
+REQUESTED_SHELLS="${VG_SHELLS:-}"
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --shell|--shells)
+            if [ $# -lt 2 ]; then
+                echo "❌ Missing value for $1 (use space-separated shells like 'bash zsh')" >&2
+                exit 1
+            fi
+            shift
+            REQUESTED_SHELLS="${1:-}"
+            ;;
+        --shells=*)
+            REQUESTED_SHELLS="${1#*=}"
+            ;;
+        -h|--help)
+            echo "Usage: install-universal-shell-protection.sh [--shells \"bash zsh\"]" >&2
+            echo "       (or set VG_SHELLS=\"bash zsh\" for non-interactive selection)" >&2
+            exit 0
+            ;;
+        *)
+            echo "❌ Unknown option: $1" >&2
+            exit 1
+            ;;
+    esac
+    shift
+done
+
 echo "🛡️  Vectra Guard - Universal Shell Protection Installer"
 echo "======================================================="
 echo ""
@@ -44,27 +71,40 @@ echo ""
 # Backup existing configs
 SELECTED_SHELLS=("${SHELLS[@]}")
 
-# Optional interactive shell selection
-if [ -t 0 ] && [ -c /dev/tty ]; then
-    read -p "Install protection for all detected shells? [Y/n] " -n 1 -r < /dev/tty
-    echo
-    if [[ $REPLY =~ ^[Nn]$ ]]; then
-        echo "Available shells: ${SHELLS[*]}"
-        read -p "Enter shells to enable (space-separated, e.g., 'bash zsh'): " -r < /dev/tty
-        if [ -n "$REPLY" ]; then
-            SELECTED_SHELLS=()
-            for shell in $REPLY; do
-                for detected in "${SHELLS[@]}"; do
-                    if [ "$shell" = "$detected" ]; then
-                        SELECTED_SHELLS+=("$shell")
-                    fi
-                done
-            done
-            if [ ${#SELECTED_SHELLS[@]} -eq 0 ]; then
-                echo "❌ No valid shells selected, using all detected shells."
-                SELECTED_SHELLS=("${SHELLS[@]}")
+# Optional interactive or flag/env-based shell selection
+if [ -n "$REQUESTED_SHELLS" ]; then
+    SELECTED_SHELLS=()
+    for shell in $REQUESTED_SHELLS; do
+        for detected in "${SHELLS[@]}"; do
+            if [ "$shell" = "$detected" ]; then
+                SELECTED_SHELLS+=("$shell")
             fi
+        done
+    done
+    if [ ${#SELECTED_SHELLS[@]} -eq 0 ]; then
+        echo "❌ None of the requested shells are available. Detected: ${SHELLS[*]}" >&2
+        exit 1
+    fi
+    echo "  ℹ️  Shell selection provided (--shells/VG_SHELLS): ${SELECTED_SHELLS[*]}"
+elif [ -c /dev/tty ]; then
+    echo "Select shells to enable (space-separated). Press Enter for all detected."
+    echo "Detected: ${SHELLS[*]}"
+    read -p "> " -r < /dev/tty
+    if [ -n "$REPLY" ]; then
+        SELECTED_SHELLS=()
+        for shell in $REPLY; do
+            for detected in "${SHELLS[@]}"; do
+                if [ "$shell" = "$detected" ]; then
+                    SELECTED_SHELLS+=("$shell")
+                fi
+            done
+        done
+        if [ ${#SELECTED_SHELLS[@]} -eq 0 ]; then
+            echo "❌ No valid shells selected, using all detected shells."
+            SELECTED_SHELLS=("${SHELLS[@]}")
         fi
+    else
+        echo "  ℹ️  No selection entered, enabling all detected shells."
     fi
 else
     echo "  ℹ️  Non-interactive mode: installing for all detected shells"
