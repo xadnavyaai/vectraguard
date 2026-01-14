@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package namespace
@@ -20,6 +21,10 @@ const (
 
 // ApplySeccompFilter applies a seccomp-bpf filter to block dangerous syscalls
 func ApplySeccompFilter(profile SeccompProfile) error {
+	if profile == SeccompProfileNone {
+		return nil
+	}
+
 	// Check if seccomp is available
 	if _, _, errno := unix.Syscall6(unix.SYS_PRCTL, unix.PR_GET_SECCOMP, 0, 0, 0, 0, 0); errno != 0 {
 		return fmt.Errorf("seccomp not available: %v", errno)
@@ -33,17 +38,15 @@ func ApplySeccompFilter(profile SeccompProfile) error {
 	// Get blocked syscalls based on profile
 	blockedSyscalls := getBlockedSyscalls(profile)
 
-	// Note: Full seccomp-bpf implementation requires libseccomp bindings
-	// For now, we use PR_SET_NO_NEW_PRIVS as a basic protection
-	// TODO: Integrate with github.com/seccomp/libseccomp-golang for full BPF filtering
+	if profile == SeccompProfileStrict {
+		if err := unix.Prctl(unix.PR_SET_SECCOMP, unix.SECCOMP_MODE_STRICT, 0, 0, 0); err != nil {
+			return fmt.Errorf("failed to enable strict seccomp: %w", err)
+		}
+		return nil
+	}
 
 	if len(blockedSyscalls) > 0 {
-		// This is a placeholder for full seccomp-bpf implementation
-		// In production, you would:
-		// 1. Create a BPF program that checks each syscall
-		// 2. Return SECCOMP_RET_KILL or SECCOMP_RET_ERRNO for blocked syscalls
-		// 3. Return SECCOMP_RET_ALLOW for allowed syscalls
-		// 4. Load the program with prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, prog)
+		return fmt.Errorf("seccomp profile %s requires syscall filtering not available without BPF support", profile)
 	}
 
 	return nil
@@ -56,51 +59,51 @@ func getBlockedSyscalls(profile SeccompProfile) []string {
 	// Minimal blocking - only the most dangerous
 	if profile == SeccompProfileMinimal || profile == SeccompProfileModerate || profile == SeccompProfileStrict {
 		blocked = append(blocked, []string{
-			"reboot",           // System reboot
-			"kexec_load",       // Load new kernel
-			"kexec_file_load",  // Load new kernel from file
-			"create_module",    // Create kernel module (deprecated)
-			"init_module",      // Load kernel module
-			"finit_module",     // Load kernel module from fd
-			"delete_module",    // Unload kernel module
+			"reboot",          // System reboot
+			"kexec_load",      // Load new kernel
+			"kexec_file_load", // Load new kernel from file
+			"create_module",   // Create kernel module (deprecated)
+			"init_module",     // Load kernel module
+			"finit_module",    // Load kernel module from fd
+			"delete_module",   // Unload kernel module
 		}...)
 	}
 
 	// Moderate blocking - add privilege escalation and system modification
 	if profile == SeccompProfileModerate || profile == SeccompProfileStrict {
 		blocked = append(blocked, []string{
-			"mount",            // Mount filesystem
-			"umount",           // Unmount filesystem
-			"umount2",          // Unmount filesystem (variant)
-			"pivot_root",       // Change root filesystem
-			"chroot",           // Change root directory
-			"swapon",           // Enable swap
-			"swapoff",          // Disable swap
-			"acct",             // Enable/disable process accounting
-			"settimeofday",     // Set system time
-			"stime",            // Set system time (deprecated)
-			"clock_settime",    // Set clock time
-			"sethostname",      // Set hostname
-			"setdomainname",    // Set domain name
+			"mount",         // Mount filesystem
+			"umount",        // Unmount filesystem
+			"umount2",       // Unmount filesystem (variant)
+			"pivot_root",    // Change root filesystem
+			"chroot",        // Change root directory
+			"swapon",        // Enable swap
+			"swapoff",       // Disable swap
+			"acct",          // Enable/disable process accounting
+			"settimeofday",  // Set system time
+			"stime",         // Set system time (deprecated)
+			"clock_settime", // Set clock time
+			"sethostname",   // Set hostname
+			"setdomainname", // Set domain name
 		}...)
 	}
 
 	// Strict blocking - add debugging and dangerous operations
 	if profile == SeccompProfileStrict {
 		blocked = append(blocked, []string{
-			"ptrace",           // Process trace/debug
-			"process_vm_readv", // Read process memory
-			"process_vm_writev",// Write process memory
-			"kcmp",             // Compare kernel objects
-			"lookup_dcookie",   // Kernel debugging
-			"perf_event_open",  // Performance monitoring
-			"bpf",              // BPF syscall (could load malicious BPF)
-			"userfaultfd",      // User-space page fault handling
-			"iopl",             // Change I/O privilege level
-			"ioperm",           // Set I/O port permissions
-			"quotactl",         // Quota operations
-			"nfsservctl",       // NFS server control (deprecated)
-			"vhangup",          // Hang up TTY
+			"ptrace",            // Process trace/debug
+			"process_vm_readv",  // Read process memory
+			"process_vm_writev", // Write process memory
+			"kcmp",              // Compare kernel objects
+			"lookup_dcookie",    // Kernel debugging
+			"perf_event_open",   // Performance monitoring
+			"bpf",               // BPF syscall (could load malicious BPF)
+			"userfaultfd",       // User-space page fault handling
+			"iopl",              // Change I/O privilege level
+			"ioperm",            // Set I/O port permissions
+			"quotactl",          // Quota operations
+			"nfsservctl",        // NFS server control (deprecated)
+			"vhangup",           // Hang up TTY
 		}...)
 	}
 
@@ -131,4 +134,3 @@ func GetSeccompInfo() (string, error) {
 		return fmt.Sprintf("seccomp in unknown mode: %d", mode), nil
 	}
 }
-

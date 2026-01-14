@@ -449,8 +449,7 @@ func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string
 	case "none":
 		args = append(args, "--network", "none")
 	case "restricted":
-		// TODO: Implement restricted network (custom network with egress filtering)
-		args = append(args, "--network", "bridge")
+		args = append(args, "--network", "none")
 	case "full":
 		args = append(args, "--network", "host")
 	default:
@@ -696,4 +695,3 @@ func isTerminal(f *os.File) bool {
 	}
 	return (stat.Mode() & os.ModeCharDevice) != 0
 }
-
