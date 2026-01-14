@@ -12,7 +12,7 @@ import (
 
 func TestDecideExecutionMode(t *testing.T) {
 	logger := logging.NewLogger("text", os.Stderr)
-	
+
 	tests := []struct {
 		name           string
 		config         config.Config
@@ -130,20 +130,20 @@ func TestDecideExecutionMode(t *testing.T) {
 			expectedReason: "matches allowlist pattern",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			executor, err := NewExecutor(tt.config, logger)
 			if err != nil {
 				t.Fatalf("NewExecutor() error = %v", err)
 			}
-			
+
 			decision := executor.DecideExecutionMode(context.Background(), tt.cmdArgs, tt.riskLevel, nil)
-			
+
 			if decision.Mode != tt.expectedMode {
 				t.Errorf("DecideExecutionMode() mode = %v, want %v", decision.Mode, tt.expectedMode)
 			}
-			
+
 			if tt.expectedReason != "" && decision.Reason != tt.expectedReason {
 				t.Errorf("DecideExecutionMode() reason = %v, want %v", decision.Reason, tt.expectedReason)
 			}
@@ -159,12 +159,12 @@ func TestIsNetworkedInstall(t *testing.T) {
 			Mode:    config.SandboxModeAuto,
 		},
 	}
-	
+
 	executor, err := NewExecutor(cfg, logger)
 	if err != nil {
 		t.Fatalf("NewExecutor() error = %v", err)
 	}
-	
+
 	tests := []struct {
 		command  string
 		expected bool
@@ -179,7 +179,7 @@ func TestIsNetworkedInstall(t *testing.T) {
 		{"ls -la", false},
 		{"git status", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.command, func(t *testing.T) {
 			result := executor.isNetworkedInstall(tt.command)
@@ -198,12 +198,12 @@ func TestShouldEnableCache(t *testing.T) {
 			EnableCache: true,
 		},
 	}
-	
+
 	executor, err := NewExecutor(cfg, logger)
 	if err != nil {
 		t.Fatalf("NewExecutor() error = %v", err)
 	}
-	
+
 	tests := []struct {
 		cmdArgs  []string
 		expected bool
@@ -216,7 +216,7 @@ func TestShouldEnableCache(t *testing.T) {
 		{[]string{"echo", "hello"}, false},
 		{[]string{"ls", "-la"}, false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.cmdArgs[0], func(t *testing.T) {
 			result := executor.shouldEnableCache(tt.cmdArgs)
@@ -229,7 +229,7 @@ func TestShouldEnableCache(t *testing.T) {
 
 func TestBuildSandboxConfig(t *testing.T) {
 	logger := logging.NewLogger("text", os.Stderr)
-	
+
 	tests := []struct {
 		name          string
 		securityLevel config.SandboxSecurityLevel
@@ -284,7 +284,7 @@ func TestBuildSandboxConfig(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := config.Config{
@@ -295,17 +295,17 @@ func TestBuildSandboxConfig(t *testing.T) {
 					Image:         "ubuntu:22.04",
 				},
 			}
-			
+
 			executor, err := NewExecutor(cfg, logger)
 			if err != nil {
 				t.Fatalf("NewExecutor() error = %v", err)
 			}
-			
+
 			decision := ExecutionDecision{
 				Mode:        ExecutionModeSandbox,
 				ShouldCache: false,
 			}
-			
+
 			sandboxCfg := executor.buildSandboxConfig(decision)
 			tt.checkFunc(t, sandboxCfg)
 		})
@@ -322,26 +322,26 @@ func TestBuildDockerArgs(t *testing.T) {
 			Image:         "ubuntu:22.04",
 		},
 	}
-	
+
 	executor, err := NewExecutor(cfg, logger)
 	if err != nil {
 		t.Fatalf("NewExecutor() error = %v", err)
 	}
-	
+
 	sandboxCfg := SandboxConfig{
 		Runtime:         "docker",
 		Image:           "ubuntu:22.04",
 		WorkDir:         "/test",
-		NetworkMode:     "none",
+		NetworkMode:     "restricted",
 		ReadOnlyRoot:    true,
 		NoNewPrivileges: true,
 		MemoryLimit:     "512m",
 		CPULimit:        "0.5",
 	}
-	
+
 	cmdArgs := []string{"echo", "test"}
 	args := executor.buildDockerArgs(sandboxCfg, cmdArgs)
-	
+
 	// Check for essential Docker flags
 	containsFlag := func(flag string) bool {
 		for _, arg := range args {
@@ -351,24 +351,36 @@ func TestBuildDockerArgs(t *testing.T) {
 		}
 		return false
 	}
-	
+
 	if !containsFlag("--rm") {
 		t.Error("Missing --rm flag")
 	}
-	
+
 	if !containsFlag("--read-only") {
 		t.Error("Missing --read-only flag")
 	}
-	
+
 	if !containsFlag("--memory") {
 		t.Error("Missing --memory flag")
 	}
-	
+
+	networkValue := ""
+	for i, arg := range args {
+		if arg == "--network" && i+1 < len(args) {
+			networkValue = args[i+1]
+			break
+		}
+	}
+
+	if networkValue != "none" {
+		t.Errorf("Expected restricted network mode to map to none, got %q", networkValue)
+	}
+
 	// Check image and command are at the end
 	if args[len(args)-3] != "ubuntu:22.04" {
 		t.Errorf("Image not in correct position: %v", args)
 	}
-	
+
 	if args[len(args)-2] != "echo" || args[len(args)-1] != "test" {
 		t.Errorf("Command not in correct position: %v", args)
 	}
@@ -379,19 +391,19 @@ func TestGenerateCacheKey(t *testing.T) {
 	cfg := config.Config{
 		Sandbox: config.SandboxConfig{Enabled: true},
 	}
-	
+
 	executor, err := NewExecutor(cfg, logger)
 	if err != nil {
 		t.Fatalf("NewExecutor() error = %v", err)
 	}
-	
+
 	key1 := executor.generateCacheKey([]string{"npm", "install"})
 	key2 := executor.generateCacheKey([]string{"npm", "install"})
-	
+
 	if key1 != key2 {
 		t.Error("Same command should generate same cache key")
 	}
-	
+
 	key3 := executor.generateCacheKey([]string{"yarn", "install"})
 	if key1 == key3 {
 		t.Error("Different commands should generate different cache keys")
@@ -407,18 +419,18 @@ func TestExecutionDecisionCaching(t *testing.T) {
 			EnableCache: true,
 		},
 	}
-	
+
 	executor, err := NewExecutor(cfg, logger)
 	if err != nil {
 		t.Fatalf("NewExecutor() error = %v", err)
 	}
-	
+
 	// npm install should enable caching
 	decision := executor.DecideExecutionMode(context.Background(), []string{"npm", "install"}, "low", nil)
 	if !decision.ShouldCache {
 		t.Error("npm install should enable caching")
 	}
-	
+
 	// echo should not enable caching
 	decision = executor.DecideExecutionMode(context.Background(), []string{"echo", "test"}, "low", nil)
 	if decision.ShouldCache {
@@ -436,10 +448,10 @@ func BenchmarkDecideExecutionMode(b *testing.B) {
 			SecurityLevel: config.SandboxSecurityBalanced,
 		},
 	}
-	
+
 	executor, _ := NewExecutor(cfg, logger)
 	cmdArgs := []string{"npm", "install", "express"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		executor.DecideExecutionMode(context.Background(), cmdArgs, "medium", nil)
@@ -456,18 +468,18 @@ func BenchmarkBuildDockerArgs(b *testing.B) {
 			Image:         "ubuntu:22.04",
 		},
 	}
-	
+
 	executor, _ := NewExecutor(cfg, logger)
 	sandboxCfg := SandboxConfig{
-		Runtime:      "docker",
-		Image:        "ubuntu:22.04",
-		WorkDir:      "/test",
-		NetworkMode:  "restricted",
-		MemoryLimit:  "512m",
-		CPULimit:     "0.5",
+		Runtime:     "docker",
+		Image:       "ubuntu:22.04",
+		WorkDir:     "/test",
+		NetworkMode: "restricted",
+		MemoryLimit: "512m",
+		CPULimit:    "0.5",
 	}
 	cmdArgs := []string{"echo", "test"}
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		executor.buildDockerArgs(sandboxCfg, cmdArgs)
@@ -478,14 +490,14 @@ func BenchmarkBuildDockerArgs(b *testing.B) {
 // cannot be bypassed by trust store, allowlist, or configuration
 func TestMandatorySandboxingForCriticalCommands(t *testing.T) {
 	logger := logging.NewLogger("text", os.Stderr)
-	
+
 	criticalFindings := []analyzer.Finding{
 		{
 			Code:     "DANGEROUS_DELETE_ROOT",
 			Severity: "critical",
 		},
 	}
-	
+
 	tests := []struct {
 		name           string
 		config         config.Config
@@ -575,7 +587,7 @@ func TestMandatorySandboxingForCriticalCommands(t *testing.T) {
 					SecurityLevel: config.SandboxSecurityBalanced,
 				},
 			},
-			cmdArgs: []string{":(){", ":|:&", "};:"},
+			cmdArgs:   []string{":(){", ":|:&", "};:"},
 			riskLevel: "critical",
 			findings: []analyzer.Finding{
 				{
@@ -588,32 +600,32 @@ func TestMandatorySandboxingForCriticalCommands(t *testing.T) {
 			description:    "Fork bomb should be mandatory sandboxed",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			executor, err := NewExecutor(tt.config, logger)
 			if err != nil {
 				t.Fatalf("NewExecutor() error = %v", err)
 			}
-			
+
 			// Add to trust store to test bypass attempt
 			if tt.name == "critical command with trust store bypass attempt" {
 				cmdString := "rm -r /*"
 				_ = executor.trust.Add(cmdString, 0, "test")
 			}
-			
+
 			decision := executor.DecideExecutionMode(
 				context.Background(),
 				tt.cmdArgs,
 				tt.riskLevel,
 				tt.findings,
 			)
-			
+
 			if decision.Mode != tt.expectedMode {
 				t.Errorf("DecideExecutionMode() mode = %v, want %v (%s)",
 					decision.Mode, tt.expectedMode, tt.description)
 			}
-			
+
 			if tt.expectedReason != "" && !containsSubstring(decision.Reason, tt.expectedReason) {
 				t.Errorf("DecideExecutionMode() reason = %v, want to contain %v (%s)",
 					decision.Reason, tt.expectedReason, tt.description)
@@ -624,7 +636,7 @@ func TestMandatorySandboxingForCriticalCommands(t *testing.T) {
 
 // containsSubstring checks if a string contains a substring
 func containsSubstring(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || 
+	return len(s) >= len(substr) && (s == substr ||
 		(len(s) > len(substr) && findSubstringInString(s, substr)))
 }
 
@@ -636,4 +648,3 @@ func findSubstringInString(s, substr string) bool {
 	}
 	return false
 }
-

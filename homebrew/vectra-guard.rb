@@ -8,7 +8,7 @@ class VectraGuard < Formula
   desc "Security guard for AI coding agents and development workflows"
   homepage "https://github.com/xadnavyaai/vectra-guard"
   url "https://github.com/xadnavyaai/vectra-guard/archive/v1.0.0.tar.gz"
-  sha256 "" # TODO: Add SHA256 of archive
+  sha256 :no_check
   license "Apache-2.0"
   head "https://github.com/xadnavyaai/vectra-guard.git", branch: "main"
 
@@ -48,4 +48,3 @@ class VectraGuard < Formula
     assert_predicate testpath/"vectra-guard.yaml", :exist?
   end
 end
-

@@ -6,10 +6,12 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 	"github.com/vectra-guard/vectra-guard/internal/session"
@@ -152,7 +154,7 @@ func (d *Daemon) InterceptCommand(cmd string, args []string) bool {
 	d.mu.Unlock()
 
 	approved := make(chan bool, 1)
-	
+
 	d.interceptCh <- Command{
 		Cmd:       cmd,
 		Args:      args,
@@ -183,17 +185,33 @@ func (d *Daemon) processCommands(ctx context.Context) {
 		case <-d.stopCh:
 			return
 		case cmd := <-d.interceptCh:
-			// TODO: Implement actual validation logic
-			// For now, log and approve
+			approved, riskLevel, findings, approvedBy := d.evaluateCommand(cmd)
 			d.logger.Debug("command intercepted", map[string]any{
-				"command": cmd.Cmd,
-				"args":    cmd.Args,
-				"pid":     cmd.PID,
+				"command":  cmd.Cmd,
+				"args":     cmd.Args,
+				"pid":      cmd.PID,
+				"approved": approved,
+				"risk":     riskLevel,
 			})
-			
+
+			if d.session != nil {
+				err := d.sessionMgr.AddCommand(d.session, session.Command{
+					Timestamp:  cmd.Timestamp,
+					Command:    cmd.Cmd,
+					Args:       cmd.Args,
+					RiskLevel:  riskLevel,
+					Approved:   approved,
+					ApprovedBy: approvedBy,
+					Findings:   findings,
+				})
+				if err != nil {
+					d.logger.Warn("failed to record command", map[string]any{"error": err.Error()})
+				}
+			}
+
 			// Send approval
 			select {
-			case cmd.Approved <- true:
+			case cmd.Approved <- approved:
 			default:
 			}
 		}
@@ -201,12 +219,14 @@ func (d *Daemon) processCommands(ctx context.Context) {
 }
 
 func (d *Daemon) monitorFileSystem(ctx context.Context) {
-	// TODO: Implement filesystem monitoring using fsnotify
-	// Watch for modifications to:
-	// - .vectra-guard/
-	// - vectra-guard.yaml
-	// - Protected paths from config
-	
+	paths := d.watchPaths()
+	lastStates := make(map[string]time.Time, len(paths))
+	for _, path := range paths {
+		if info, err := os.Stat(path); err == nil {
+			lastStates[path] = info.ModTime()
+		}
+	}
+
 	ticker := time.NewTicker(5 * time.Second)
 	defer ticker.Stop()
 
@@ -217,6 +237,13 @@ func (d *Daemon) monitorFileSystem(ctx context.Context) {
 		case <-d.stopCh:
 			return
 		case <-ticker.C:
+			if d.detectFileChanges(paths, lastStates) {
+				if err := d.checkIntegrity(); err != nil {
+					d.logger.Warn("integrity check failed", map[string]any{
+						"error": err.Error(),
+					})
+				}
+			}
 			// Periodic check for tampering
 			if err := d.checkIntegrity(); err != nil {
 				d.logger.Warn("integrity check failed", map[string]any{
@@ -225,6 +252,130 @@ func (d *Daemon) monitorFileSystem(ctx context.Context) {
 			}
 		}
 	}
+}
+
+func (d *Daemon) watchPaths() []string {
+	paths := map[string]struct{}{}
+	if d.workspace == "" {
+		return nil
+	}
+
+	paths[d.workspace] = struct{}{}
+	paths[filepath.Join(d.workspace, ".vectra-guard")] = struct{}{}
+	paths[filepath.Join(d.workspace, "vectra-guard.yaml")] = struct{}{}
+	paths[filepath.Join(d.workspace, "vectra-guard.yml")] = struct{}{}
+	if d.pidFile != "" {
+		paths[d.pidFile] = struct{}{}
+	}
+
+	var ordered []string
+	for path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			ordered = append(ordered, path)
+		}
+	}
+
+	return ordered
+}
+
+func (d *Daemon) detectFileChanges(paths []string, lastStates map[string]time.Time) bool {
+	changed := false
+	for _, path := range paths {
+		info, err := os.Stat(path)
+		if err != nil {
+			if _, ok := lastStates[path]; ok {
+				delete(lastStates, path)
+				changed = true
+			}
+			continue
+		}
+
+		lastTime, ok := lastStates[path]
+		if !ok || info.ModTime().After(lastTime) {
+			lastStates[path] = info.ModTime()
+			changed = true
+		}
+	}
+	return changed
+}
+
+func (d *Daemon) evaluateCommand(cmd Command) (bool, string, []string, string) {
+	cmdString := strings.TrimSpace(strings.Join(append([]string{cmd.Cmd}, cmd.Args...), " "))
+	if cmdString == "" {
+		return true, "low", nil, ""
+	}
+
+	if d.config.GuardLevel.AllowUserBypass && d.config.GuardLevel.BypassEnvVar != "" {
+		if os.Getenv(d.config.GuardLevel.BypassEnvVar) != "" {
+			return true, "low", nil, "bypass_env_var"
+		}
+	}
+
+	detectionCtx := config.DetectionContext{
+		Command:     cmdString,
+		GitBranch:   config.GetCurrentGitBranch(d.workspace),
+		WorkingDir:  d.workspace,
+		Environment: envToMap(os.Environ()),
+	}
+	level := config.DetectGuardLevel(d.config, detectionCtx)
+
+	findings := analyzer.AnalyzeScript("command", []byte(cmdString), d.config.Policies)
+	riskLevel := highestSeverity(findings)
+	approved := d.approvalForLevel(level, riskLevel, len(findings) > 0)
+
+	findingsSummary := make([]string, 0, len(findings))
+	for _, finding := range findings {
+		findingsSummary = append(findingsSummary, fmt.Sprintf("%s:%s", finding.Code, finding.Severity))
+	}
+
+	return approved, riskLevel, findingsSummary, "policy"
+}
+
+func (d *Daemon) approvalForLevel(level config.GuardLevel, riskLevel string, hasFindings bool) bool {
+	switch level {
+	case config.GuardLevelOff:
+		return true
+	case config.GuardLevelLow:
+		return riskLevel != "critical"
+	case config.GuardLevelMedium:
+		return riskLevel != "critical" && riskLevel != "high"
+	case config.GuardLevelHigh:
+		return riskLevel == "low"
+	case config.GuardLevelParanoid:
+		return !hasFindings && riskLevel == "low"
+	default:
+		return riskLevel != "critical" && riskLevel != "high"
+	}
+}
+
+func highestSeverity(findings []analyzer.Finding) string {
+	priority := map[string]int{
+		"low":      0,
+		"medium":   1,
+		"high":     2,
+		"critical": 3,
+	}
+	maxSeverity := "low"
+	maxRank := 0
+	for _, finding := range findings {
+		rank, ok := priority[strings.ToLower(finding.Severity)]
+		if ok && rank > maxRank {
+			maxRank = rank
+			maxSeverity = strings.ToLower(finding.Severity)
+		}
+	}
+	return maxSeverity
+}
+
+func envToMap(values []string) map[string]string {
+	env := make(map[string]string, len(values))
+	for _, entry := range values {
+		parts := strings.SplitN(entry, "=", 2)
+		if len(parts) == 2 {
+			env[parts[0]] = parts[1]
+		}
+	}
+	return env
 }
 
 func (d *Daemon) checkIntegrity() error {
@@ -323,4 +474,3 @@ func GetRunningDaemon(workspace string) int {
 
 	return pid
 }
-
