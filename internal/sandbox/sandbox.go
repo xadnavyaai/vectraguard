@@ -36,39 +36,39 @@ type ExecutionDecision struct {
 // SandboxConfig controls sandbox behavior and isolation
 type SandboxConfig struct {
 	// Runtime configuration
-	Runtime          string        // docker, podman, process
-	Image            string        // Container image to use
-	Timeout          time.Duration // Execution timeout
-	WorkDir          string        // Working directory to mount
-	
+	Runtime string        // docker, podman, process
+	Image   string        // Container image to use
+	Timeout time.Duration // Execution timeout
+	WorkDir string        // Working directory to mount
+
 	// Cache configuration
 	EnableCache      bool     // Enable dependency caching
 	CacheMounts      []string // Paths to mount for caching
 	SharedCachePaths []string // System-wide cache paths
-	
+
 	// Security posture
-	NetworkMode      string   // none, restricted, full
-	ReadOnlyRoot     bool     // Make root filesystem read-only
-	NoNewPrivileges  bool     // Prevent privilege escalation
-	CapDrop          []string // Linux capabilities to drop
-	CapAdd           []string // Linux capabilities to add
-	SeccompProfile   string   // Path to seccomp profile
-	
+	NetworkMode     string   // none, restricted, full
+	ReadOnlyRoot    bool     // Make root filesystem read-only
+	NoNewPrivileges bool     // Prevent privilege escalation
+	CapDrop         []string // Linux capabilities to drop
+	CapAdd          []string // Linux capabilities to add
+	SeccompProfile  string   // Path to seccomp profile
+
 	// Resource limits
-	MemoryLimit      string // Memory limit (e.g., "512m")
-	CPULimit         string // CPU limit (e.g., "1.0")
-	PidsLimit        int    // Max number of processes
-	
+	MemoryLimit string // Memory limit (e.g., "512m")
+	CPULimit    string // CPU limit (e.g., "1.0")
+	PidsLimit   int    // Max number of processes
+
 	// Environment
-	EnvWhitelist     []string          // Environment variables to pass through
-	EnvOverrides     map[string]string // Environment variable overrides
-	
+	EnvWhitelist []string          // Environment variables to pass through
+	EnvOverrides map[string]string // Environment variable overrides
+
 	// Bind mounts
-	BindMounts       []BindMount // Additional bind mounts
-	
+	BindMounts []BindMount // Additional bind mounts
+
 	// Observability
-	EnableMetrics    bool // Collect execution metrics
-	LogOutput        bool // Log command output
+	EnableMetrics bool // Collect execution metrics
+	LogOutput     bool // Log command output
 }
 
 // BindMount represents a host path mounted into the sandbox
@@ -91,7 +91,7 @@ func NewExecutor(cfg config.Config, logger *logging.Logger) (*Executor, error) {
 	if err != nil {
 		return nil, fmt.Errorf("initialize trust store: %w", err)
 	}
-	
+
 	return &Executor{
 		config: cfg,
 		logger: logger,
@@ -103,14 +103,14 @@ func NewExecutor(cfg config.Config, logger *logging.Logger) (*Executor, error) {
 func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, riskLevel string, findings interface{}) ExecutionDecision {
 	cmdString := strings.Join(cmdArgs, " ")
 	sandboxCfg := e.config.Sandbox
-	
+
 	decision := ExecutionDecision{
 		Mode:          ExecutionModeHost,
 		RiskLevel:     riskLevel,
 		ShouldCache:   false,
 		SecurityLevel: string(sandboxCfg.SecurityLevel),
 	}
-	
+
 	// Rule 1: MANDATORY SANDBOXING for critical commands (cannot be bypassed)
 	// Check for critical risk commands that MUST run in sandbox regardless of trust or config
 	if riskLevel == "critical" {
@@ -119,7 +119,7 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 		if findings, ok := findings.([]analyzer.Finding); ok {
 			findingsList = findings
 		}
-		
+
 		// Critical codes that require mandatory sandboxing (cannot bypass)
 		mandatorySandboxCodes := []string{
 			"DANGEROUS_DELETE_ROOT",
@@ -128,7 +128,7 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 			"SENSITIVE_ENV_ACCESS",
 			"DOTENV_FILE_READ",
 		}
-		
+
 		hasMandatoryCode := false
 		for _, finding := range findingsList {
 			for _, code := range mandatorySandboxCodes {
@@ -141,7 +141,7 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 				break
 			}
 		}
-		
+
 		if hasMandatoryCode {
 			// MANDATORY: These commands MUST run in sandbox, cannot bypass
 			decision.Mode = ExecutionModeSandbox
@@ -151,20 +151,20 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 			return decision
 		}
 	}
-	
+
 	// Rule 2: Check if sandboxing is disabled (but not for critical commands above)
 	if !sandboxCfg.Enabled {
 		decision.Reason = "sandboxing disabled in config"
 		return decision
 	}
-	
+
 	// Rule 3: Check trust store - if approved and remembered, run on host
 	// NOTE: Trust store bypass does NOT apply to critical commands (handled above)
 	if e.trust.IsTrusted(cmdString) {
 		decision.Reason = "command previously approved and trusted"
 		return decision
 	}
-	
+
 	// Rule 4: Check mode-specific behavior first
 	if sandboxCfg.Mode == config.SandboxModeAlways {
 		// Always mode sandboxes everything
@@ -174,27 +174,27 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 		decision.CacheKey = e.generateCacheKey(cmdArgs)
 		return decision
 	}
-	
+
 	if sandboxCfg.Mode == config.SandboxModeNever {
 		// Never mode never sandboxes (but critical commands already handled above)
 		decision.Reason = "sandboxing disabled by mode"
 		return decision
 	}
-	
+
 	// Rule 5: Check allowlist patterns - but NOT for critical commands
 	// Allowlist does NOT bypass mandatory sandboxing for critical operations
 	if riskLevel != "critical" && e.matchesAllowlist(cmdString) {
 		decision.Reason = "matches allowlist pattern"
 		return decision
 	}
-	
+
 	// Rule 6: Check for networked installs (before low-risk check)
 	isNetworkedInstall := e.isNetworkedInstall(cmdString)
-	
+
 	// Rule 7: Determine if command should run in sandbox based on risk and policy
 	shouldSandbox := false
 	reason := ""
-	
+
 	switch sandboxCfg.Mode {
 	case config.SandboxModeAuto:
 		// Auto mode: sandbox medium+ risk or when networked install detected
@@ -202,7 +202,7 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 			shouldSandbox = true
 			reason = fmt.Sprintf("%s risk detected", riskLevel)
 		}
-		
+
 		// Check for networked install operations
 		if isNetworkedInstall {
 			shouldSandbox = true
@@ -212,7 +212,7 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 				reason = "networked install detected"
 			}
 		}
-		
+
 	case config.SandboxModeRisky:
 		// Only sandbox high/critical risk
 		if riskLevel == "high" || riskLevel == "critical" {
@@ -220,7 +220,7 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 			reason = fmt.Sprintf("%s risk - requires isolation", riskLevel)
 		}
 	}
-	
+
 	// If sandbox not triggered, check if we can run on host
 	if !shouldSandbox {
 		// Low-risk commands run on host
@@ -228,17 +228,17 @@ func (e *Executor) DecideExecutionMode(ctx context.Context, cmdArgs []string, ri
 			decision.Reason = "low risk, no isolation needed"
 			return decision
 		}
-		
+
 		decision.Reason = "no sandbox triggers matched"
 		return decision
 	}
-	
+
 	// Sandbox triggered
 	decision.Mode = ExecutionModeSandbox
 	decision.Reason = reason
 	decision.ShouldCache = e.shouldEnableCache(cmdArgs)
 	decision.CacheKey = e.generateCacheKey(cmdArgs)
-	
+
 	return decision
 }
 
@@ -247,7 +247,7 @@ func (e *Executor) Execute(ctx context.Context, cmdArgs []string, decision Execu
 	if decision.Mode == ExecutionModeHost {
 		return e.executeOnHost(ctx, cmdArgs)
 	}
-	
+
 	return e.executeInSandbox(ctx, cmdArgs, decision)
 }
 
@@ -256,29 +256,38 @@ func (e *Executor) executeOnHost(ctx context.Context, cmdArgs []string) error {
 	if len(cmdArgs) == 0 {
 		return fmt.Errorf("no command specified")
 	}
-	
+
 	cmd := exec.CommandContext(ctx, cmdArgs[0], cmdArgs[1:]...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Env = os.Environ()
-	
+
 	return cmd.Run()
 }
 
 // executeInSandbox runs command in an isolated sandbox
 func (e *Executor) executeInSandbox(ctx context.Context, cmdArgs []string, decision ExecutionDecision) error {
-	sandboxCfg := e.buildSandboxConfig(decision)
-	
+	sandboxCfg, err := e.buildSandboxConfig(decision)
+	if err != nil {
+		return err
+	}
+
 	start := time.Now()
 	e.logger.Info("executing in sandbox", map[string]any{
-		"command":    strings.Join(cmdArgs, " "),
-		"runtime":    sandboxCfg.Runtime,
-		"cache":      decision.ShouldCache,
-		"network":    sandboxCfg.NetworkMode,
-		"reason":     decision.Reason,
+		"command": strings.Join(cmdArgs, " "),
+		"runtime": sandboxCfg.Runtime,
+		"cache":   decision.ShouldCache,
+		"network": sandboxCfg.NetworkMode,
+		"reason":  decision.Reason,
 	})
-	
+
+	if sandboxCfg.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, sandboxCfg.Timeout)
+		defer cancel()
+	}
+
 	var err error
 	switch sandboxCfg.Runtime {
 	case "docker":
@@ -290,24 +299,27 @@ func (e *Executor) executeInSandbox(ctx context.Context, cmdArgs []string, decis
 	default:
 		return fmt.Errorf("unsupported sandbox runtime: %s", sandboxCfg.Runtime)
 	}
-	
+
 	duration := time.Since(start)
-	
+
 	if err == nil {
 		e.logger.Info("sandbox execution completed", map[string]any{
 			"duration": duration.String(),
 			"cached":   decision.ShouldCache,
 		})
 	}
-	
+
 	return err
 }
 
 // buildSandboxConfig creates runtime configuration based on security level
-func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig {
+func (e *Executor) buildSandboxConfig(decision ExecutionDecision) (SandboxConfig, error) {
 	cfg := e.config.Sandbox
-	workDir, _ := os.Getwd()
-	
+	workDir, err := os.Getwd()
+	if err != nil {
+		return SandboxConfig{}, fmt.Errorf("resolve working directory: %w", err)
+	}
+
 	sandboxCfg := SandboxConfig{
 		Runtime:         cfg.Runtime,
 		Image:           cfg.Image,
@@ -321,7 +333,7 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig 
 		EnvWhitelist:    cfg.EnvWhitelist,
 		EnvOverrides:    make(map[string]string),
 	}
-	
+
 	// Configure security posture based on level
 	switch cfg.SecurityLevel {
 	case config.SandboxSecurityPermissive:
@@ -329,7 +341,7 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig 
 		sandboxCfg.ReadOnlyRoot = false
 		sandboxCfg.MemoryLimit = "2g"
 		sandboxCfg.CPULimit = "2.0"
-		
+
 	case config.SandboxSecurityBalanced:
 		sandboxCfg.NetworkMode = cfg.NetworkMode
 		if sandboxCfg.NetworkMode == "" {
@@ -340,7 +352,7 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig 
 		sandboxCfg.CPULimit = "1.0"
 		sandboxCfg.CapDrop = []string{"ALL"}
 		sandboxCfg.CapAdd = []string{"CHOWN", "DAC_OVERRIDE", "FOWNER", "SETGID", "SETUID"}
-		
+
 	case config.SandboxSecurityStrict:
 		sandboxCfg.NetworkMode = "restricted"
 		sandboxCfg.ReadOnlyRoot = true
@@ -350,7 +362,7 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig 
 		sandboxCfg.CapDrop = []string{"ALL"}
 		sandboxCfg.CapAdd = []string{"CHOWN", "DAC_OVERRIDE"}
 		sandboxCfg.SeccompProfile = cfg.SeccompProfile
-		
+
 	case config.SandboxSecurityParanoid:
 		sandboxCfg.NetworkMode = "none"
 		sandboxCfg.ReadOnlyRoot = true
@@ -360,12 +372,12 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig 
 		sandboxCfg.CapDrop = []string{"ALL"}
 		sandboxCfg.SeccompProfile = cfg.SeccompProfile
 	}
-	
+
 	// Add cache mounts if enabled
 	if decision.ShouldCache {
 		sandboxCfg.CacheMounts = e.getCacheMounts()
 	}
-	
+
 	// Add custom bind mounts
 	for _, mount := range cfg.BindMounts {
 		sandboxCfg.BindMounts = append(sandboxCfg.BindMounts, BindMount{
@@ -374,31 +386,31 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) SandboxConfig 
 			ReadOnly:      mount.ReadOnly,
 		})
 	}
-	
-	return sandboxCfg
+
+	return sandboxCfg, nil
 }
 
 // executeDocker runs command in Docker container
 func (e *Executor) executeDocker(ctx context.Context, cmdArgs []string, cfg SandboxConfig) error {
 	dockerArgs := e.buildDockerArgs(cfg, cmdArgs)
-	
+
 	cmd := exec.CommandContext(ctx, "docker", dockerArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	
+
 	return cmd.Run()
 }
 
 // executePodman runs command in Podman container
 func (e *Executor) executePodman(ctx context.Context, cmdArgs []string, cfg SandboxConfig) error {
 	podmanArgs := e.buildDockerArgs(cfg, cmdArgs) // Podman is CLI-compatible with Docker
-	
+
 	cmd := exec.CommandContext(ctx, "podman", podmanArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	
+
 	return cmd.Run()
 }
 
@@ -407,43 +419,43 @@ func (e *Executor) executeProcess(ctx context.Context, cmdArgs []string, cfg San
 	if runtime.GOOS != "linux" {
 		return fmt.Errorf("process sandbox mode only supported on Linux")
 	}
-	
+
 	// Use unshare for namespace isolation
 	unshareArgs := []string{
 		"--map-root-user", // Map to root in new namespace
 		"--pid",           // PID namespace
 		"--mount",         // Mount namespace
 	}
-	
+
 	if cfg.NetworkMode == "none" {
 		unshareArgs = append(unshareArgs, "--net") // Network namespace
 	}
-	
+
 	unshareArgs = append(unshareArgs, "--")
 	unshareArgs = append(unshareArgs, cmdArgs...)
-	
+
 	cmd := exec.CommandContext(ctx, "unshare", unshareArgs...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
 	cmd.Env = e.buildEnv(cfg)
-	
+
 	return cmd.Run()
 }
 
 // buildDockerArgs constructs Docker/Podman CLI arguments
 func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string {
 	args := []string{"run", "--rm", "-i"}
-	
+
 	// Add TTY if stdin is a terminal
 	if isTerminal(os.Stdin) {
 		args = append(args, "-t")
 	}
-	
+
 	// Working directory mount
 	args = append(args, "-v", fmt.Sprintf("%s:%s", cfg.WorkDir, cfg.WorkDir))
 	args = append(args, "-w", cfg.WorkDir)
-	
+
 	// Network mode
 	switch cfg.NetworkMode {
 	case "none":
@@ -455,18 +467,18 @@ func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string
 	default:
 		args = append(args, "--network", "bridge")
 	}
-	
+
 	// Security options
 	if cfg.ReadOnlyRoot {
 		args = append(args, "--read-only")
 		// Add tmpfs for /tmp
 		args = append(args, "--tmpfs", "/tmp:rw,noexec,nosuid,size=100m")
 	}
-	
+
 	if cfg.NoNewPrivileges {
 		args = append(args, "--security-opt", "no-new-privileges")
 	}
-	
+
 	// Capabilities
 	for _, cap := range cfg.CapDrop {
 		args = append(args, "--cap-drop", cap)
@@ -474,12 +486,12 @@ func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string
 	for _, cap := range cfg.CapAdd {
 		args = append(args, "--cap-add", cap)
 	}
-	
+
 	// Seccomp profile
 	if cfg.SeccompProfile != "" {
 		args = append(args, "--security-opt", fmt.Sprintf("seccomp=%s", cfg.SeccompProfile))
 	}
-	
+
 	// Resource limits
 	if cfg.MemoryLimit != "" {
 		args = append(args, "--memory", cfg.MemoryLimit)
@@ -490,12 +502,12 @@ func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string
 	if cfg.PidsLimit > 0 {
 		args = append(args, "--pids-limit", fmt.Sprintf("%d", cfg.PidsLimit))
 	}
-	
+
 	// Cache mounts
 	for _, mount := range cfg.CacheMounts {
 		args = append(args, "-v", mount)
 	}
-	
+
 	// Custom bind mounts
 	for _, mount := range cfg.BindMounts {
 		mountStr := fmt.Sprintf("%s:%s", mount.HostPath, mount.ContainerPath)
@@ -504,7 +516,7 @@ func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string
 		}
 		args = append(args, "-v", mountStr)
 	}
-	
+
 	// Environment variables
 	for _, envVar := range cfg.EnvWhitelist {
 		if val, ok := os.LookupEnv(envVar); ok {
@@ -514,30 +526,30 @@ func (e *Executor) buildDockerArgs(cfg SandboxConfig, cmdArgs []string) []string
 	for key, val := range cfg.EnvOverrides {
 		args = append(args, "-e", fmt.Sprintf("%s=%s", key, val))
 	}
-	
+
 	// Image
 	args = append(args, cfg.Image)
-	
+
 	// Command
 	args = append(args, cmdArgs...)
-	
+
 	return args
 }
 
 // buildEnv constructs environment variables for process sandbox
 func (e *Executor) buildEnv(cfg SandboxConfig) []string {
 	env := []string{}
-	
+
 	for _, envVar := range cfg.EnvWhitelist {
 		if val, ok := os.LookupEnv(envVar); ok {
 			env = append(env, fmt.Sprintf("%s=%s", envVar, val))
 		}
 	}
-	
+
 	for key, val := range cfg.EnvOverrides {
 		env = append(env, fmt.Sprintf("%s=%s", key, val))
 	}
-	
+
 	return env
 }
 
@@ -554,7 +566,7 @@ func (e *Executor) matchesAllowlist(cmdString string) bool {
 // isNetworkedInstall detects if command is a networked install operation
 func (e *Executor) isNetworkedInstall(cmdString string) bool {
 	lower := strings.ToLower(cmdString)
-	
+
 	installCommands := []string{
 		"npm install", "yarn install", "pnpm install",
 		"pip install", "pip3 install",
@@ -568,13 +580,13 @@ func (e *Executor) isNetworkedInstall(cmdString string) bool {
 		"maven install", "mvn install",
 		"gradle build",
 	}
-	
+
 	for _, cmd := range installCommands {
 		if strings.Contains(lower, cmd) {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -584,14 +596,14 @@ func (e *Executor) shouldEnableCache(cmdArgs []string) bool {
 	if !e.config.Sandbox.EnableCache {
 		return false
 	}
-	
+
 	// If always-sandbox mode is enabled, cache everything for maximum performance
 	if e.config.Sandbox.Mode == config.SandboxModeAlways {
 		return true
 	}
-	
+
 	cmdString := strings.ToLower(strings.Join(cmdArgs, " "))
-	
+
 	// Enable cache for package managers and build tools
 	cacheableCommands := []string{
 		"npm", "yarn", "pnpm",
@@ -606,13 +618,13 @@ func (e *Executor) shouldEnableCache(cmdArgs []string) bool {
 		"apt", "apt-get", "yum", "dnf", "pacman",
 		"brew", "port",
 	}
-	
+
 	for _, cmd := range cacheableCommands {
 		if strings.HasPrefix(cmdString, cmd+" ") || cmdString == cmd {
 			return true
 		}
 	}
-	
+
 	return false
 }
 
@@ -631,59 +643,59 @@ func (e *Executor) getCacheMounts() []string {
 	if err != nil {
 		return mounts
 	}
-	
+
 	// Expand user cache directories from config if provided
 	if len(e.config.Sandbox.CacheDirs) > 0 {
 		for _, cacheDir := range e.config.Sandbox.CacheDirs {
 			// Expand ~ to home directory
 			expandedDir := strings.Replace(cacheDir, "~", homeDir, 1)
 			expandedDir = os.ExpandEnv(expandedDir)
-			
+
 			// Use same path in container
 			if _, err := os.Stat(expandedDir); err == nil {
 				mounts = append(mounts, fmt.Sprintf("%s:%s", expandedDir, expandedDir))
 			}
 		}
 	}
-	
+
 	// Common cache directories (comprehensive list)
 	cacheDirs := map[string]string{
 		// Node.js
-		filepath.Join(homeDir, ".npm"):                    "/.npm",
-		filepath.Join(homeDir, ".yarn"):                   "/.yarn",
-		filepath.Join(homeDir, ".pnpm"):                   "/.pnpm",
-		filepath.Join(homeDir, ".cache", "npm"):          "/.cache/npm",
-		filepath.Join(homeDir, ".cache", "yarn"):         "/.cache/yarn",
+		filepath.Join(homeDir, ".npm"):           "/.npm",
+		filepath.Join(homeDir, ".yarn"):          "/.yarn",
+		filepath.Join(homeDir, ".pnpm"):          "/.pnpm",
+		filepath.Join(homeDir, ".cache", "npm"):  "/.cache/npm",
+		filepath.Join(homeDir, ".cache", "yarn"): "/.cache/yarn",
 		// Python
-		filepath.Join(homeDir, ".cache", "pip"):          "/.cache/pip",
-		filepath.Join(homeDir, ".cache", "pip3"):         "/.cache/pip3",
+		filepath.Join(homeDir, ".cache", "pip"):  "/.cache/pip",
+		filepath.Join(homeDir, ".cache", "pip3"): "/.cache/pip3",
 		// Go
-		filepath.Join(homeDir, "go", "pkg"):               "/go/pkg",
-		filepath.Join(homeDir, ".cache", "go-build"):    "/.cache/go-build",
+		filepath.Join(homeDir, "go", "pkg"):          "/go/pkg",
+		filepath.Join(homeDir, ".cache", "go-build"): "/.cache/go-build",
 		// Rust
-		filepath.Join(homeDir, ".cargo"):                 "/.cargo",
-		filepath.Join(homeDir, ".rustup"):                "/.rustup",
-		filepath.Join(homeDir, ".cache", "cargo"):        "/.cache/cargo",
+		filepath.Join(homeDir, ".cargo"):          "/.cargo",
+		filepath.Join(homeDir, ".rustup"):         "/.rustup",
+		filepath.Join(homeDir, ".cache", "cargo"): "/.cache/cargo",
 		// Java
-		filepath.Join(homeDir, ".m2"):                    "/.m2",
-		filepath.Join(homeDir, ".gradle"):                "/.gradle",
+		filepath.Join(homeDir, ".m2"):     "/.m2",
+		filepath.Join(homeDir, ".gradle"): "/.gradle",
 		// Ruby
-		filepath.Join(homeDir, ".gem"):                   "/.gem",
+		filepath.Join(homeDir, ".gem"): "/.gem",
 		// PHP
-		filepath.Join(homeDir, ".cache", "composer"):    "/.cache/composer",
+		filepath.Join(homeDir, ".cache", "composer"): "/.cache/composer",
 		// Other
-		filepath.Join(homeDir, ".cache", "bower"):       "/.cache/bower",
-		filepath.Join(homeDir, ".cache", "nuget"):       "/.cache/nuget",
+		filepath.Join(homeDir, ".cache", "bower"): "/.cache/bower",
+		filepath.Join(homeDir, ".cache", "nuget"): "/.cache/nuget",
 		// System package managers (if accessible)
-		filepath.Join(homeDir, ".cache", "apt"):         "/.cache/apt",
+		filepath.Join(homeDir, ".cache", "apt"): "/.cache/apt",
 	}
-	
+
 	for hostPath, containerPath := range cacheDirs {
 		if _, err := os.Stat(hostPath); err == nil {
 			mounts = append(mounts, fmt.Sprintf("%s:%s", hostPath, containerPath))
 		}
 	}
-	
+
 	return mounts
 }
 

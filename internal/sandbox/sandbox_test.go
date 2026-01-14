@@ -306,7 +306,10 @@ func TestBuildSandboxConfig(t *testing.T) {
 				ShouldCache: false,
 			}
 
-			sandboxCfg := executor.buildSandboxConfig(decision)
+			sandboxCfg, err := executor.buildSandboxConfig(decision)
+			if err != nil {
+				t.Fatalf("buildSandboxConfig() error = %v", err)
+			}
 			tt.checkFunc(t, sandboxCfg)
 		})
 	}
