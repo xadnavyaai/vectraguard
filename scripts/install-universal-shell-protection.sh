@@ -158,7 +158,8 @@ install_bash() {
 # Vectra Guard Integration (Auto-generated)
 # ============================================================================
 
-if command -v vectra-guard &> /dev/null; then
+# Only run in bash (protect against sourcing in zsh)
+if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # Initialize session
     _vectra_guard_init() {
         if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
@@ -330,7 +331,8 @@ install_zsh() {
 # Vectra Guard Integration (Auto-generated)
 # ============================================================================
 
-if command -v vectra-guard &> /dev/null; then
+# Only run in zsh (protect against sourcing in bash)
+if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # Initialize session
     _vectra_guard_init() {
         if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
@@ -456,10 +458,12 @@ if command -v vectra-guard &> /dev/null; then
         unset VECTRA_LAST_CMD
     }
     
-    # Register hooks
-    autoload -Uz add-zsh-hook
-    add-zsh-hook preexec _vectra_guard_preexec
-    add-zsh-hook precmd _vectra_guard_precmd
+    # Register hooks (only in zsh)
+    if [ -n "$ZSH_VERSION" ]; then
+        autoload -Uz add-zsh-hook 2>/dev/null || true
+        add-zsh-hook preexec _vectra_guard_preexec 2>/dev/null || true
+        add-zsh-hook precmd _vectra_guard_precmd 2>/dev/null || true
+    fi
     
     # Initialize
     _vectra_guard_init
