@@ -86,11 +86,11 @@ if [ -n "$REQUESTED_SHELLS" ]; then
         exit 1
     fi
     echo "  ℹ️  Shell selection provided (--shells/VG_SHELLS): ${SELECTED_SHELLS[*]}"
-elif [ -c /dev/tty ]; then
+elif [ -c /dev/tty ] && [ -t 0 ]; then
     echo "Select shells to enable (space-separated). Press Enter for all detected."
     echo "Detected: ${SHELLS[*]}"
-    read -p "> " -r < /dev/tty
-    if [ -n "$REPLY" ]; then
+    read -p "> " -r < /dev/tty || REPLY=""
+    if [ -n "${REPLY:-}" ]; then
         SELECTED_SHELLS=()
         for shell in $REPLY; do
             for detected in "${SHELLS[@]}"; do
@@ -193,11 +193,25 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
             cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
         fi
         
-        # Pattern 1: Root deletion patterns
+        # Pattern 1: Root deletion patterns (before shell expansion)
         # Matches: rm -rf /, rm -r /, rm -rf /*, rm -rf / *, etc.
         if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
            [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
            [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+            return 0  # Protected
+        fi
+        
+        # Pattern 1.5: Detect multiple system directories (after shell expansion of /*)
+        # When /* expands, we get: rm -rf /bin /usr /etc /var ...
+        # Count system directories in the command
+        local system_dir_count=0
+        for dir in /bin /sbin /usr /etc /var /lib /lib64 /lib32 /opt /boot /root /sys /proc /dev /home /srv /run /mnt /media /applications /library /system /private /cores /users /volumes; do
+            if [[ "$cmd_lower" =~ [[:space:]]${dir}(/|$|[[:space:]]) ]]; then
+                ((system_dir_count++))
+            fi
+        done
+        # If 3+ system directories are being deleted, it's likely /* expansion
+        if [ "$system_dir_count" -ge 3 ]; then
             return 0  # Protected
         fi
         
@@ -360,10 +374,23 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
             local cmd="$1"
             local cmd_lower="${cmd:l}"  # zsh lowercase conversion
             
-            # Pattern 1: Root deletion patterns
+            # Pattern 1: Root deletion patterns (before shell expansion)
             if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
                [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
                [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+                return 0  # Protected
+            fi
+            
+            # Pattern 1.5: Detect multiple system directories (after shell expansion of /*)
+            # When /* expands, we get: rm -rf /bin /usr /etc /var ...
+            local system_dir_count=0
+            for dir in /bin /sbin /usr /etc /var /lib /lib64 /lib32 /opt /boot /root /sys /proc /dev /home /srv /run /mnt /media /applications /library /system /private /cores /users /volumes; do
+                if [[ "$cmd_lower" =~ [[:space:]]${dir}(/|$|[[:space:]]) ]]; then
+                    ((system_dir_count++))
+                fi
+            done
+            # If 3+ system directories are being deleted, it's likely /* expansion
+            if [ "$system_dir_count" -ge 3 ]; then
                 return 0  # Protected
             fi
             
@@ -561,9 +588,9 @@ echo ""
 # Optional: IDE integration setup (Cursor/VS Code)
 echo "Step 4/5: IDE integration (optional)..."
 if [ -t 0 ] && [ -c /dev/tty ]; then
-    read -p "Configure Cursor/VS Code integration? [y/N] " -n 1 -r < /dev/tty
+    read -p "Configure Cursor/VS Code integration? [y/N] " -n 1 -r < /dev/tty || REPLY="n"
     echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
+    if [[ "${REPLY:-n}" =~ ^[Yy]$ ]]; then
         if [ -f "$(dirname "$0")/setup-cursor-protection.sh" ]; then
             read -p "Workspace path for IDE integration [$(pwd)]: " -r < /dev/tty
             WORKSPACE_PATH="${REPLY:-$(pwd)}"
@@ -587,14 +614,14 @@ echo ""
 echo "Step 5/5: Setting up safety aliases (optional)..."
 # Use /dev/tty to read from terminal when piped through curl | bash
 if [ -t 0 ] && [ -c /dev/tty ]; then
-    read -p "Install safety aliases (wrap dangerous commands)? [y/N] " -n 1 -r < /dev/tty
+    read -p "Install safety aliases (wrap dangerous commands)? [y/N] " -n 1 -r < /dev/tty || REPLY="n"
     echo
 else
     # Non-interactive mode - skip aliases
     REPLY="n"
     echo "  ℹ️  Skipping in non-interactive mode"
 fi
-if [[ $REPLY =~ ^[Yy]$ ]]; then
+if [[ "${REPLY:-n}" =~ ^[Yy]$ ]]; then
     for shell in "${SELECTED_SHELLS[@]}"; do
         case $shell in
             bash|zsh)
