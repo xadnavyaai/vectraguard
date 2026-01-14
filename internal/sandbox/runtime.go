@@ -50,13 +50,13 @@ func (rs *RuntimeSelector) SelectRuntime(ctx context.Context) (RuntimeExecutor, 
 	// Detect available capabilities
 	caps := namespace.DetectCapabilities()
 	rs.logger.Debug("detected capabilities", map[string]any{
-		"bubblewrap":        caps.Bubblewrap,
-		"namespaces":        caps.Namespaces,
-		"docker":            caps.Docker,
-		"seccomp":           caps.Seccomp,
-		"overlayfs":         caps.OverlayFS,
-		"user_namespaces":   caps.UserNamespaces,
-		"mount_namespaces":  caps.MountNamespaces,
+		"bubblewrap":         caps.Bubblewrap,
+		"namespaces":         caps.Namespaces,
+		"docker":             caps.Docker,
+		"seccomp":            caps.Seccomp,
+		"overlayfs":          caps.OverlayFS,
+		"user_namespaces":    caps.UserNamespaces,
+		"mount_namespaces":   caps.MountNamespaces,
 		"network_namespaces": caps.NetworkNamespaces,
 	})
 
@@ -114,7 +114,9 @@ func (rs *RuntimeSelector) createExecutor(runtime namespace.RuntimeType, caps na
 	}
 
 	// Ensure cache directory exists
-	os.MkdirAll(cacheDir, 0755)
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		return nil, fmt.Errorf("create cache directory: %w", err)
+	}
 
 	// Convert config bind mounts to namespace bind mounts
 	bindMounts := []namespace.BindMount{}
@@ -252,10 +254,24 @@ type dockerRuntimeExecutor struct {
 }
 
 func (e *dockerRuntimeExecutor) Execute(cmdArgs []string) error {
-	// Use existing Docker execution logic
-	// This is a placeholder - the actual implementation would use the
-	// existing runInContainer function from sandbox.go
-	return fmt.Errorf("docker execution not yet migrated - use legacy runInContainer")
+	executor := &Executor{
+		config: config.Config{Sandbox: e.config},
+		logger: e.logger,
+	}
+	decision := ExecutionDecision{ShouldCache: e.config.EnableCache}
+	sandboxCfg, err := executor.buildSandboxConfig(decision)
+	if err != nil {
+		return err
+	}
+
+	ctx := context.Background()
+	if sandboxCfg.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, sandboxCfg.Timeout)
+		defer cancel()
+	}
+
+	return executor.executeDocker(ctx, cmdArgs, sandboxCfg)
 }
 
 func (e *dockerRuntimeExecutor) Name() string {
@@ -266,4 +282,3 @@ func (e *dockerRuntimeExecutor) IsAvailable() bool {
 	caps := namespace.DetectCapabilities()
 	return caps.Docker
 }
-
