@@ -288,7 +288,6 @@ func (e *Executor) executeInSandbox(ctx context.Context, cmdArgs []string, decis
 		defer cancel()
 	}
 
-	var err error
 	switch sandboxCfg.Runtime {
 	case "docker":
 		err = e.executeDocker(ctx, cmdArgs, sandboxCfg)

@@ -52,6 +52,26 @@ test-docker:
 	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-e2e
 	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm test-all
 
+# Run Docker-based tests for PR changes (isolated execution tests)
+# Tests runtime execution, timeouts, and sandbox behavior in Docker
+test-docker-pr:
+	@if ! command -v docker >/dev/null 2>&1; then \
+		echo "❌ Docker is not installed"; \
+		exit 1; \
+	fi
+	@if [ -z "$(DOCKER_COMPOSE)" ]; then \
+		echo "❌ docker-compose is not available"; \
+		exit 1; \
+	fi
+	@echo "🐳 Running Docker-based tests for PR changes..."
+	@echo "Testing extended tests in Docker (PR #8 & #9)..."
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-extended
+	@echo "Testing e2e tests in Docker..."
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-e2e
+	@echo "Testing all Go tests in Docker..."
+	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm test-all
+	@echo "✅ Docker-based tests completed"
+
 # ============================================================================
 # TESTING - LOCAL MODE
 # ============================================================================
@@ -76,9 +96,48 @@ test-local-extensive:
 test:
 	go test -v ./...
 
+# Run internal tests (safe - no execution, unit tests only)
+# Tests: daemon, sandbox, runtime, analyzer, config
+test-internal:
+	@echo "🧪 Running internal Go unit tests (safe, no execution)..."
+	@echo ""
+	@echo "Testing daemon (PR #8 changes)..."
+	go test -v ./internal/daemon/...
+	@echo ""
+	@echo "Testing sandbox (PR #8 & #9 changes)..."
+	go test -v ./internal/sandbox/...
+	@echo ""
+	@echo "Testing runtime (PR #9 changes)..."
+	go test -v ./internal/sandbox/... -run TestRuntime
+	@echo ""
+	@echo "Testing analyzer..."
+	go test -v ./internal/analyzer/...
+	@echo ""
+	@echo "Testing config..."
+	go test -v ./internal/config/...
+	@echo ""
+	@echo "Testing other internal packages..."
+	go test -v ./internal/logging/... ./internal/session/...
+	@echo ""
+	@echo "✅ Internal tests completed"
+
 # Run namespace tests (local, safe - only detection logic)
 test-namespace:
 	go test -v ./internal/sandbox/namespace/... ./internal/sandbox/runtime_test.go
+
+# Test PR #8 specific changes (daemon validation, seccomp)
+test-pr8:
+	@echo "🔍 Testing PR #8: Command validation and sandboxing..."
+	go test -v ./internal/daemon/... -run TestCommand
+	go test -v ./internal/sandbox/... -run TestDecideExecutionMode
+	go test -v ./internal/sandbox/namespace/... -run TestSeccomp
+
+# Test PR #9 specific changes (runtime execution, timeouts)
+test-pr9:
+	@echo "🔍 Testing PR #9: Runtime execution and timeouts..."
+	go test -v ./internal/sandbox/runtime_test.go -run TestRuntime
+	go test -v ./internal/sandbox/... -run TestExecute
+	go test -v ./internal/sandbox/... -run TestTimeout
 
 # ============================================================================
 # CONTEXT SUMMARIZE TESTS
@@ -106,6 +165,57 @@ test-context-docker:
 	fi
 	@echo "🚀 Running context summarize tests in Docker..."
 	$(DOCKER_COMPOSE) -f docker-compose.test.yml run --rm --no-deps test-context-summarize
+
+# ============================================================================
+# COMPREHENSIVE TEST SUITE (All Tests in Order)
+# ============================================================================
+
+# Run all tests in the specified order:
+# 1. Internal tests (Go unit tests - safe, no execution)
+# 2. Docker-based tests (isolated execution tests)
+# 3. Local quick tests (detection only)
+# 4. Extensive tests (comprehensive validation)
+test-all-comprehensive:
+	@echo "╔═══════════════════════════════════════════════════════════╗"
+	@echo "║  Comprehensive Test Suite - PR #8 & #9 Review           ║"
+	@echo "╚═══════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "Step 1/4: Running internal Go unit tests (safe, no execution)..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@$(MAKE) test-internal || (echo "❌ Internal tests failed!" && exit 1)
+	@echo ""
+	@echo "Step 2/4: Running Docker-based tests (isolated execution)..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@$(MAKE) test-docker-pr || (echo "❌ Docker tests failed!" && exit 1)
+	@echo ""
+	@echo "Step 3/4: Running local quick tests (detection only)..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@$(MAKE) test-local-quick || (echo "❌ Local quick tests failed!" && exit 1)
+	@echo ""
+	@echo "Step 4/4: Running extensive tests (comprehensive validation)..."
+	@echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+	@$(MAKE) test-local-extensive || (echo "❌ Extensive tests failed!" && exit 1)
+	@echo ""
+	@echo "╔═══════════════════════════════════════════════════════════╗"
+	@echo "║  ✅ All Tests Completed Successfully!                    ║"
+	@echo "╚═══════════════════════════════════════════════════════════╝"
+
+# Quick comprehensive test (skips extensive tests)
+test-all-quick:
+	@echo "╔═══════════════════════════════════════════════════════════╗"
+	@echo "║  Quick Test Suite - PR #8 & #9 Review                    ║"
+	@echo "╚═══════════════════════════════════════════════════════════╝"
+	@echo ""
+	@echo "Step 1/3: Running internal Go unit tests..."
+	@$(MAKE) test-internal || (echo "❌ Internal tests failed!" && exit 1)
+	@echo ""
+	@echo "Step 2/3: Running Docker-based tests..."
+	@$(MAKE) test-docker-pr || (echo "❌ Docker tests failed!" && exit 1)
+	@echo ""
+	@echo "Step 3/3: Running local quick tests..."
+	@$(MAKE) test-local-quick || (echo "❌ Local quick tests failed!" && exit 1)
+	@echo ""
+	@echo "✅ Quick test suite completed!"
 
 # ============================================================================
 # UTILITIES
@@ -153,7 +263,15 @@ help:
 	@echo ""
 	@echo "Basic Testing:"
 	@echo "  test          - Run Go unit tests (local)"
+	@echo "  test-internal - Run internal Go unit tests (safe, no execution)"
 	@echo "  test-namespace - Run namespace tests (local, safe)"
+	@echo "  test-pr8      - Test PR #8 specific changes (daemon, seccomp)"
+	@echo "  test-pr9      - Test PR #9 specific changes (runtime, timeouts)"
+	@echo ""
+	@echo "Comprehensive Testing (PR Review):"
+	@echo "  test-all-comprehensive - Run ALL tests in order (internal → docker → quick → extensive)"
+	@echo "  test-all-quick        - Run quick test suite (internal → docker → quick)"
+	@echo "  test-docker-pr        - Run Docker-based tests for PR changes"
 	@echo ""
 	@echo "Development:"
 	@echo "  dev-mode      - Setup sandbox-based dev mode"
@@ -165,8 +283,12 @@ help:
 	@echo ""
 	@echo "Examples:"
 	@echo "  make build"
-	@echo "  make test-docker          # Recommended: All tests in Docker"
-	@echo "  make test-local-quick     # Quick local validation"
-	@echo "  make test-local-extensive # Full local validation"
-	@echo "  make test-context         # Test context summarize features"
-	@echo "  make test-context-docker  # Test context summarize in Docker"
+	@echo "  make test-all-comprehensive  # Full test suite (PR review)"
+	@echo "  make test-all-quick          # Quick test suite (PR review)"
+	@echo "  make test-internal           # Internal Go unit tests only"
+	@echo "  make test-docker             # All tests in Docker"
+	@echo "  make test-docker-pr          # Docker tests for PR changes"
+	@echo "  make test-local-quick        # Quick local validation"
+	@echo "  make test-local-extensive    # Full local validation"
+	@echo "  make test-context            # Test context summarize features"
+	@echo "  make test-context-docker     # Test context summarize in Docker"

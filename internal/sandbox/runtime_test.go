@@ -79,12 +79,12 @@ func TestRuntimeSelection(t *testing.T) {
 				return
 			}
 
-			// On Windows, if no runtime is available, we may get an error or "none" runtime
+			// On Windows/macOS, if no runtime is available, we may get an error or "none" runtime
 			// This is expected behavior
 			if err != nil {
-				// On Windows, if Docker isn't available and no other runtime works, this is expected
-				if goruntime.GOOS == "windows" && (tt.name == "auto runtime selection" || tt.name == "explicit docker") {
-					t.Logf("Expected error on Windows when no runtime available: %v", err)
+				// On Windows/macOS, if Docker isn't available and no other runtime works, this is expected
+				if (goruntime.GOOS == "windows" || goruntime.GOOS == "darwin") && (tt.name == "auto runtime selection" || tt.name == "explicit docker") {
+					t.Logf("Expected error on %s when no runtime available: %v", goruntime.GOOS, err)
 					return
 				}
 				t.Errorf("Unexpected error: %v", err)
