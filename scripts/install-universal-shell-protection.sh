@@ -186,11 +186,14 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # This comprehensive pattern matches system directories across Linux, macOS, and Windows (WSL)
     _vectra_guard_is_protected_path() {
         local cmd="$1"
-        local cmd_lower="${cmd,,}"  # Convert to lowercase (bash 4.0+)
+        local cmd_lower
         
+        # Check bash version FIRST before using bash 4.0+ syntax
         # If bash version < 4.0, use tr for lowercase conversion
         if [ "${BASH_VERSION%%.*}" -lt 4 ] 2>/dev/null; then
             cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
+        else
+            cmd_lower="${cmd,,}"  # Convert to lowercase (bash 4.0+)
         fi
         
         # Pattern 0: Home directory deletion patterns (check FIRST - before root patterns)
