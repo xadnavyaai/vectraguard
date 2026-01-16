@@ -630,6 +630,22 @@ vg exec "rm -rf /"          # → Blocked (critical risk, cannot bypass)
 
 **Performance:** First run normal speed, subsequent runs 10x faster due to comprehensive caching
 
+#### Example: Cache-Optimized Secure Sandbox
+```yaml
+sandbox:
+  enabled: true
+  mode: always
+  security_level: strict
+  enable_cache: true
+  network_mode: restricted
+  show_runtime_info: true
+```
+
+```bash
+vg exec "npm ci"  # first run builds cache (isolated)
+vg exec "npm ci"  # cached and fast, still sandboxed
+```
+
 ---
 
 #### 3. **With Sandbox - Auto Mode** (Balanced Security & Speed)
