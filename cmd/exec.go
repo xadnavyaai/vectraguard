@@ -39,6 +39,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	criticalCodes := []string{
 		"DANGEROUS_DELETE_ROOT",
 		"DANGEROUS_DELETE_HOME",
+		"PROTECTED_DIRECTORY_ACCESS", // Also block protected directory access (e.g., rm -rf /)
 		"FORK_BOMB",
 		"SENSITIVE_ENV_ACCESS",
 		"DOTENV_FILE_READ",
@@ -178,6 +179,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		criticalCodes := []string{
 			"DANGEROUS_DELETE_ROOT",
 			"DANGEROUS_DELETE_HOME",
+			"PROTECTED_DIRECTORY_ACCESS", // Also block protected directory access (e.g., rm -rf /)
 			"FORK_BOMB",
 			"SENSITIVE_ENV_ACCESS",
 			"DOTENV_FILE_READ",
@@ -232,6 +234,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			criticalCodes := []string{
 				"DANGEROUS_DELETE_ROOT",
 				"DANGEROUS_DELETE_HOME",
+				"PROTECTED_DIRECTORY_ACCESS", // Also block protected directory access (e.g., rm -rf /)
 				"FORK_BOMB",
 				"SENSITIVE_ENV_ACCESS",
 				"DOTENV_FILE_READ",
