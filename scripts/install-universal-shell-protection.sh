@@ -295,13 +295,13 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
         local validation_exit=$?
         
         # Check validation result
-        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE"; then
+        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY"; then
             # Command has security issues - MUST intercept it
             # Check if it's critical first (critical commands must ALWAYS be blocked)
-            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME"; then
+            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME\|PROTECTED_DIRECTORY_ACCESS"; then
                 # CRITICAL: Always block critical commands, regardless of session ID
                 echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
+                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY" | head -1 >&2
                 echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
                 if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
                     echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
@@ -604,13 +604,13 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
         local validation_exit=$?
         
         # Check validation result
-        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE"; then
+        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY"; then
             # Command has security issues - MUST intercept
             # Check if it's critical first (critical commands must ALWAYS be blocked)
-            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME"; then
+            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME\|PROTECTED_DIRECTORY_ACCESS"; then
                 # CRITICAL: Always block critical commands
                 echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
+                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY" | head -1 >&2
                 echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
                 if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
                     echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
