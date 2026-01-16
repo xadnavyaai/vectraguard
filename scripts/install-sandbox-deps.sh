@@ -74,21 +74,38 @@ if [ "$OS" = "Darwin" ]; then
     fi
 
     echo "📦 Installing Docker Desktop..."
-    if ! run_cmd brew install --cask docker; then
+    install_docker_desktop() {
+        if [ "$DRY_RUN" = "1" ]; then
+            echo "→ brew install --cask docker"
+            return 0
+        fi
+        brew install --cask docker
+    }
+
+    attempt=1
+    max_attempts=2
+    while [ $attempt -le $max_attempts ]; do
+        set +e
+        install_docker_desktop
+        status=$?
+        set -e
+
+        if [ $status -eq 0 ]; then
+            break
+        fi
+
         if [ -e /usr/local/bin/hub-tool ]; then
             echo "⚠️  Docker Desktop install failed due to /usr/local/bin/hub-tool conflict."
-            if [ "$VG_FORCE" = "1" ]; then
+            if [ "$VG_FORCE" = "1" ] && [ $attempt -lt $max_attempts ]; then
                 echo "   Removing /usr/local/bin/hub-tool and retrying install."
                 run_cmd sudo rm -f /usr/local/bin/hub-tool
-                run_cmd brew install --cask docker
-            else
-                echo "   Remove /usr/local/bin/hub-tool or rerun with --force/VG_FORCE=1."
-                exit 1
+                attempt=$((attempt + 1))
+                continue
             fi
-        else
-            exit 1
+            echo "   Remove /usr/local/bin/hub-tool or rerun with --force/VG_FORCE=1."
         fi
-    fi
+        exit $status
+    done
     echo ""
     echo "✅ Docker Desktop installed."
     echo "   Open Docker.app once to finish setup."
