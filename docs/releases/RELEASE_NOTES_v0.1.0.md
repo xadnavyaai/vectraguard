@@ -38,15 +38,12 @@ This is the first release focused on **macOS** and **Debian Linux** (x86_64, arm
 
 ---
 
+---
 ## 📦 Installation
-
-Build from source (recommended):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
-
-Prereqs: `git` and `go` installed.
 
 ---
 
