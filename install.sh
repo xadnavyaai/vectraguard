@@ -83,47 +83,48 @@ esac
 echo "📋 System: $OS $ARCH"
 echo ""
 
-# Get latest release
-echo "📦 Downloading Vectra Guard..."
-BINARY_FILENAME="${BINARY_NAME}-${OS}-${ARCH}"
-DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_FILENAME}"
+# Always build from main branch (latest code)
+echo "📦 Building Vectra Guard from main branch..."
+echo ""
 
-# Create temp file
+# Check if Go is installed
+if ! command -v go &> /dev/null; then
+    echo "❌ Go is not installed. Cannot build from source."
+    echo ""
+    echo "   Please install Go first:"
+    echo "   - macOS: brew install go"
+    echo "   - Linux: https://go.dev/doc/install"
+    echo ""
+    echo "   Or download a pre-built binary from:"
+    echo "   https://github.com/${REPO}/releases"
+    exit 1
+fi
+
+# Create temp file for binary
 TEMP_FILE=$(mktemp)
 trap "rm -f $TEMP_FILE" EXIT
 
-# Download
-if command -v curl &> /dev/null; then
-    if ! curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_FILE"; then
-        echo "❌ Download failed. Release may not exist yet."
-        echo "   Trying to build from source instead..."
-        echo ""
-        echo "   To build from source:"
-        echo "   git clone https://github.com/${REPO}.git"
-        echo "   cd vectra-guard"
-        echo "   go build -o vectra-guard ."
-        echo "   sudo cp vectra-guard /usr/local/bin/"
-        rm -f "$TEMP_FILE"
-        exit 1
-    fi
-elif command -v wget &> /dev/null; then
-    if ! wget -q "$DOWNLOAD_URL" -O "$TEMP_FILE"; then
-        echo "❌ Download failed. Release may not exist yet."
-        echo "   Trying to build from source instead..."
-        echo ""
-        echo "   To build from source:"
-        echo "   git clone https://github.com/${REPO}.git"
-        echo "   cd vectra-guard"
-        echo "   go build -o vectra-guard ."
-        echo "   sudo cp vectra-guard /usr/local/bin/"
-        rm -f "$TEMP_FILE"
-        exit 1
-    fi
-else
-    echo "❌ Need curl or wget to download"
-    echo "   Please install curl or wget, or build from source"
+# Create temp directory for building
+BUILD_DIR=$(mktemp -d)
+trap "rm -rf $BUILD_DIR" EXIT
+
+echo "📥 Cloning repository from main branch..."
+if ! git clone --depth 1 --branch main "https://github.com/${REPO}.git" "$BUILD_DIR" 2>/dev/null; then
+    echo "❌ Failed to clone repository"
+    echo "   Please check your internet connection or install manually"
     exit 1
 fi
+
+echo "🔨 Building binary..."
+cd "$BUILD_DIR"
+if ! go build -o "$TEMP_FILE" .; then
+    echo "❌ Build failed"
+    echo "   Please report this issue: https://github.com/${REPO}/issues"
+    exit 1
+fi
+
+echo "✅ Build successful!"
+echo ""
 
 # Make executable
 chmod +x "$TEMP_FILE"

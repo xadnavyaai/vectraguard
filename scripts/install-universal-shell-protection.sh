@@ -262,7 +262,8 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
         local cmd="$BASH_COMMAND"
         
         # Skip if command is vectra-guard itself (avoid recursion)
-        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
+        # Also skip vg alias (shorthand for vectra-guard)
+        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
             return 0
         fi
         
@@ -558,7 +559,8 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
         fi
         
         # Skip if command is vectra-guard itself (avoid recursion)
-        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
+        # Also skip vg alias (shorthand for vectra-guard)
+        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
             return 0
         fi
         
