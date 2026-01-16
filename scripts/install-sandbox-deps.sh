@@ -25,6 +25,14 @@ if [ "$OS" = "Darwin" ]; then
         exit 1
     fi
 
+    # Docker Desktop cask may conflict with existing hub-tool binary
+    if [ -e /usr/local/bin/hub-tool ]; then
+        echo "⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict)."
+        echo "   Skipping Docker Desktop install to avoid forcing changes."
+        echo "   You can install Docker Desktop manually if desired."
+        exit 0
+    fi
+
     echo "📦 Installing Docker Desktop..."
     run_cmd brew install --cask docker
     echo ""
