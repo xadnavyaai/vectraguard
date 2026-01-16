@@ -84,20 +84,20 @@ esac
 echo "📋 System: $OS $ARCH"
 echo ""
 
-# Always build from main branch (latest code)
-echo "📦 Building Vectra Guard from main branch..."
+# Download pre-built release binary
+echo "📦 Downloading Vectra Guard release binary..."
 echo ""
 
-# Check if Go is installed
-if ! command -v go &> /dev/null; then
-    echo "❌ Go is not installed. Cannot build from source."
-    echo ""
-    echo "   Please install Go first:"
-    echo "   - macOS: brew install go"
-    echo "   - Linux: https://go.dev/doc/install"
-    echo ""
-    echo "   Or download a pre-built binary from:"
-    echo "   https://github.com/${REPO}/releases"
+BINARY_FILENAME="${BINARY_NAME}-${OS}-${ARCH}"
+DOWNLOAD_URL="https://github.com/${REPO}/releases/latest/download/${BINARY_FILENAME}"
+CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
+
+# Ensure a download tool exists
+if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
+    echo "❌ Neither curl nor wget is installed."
+    echo "   Please install one of them and re-run:"
+    echo "   - macOS: brew install curl"
+    echo "   - Debian/Ubuntu: sudo apt-get install -y curl"
     exit 1
 fi
 
@@ -105,27 +105,54 @@ fi
 TEMP_FILE=$(mktemp)
 trap "rm -f $TEMP_FILE" EXIT
 
-# Create temp directory for building
-BUILD_DIR=$(mktemp -d)
-trap "rm -rf $BUILD_DIR" EXIT
+DOWNLOAD_SUCCESS=false
+if command -v curl &> /dev/null; then
+    if curl -fsSL "$DOWNLOAD_URL" -o "$TEMP_FILE"; then
+        DOWNLOAD_SUCCESS=true
+    fi
+elif command -v wget &> /dev/null; then
+    if wget -q "$DOWNLOAD_URL" -O "$TEMP_FILE"; then
+        DOWNLOAD_SUCCESS=true
+    fi
+fi
 
-echo "📥 Cloning repository from main branch..."
-if ! git clone --depth 1 --branch main "https://github.com/${REPO}.git" "$BUILD_DIR" 2>/dev/null; then
-    echo "❌ Failed to clone repository"
-    echo "   Please check your internet connection or install manually"
+if [ "$DOWNLOAD_SUCCESS" = false ]; then
+    echo "❌ Release download failed."
+    echo "   Please check your internet connection or install manually from source:"
+    echo "   https://github.com/${REPO}"
     exit 1
 fi
 
-echo "🔨 Building binary..."
-cd "$BUILD_DIR"
-if ! go build -o "$TEMP_FILE" .; then
-    echo "❌ Build failed"
-    echo "   Please report this issue: https://github.com/${REPO}/issues"
-    exit 1
+# Optional checksum verification (best-effort)
+CHECKSUM_FILE=$(mktemp)
+trap "rm -f $CHECKSUM_FILE" EXIT
+if command -v curl &> /dev/null; then
+    curl -fsSL "$CHECKSUM_URL" -o "$CHECKSUM_FILE" || true
+elif command -v wget &> /dev/null; then
+    wget -q "$CHECKSUM_URL" -O "$CHECKSUM_FILE" || true
 fi
 
-echo "✅ Build successful!"
-echo ""
+if [ -s "$CHECKSUM_FILE" ]; then
+    if command -v shasum &> /dev/null; then
+        EXPECTED_SHA=$(grep "  ${BINARY_FILENAME}$" "$CHECKSUM_FILE" | awk '{print $1}')
+        ACTUAL_SHA=$(shasum -a 256 "$TEMP_FILE" | awk '{print $1}')
+        if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+            echo "❌ Checksum verification failed."
+            exit 1
+        fi
+    elif command -v sha256sum &> /dev/null; then
+        EXPECTED_SHA=$(grep "  ${BINARY_FILENAME}$" "$CHECKSUM_FILE" | awk '{print $1}')
+        ACTUAL_SHA=$(sha256sum "$TEMP_FILE" | awk '{print $1}')
+        if [ -n "$EXPECTED_SHA" ] && [ "$EXPECTED_SHA" != "$ACTUAL_SHA" ]; then
+            echo "❌ Checksum verification failed."
+            exit 1
+        fi
+    else
+        echo "⚠️  Checksum verification skipped (no shasum/sha256sum)"
+    fi
+else
+    echo "⚠️  Checksums not available. Skipping verification."
+fi
 
 # Make executable
 chmod +x "$TEMP_FILE"
@@ -140,8 +167,12 @@ else
 fi
 
 # Verify installation
-if command -v vectra-guard &> /dev/null; then
-    NEW_VERSION=$(vectra-guard version 2>&1 | head -1 || vectra-guard --help 2>&1 | head -1 || echo "installed")
+if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
+    if command -v vectra-guard &> /dev/null; then
+        NEW_VERSION=$(vectra-guard version 2>&1 | head -1 || vectra-guard --help 2>&1 | head -1 || echo "installed")
+    else
+        NEW_VERSION=$("$INSTALL_DIR/$BINARY_NAME" version 2>&1 | head -1 || "$INSTALL_DIR/$BINARY_NAME" --help 2>&1 | head -1 || echo "installed")
+    fi
     echo ""
     
     if [ "${UPGRADE:-false}" = true ]; then
@@ -179,10 +210,7 @@ if command -v vectra-guard &> /dev/null; then
     echo ""
 else
     echo ""
-    echo "❌ Installation failed - binary not found in PATH"
-    echo "   Installed to: $INSTALL_DIR/$BINARY_NAME"
-    echo "   Please ensure $INSTALL_DIR is in your PATH"
-    echo "   Or try: export PATH=\"$INSTALL_DIR:\$PATH\""
+    echo "❌ Installation failed - binary not found at: $INSTALL_DIR/$BINARY_NAME"
     exit 1
 fi
 

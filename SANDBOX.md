@@ -46,6 +46,48 @@ sandbox:
 - **Docker** - Most compatible, works everywhere (2-5s startup)
 - **Podman** - Rootless alternative, same CLI as Docker
 
+### ✅ Dependencies & Setup (Recommended)
+Install the runtime dependencies that match your environment. For most users, install both Docker and bubblewrap so auto‑selection can pick the best runtime.
+
+**macOS (Docker runtime)**
+```bash
+# Docker Desktop (recommended)
+brew install --cask docker
+open -a Docker
+```
+
+**Debian/Ubuntu (Docker + bubblewrap)**
+```bash
+sudo apt-get update -y
+sudo apt-get install -y docker.io docker-compose-plugin bubblewrap uidmap
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
+
+**Fedora/RHEL (Docker + bubblewrap)**
+```bash
+sudo dnf install -y docker docker-compose-plugin bubblewrap
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
+
+**Optional: install via helper script**
+```bash
+# From repo
+./scripts/install-sandbox-deps.sh
+
+# Or via curl
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
+```
+
+**Dry run (preview commands only):**
+```bash
+DRY_RUN=1 ./scripts/install-sandbox-deps.sh
+```
+
+> **Note (Linux namespaces):** bubblewrap and namespace runtimes require unprivileged user namespaces. On most modern distros this is enabled by default. If not, set:
+> `sudo sysctl -w kernel.unprivileged_userns_clone=1`
+
 **Runtime Selection:**
 Vectra Guard intelligently selects the best runtime based on your environment:
 

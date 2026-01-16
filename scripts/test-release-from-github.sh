@@ -18,7 +18,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Version to test
-VERSION="${1:-v0.0.1}"
+VERSION="${1:-v0.1.0}"
 GITHUB_REPO="xadnavyaai/vectra-guard"
 
 echo -e "${MAGENTA}"

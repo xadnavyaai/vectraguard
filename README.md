@@ -61,7 +61,7 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-**Prereqs:** `git` and `go` must be installed (installer builds from `main`).
+**Prereqs:** `curl` or `wget` (installer downloads the latest release binary).
 
 ### Use It (3 commands)
 
@@ -91,8 +91,14 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 ```
 
 - **Platform**: macOS & Debian Linux (x86_64, arm64)  
-- **What it does**: builds from `main` → installs to `/usr/local/bin` → makes `vectra-guard` available
-- **Prereqs**: `git` and `go` are required
+- **What it does**: downloads latest release → installs to `/usr/local/bin` → makes `vectra-guard` available
+- **Prereqs**: `curl` or `wget` is required
+
+### One-command full setup (deps + tool)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
+```
 
 ### Enable Universal Shell Protection (optional but recommended)
 
@@ -400,8 +406,12 @@ sandbox:
 ```
 
 **Learn More:**
-- **[SANDBOX.md](SANDBOX.md)** - Docker-based sandbox (traditional)
-- **[NAMESPACE_SANDBOXING.md](NAMESPACE_SANDBOXING.md)** - Fast namespace sandbox (<1ms overhead) ⭐
+- **[SANDBOX.md](SANDBOX.md)** - Docker, bubblewrap, and namespace sandboxing details
+
+**Install sandbox dependencies:**
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
+```
 
 ---
 

@@ -26,7 +26,7 @@ CHECKS_PASSED=0
 CHECKS_FAILED=0
 
 # Version to test
-VERSION="${1:-v0.0.1}"
+VERSION="${1:-v0.1.0}"
 
 echo -e "${RED}"
 echo "╔═══════════════════════════════════════════════════════════╗"

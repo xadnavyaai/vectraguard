@@ -26,13 +26,18 @@ After following this guide:
 **Recommended – one command:**
 
 ```bash
-# Builds from main and installs locally
+# Downloads the latest release binary and installs locally
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-**Prereqs:** `git` and `go` must be installed.
+**Prereqs:** `curl` or `wget` must be installed.
 
 For alternative installation methods (Go install, build from source), see the **Installation Options** section in `README.md`.
+
+**One-command full setup (deps + tool):**
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
+```
 
 ### Step 2: Install Universal Protection
 
