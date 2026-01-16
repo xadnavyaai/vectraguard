@@ -34,6 +34,12 @@ func installSandboxDepsDarwin(ctx context.Context, force bool, dryRun bool) erro
 		return fmt.Errorf("Homebrew not found. Install Homebrew first: https://brew.sh/")
 	}
 
+	if dockerDesktopInstalled() {
+		fmt.Println("✅ Docker Desktop already installed.")
+		fmt.Println("   Open Docker.app once to finish setup if needed.")
+		return nil
+	}
+
 	if fileExists("/usr/local/bin/hub-tool") {
 		fmt.Println("⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict).")
 		if !force {
@@ -86,7 +92,9 @@ func installSandboxDepsDarwin(ctx context.Context, force bool, dryRun bool) erro
 					return err
 				}
 			} else {
-				return fmt.Errorf("remove /usr/local/bin/hub-tool or rerun with --force/VG_FORCE=1")
+				fmt.Println("   Skipping Docker Desktop install to avoid forcing changes.")
+				fmt.Println("   Remove /usr/local/bin/hub-tool or rerun with --force/VG_FORCE=1")
+				return nil
 			}
 		} else {
 			return err
@@ -111,7 +119,9 @@ func installSandboxDepsLinux(ctx context.Context, dryRun bool) error {
 		if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker.io", "bubblewrap", "uidmap"}, nil, dryRun); err != nil {
 			return err
 		}
-		if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker-compose-plugin"}, nil, dryRun); err != nil {
+		if dockerComposeAvailable() {
+			logger.Info("docker compose already available; skipping compose install", nil)
+		} else if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker-compose-plugin"}, nil, dryRun); err != nil {
 			logger.Warn("docker-compose-plugin not available; trying docker-compose", map[string]any{"error": err.Error()})
 			if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker-compose"}, nil, dryRun); err != nil {
 				logger.Warn("docker-compose not available; continuing without compose plugin", map[string]any{"error": err.Error()})
@@ -170,6 +180,23 @@ func runCommand(name string, args []string, envOverrides []string, dryRun bool) 
 func commandAvailable(name string) bool {
 	_, err := exec.LookPath(name)
 	return err == nil
+}
+
+func dockerDesktopInstalled() bool {
+	if fileExists("/Applications/Docker.app") || fileExists("/System/Applications/Docker.app") {
+		return true
+	}
+	return commandAvailable("docker")
+}
+
+func dockerComposeAvailable() bool {
+	if commandAvailable("docker") {
+		cmd := exec.Command("docker", "compose", "version")
+		if err := cmd.Run(); err == nil {
+			return true
+		}
+	}
+	return commandAvailable("docker-compose")
 }
 
 func fileExists(path string) bool {
