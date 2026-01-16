@@ -23,23 +23,57 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		return fmt.Errorf("no command specified")
 	}
 
-	// Check guard level
-	if cfg.GuardLevel.Level == config.GuardLevelOff {
-		logger.Info("guard level is OFF - executing without protection", map[string]any{
-			"command": strings.Join(cmdArgs, " "),
-		})
-		return executeCommandDirectly(cmdArgs)
-	}
-
 	cmdName := cmdArgs[0]
 	args := cmdArgs[1:]
 
 	// Build command string for analysis
 	cmdString := strings.Join(cmdArgs, " ")
 
-	// Analyze command for risks FIRST (before any bypass checks)
-	// This ensures critical commands are detected before bypass can be applied
+	// CRITICAL: Always analyze commands FIRST, even if guard level is OFF
+	// This ensures critical commands like "rm -rf /" are ALWAYS blocked
+	// regardless of guard level configuration
 	findings := analyzer.AnalyzeScript("inline-command", []byte(cmdString), cfg.Policies)
+	
+	// Check for CRITICAL commands that MUST be blocked regardless of guard level
+	// These commands can destroy the system and should NEVER execute
+	criticalCodes := []string{
+		"DANGEROUS_DELETE_ROOT",
+		"DANGEROUS_DELETE_HOME",
+		"FORK_BOMB",
+		"SENSITIVE_ENV_ACCESS",
+		"DOTENV_FILE_READ",
+	}
+	
+	hasCriticalCode := false
+	for _, f := range findings {
+		for _, code := range criticalCodes {
+			if f.Code == code {
+				hasCriticalCode = true
+				logger.Error("CRITICAL command blocked - cannot be bypassed", map[string]any{
+					"command":    cmdString,
+					"code":       code,
+					"severity":   f.Severity,
+					"description": f.Description,
+				})
+				return &exitError{
+					message: fmt.Sprintf("CRITICAL: Command '%s' is blocked for safety. %s", cmdString, f.Recommendation),
+					code:    3,
+				}
+			}
+		}
+		if hasCriticalCode {
+			break
+		}
+	}
+
+	// Check guard level AFTER critical command check
+	// Only non-critical commands can bypass when guard level is OFF
+	if cfg.GuardLevel.Level == config.GuardLevelOff {
+		logger.Info("guard level is OFF - executing without protection", map[string]any{
+			"command": cmdString,
+		})
+		return executeCommandDirectly(cmdArgs)
+	}
 	
 	riskLevel := "low"
 	var findingCodes []string

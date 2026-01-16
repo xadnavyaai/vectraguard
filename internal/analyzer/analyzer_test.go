@@ -748,6 +748,18 @@ func TestHomeDirectoryDeletionDetection(t *testing.T) {
 		expectedCode string
 	}{
 		{
+			name:         "rm -rf ~/ (home directory without wildcard - CRITICAL)",
+			script:       "rm -rf ~/",
+			shouldDetect: true,
+			expectedCode: "DANGEROUS_DELETE_HOME",
+		},
+		{
+			name:         "rm -r ~/ (home directory without wildcard - CRITICAL)",
+			script:       "rm -r ~/",
+			shouldDetect: true,
+			expectedCode: "DANGEROUS_DELETE_HOME",
+		},
+		{
 			name:         "rm -rf ~/* (home wildcard)",
 			script:       "rm -rf ~/*",
 			shouldDetect: true,
@@ -756,6 +768,12 @@ func TestHomeDirectoryDeletionDetection(t *testing.T) {
 		{
 			name:         "rm -r ~/* (home wildcard without force)",
 			script:       "rm -r ~/*",
+			shouldDetect: true,
+			expectedCode: "DANGEROUS_DELETE_HOME",
+		},
+		{
+			name:         "rm -rf $HOME/ (home env var without wildcard - CRITICAL)",
+			script:       "rm -rf $HOME/",
 			shouldDetect: true,
 			expectedCode: "DANGEROUS_DELETE_HOME",
 		},

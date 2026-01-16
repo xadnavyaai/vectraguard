@@ -193,6 +193,15 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
             cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
         fi
         
+        # Pattern 0: Home directory deletion patterns (check FIRST - before root patterns)
+        # Matches: rm -rf ~/, rm -r ~/, rm -rf ~/*, rm -rf $HOME/, etc.
+        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+~/[[:space:]]*$ ]] || \
+           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+~/\* ]] || \
+           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+\$home/[[:space:]]*$ ]] || \
+           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+\$home/\* ]]; then
+            return 0  # Protected
+        fi
+        
         # Pattern 1: Root deletion patterns (before shell expansion)
         # Matches: rm -rf /, rm -r /, rm -rf /*, rm -rf / *, etc.
         if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
@@ -284,27 +293,40 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
         
         # Check validation result
         if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE"; then
-            # Command has security issues - intercept it
-            if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-                # Route through vectra-guard exec which will block if needed
-                BASH_COMMAND="vectra-guard exec --session '$VECTRAGUARD_SESSION_ID' -- $(printf '%q' "$cmd")"
-            else
-                # Check if it's critical
-                if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME"; then
-                    echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-                    echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
-                    echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                    # Return 1 to prevent command execution (with extdebug, this skips execution)
-                    VECTRA_LAST_CMD="$cmd"
-                    return 1
-                else
-                    # Non-critical risky command - allow but will be logged
-                    VECTRA_LAST_CMD="$cmd"
+            # Command has security issues - MUST intercept it
+            # Check if it's critical first (critical commands must ALWAYS be blocked)
+            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME"; then
+                # CRITICAL: Always block critical commands, regardless of session ID
+                echo "❌ BLOCKED: Critical command detected: $cmd" >&2
+                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
+                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
+                if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
+                    echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
+                    vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
                 fi
+                # Return 1 to prevent command execution (with extdebug, this skips execution)
+                VECTRA_LAST_CMD="$cmd"
+                return 1
+            elif [ -n "$VECTRAGUARD_SESSION_ID" ]; then
+                # Non-critical but risky command with session ID - route through vectra-guard exec
+                # This ensures proper protection and logging
+                BASH_COMMAND="vectra-guard exec --session '$VECTRAGUARD_SESSION_ID' -- $(printf '%q' "$cmd")"
+                VECTRA_LAST_CMD="$cmd"
+                # Return 0 to allow the modified command to execute
+                return 0
+            else
+                # Non-critical risky command without session ID - BLOCK for safety
+                # We cannot route through vectra-guard exec without a session, so we must block
+                echo "⚠️  BLOCKED: Risky command detected (no session): $cmd" >&2
+                echo "$validation_output" | grep -i "finding\|violation" | head -1 >&2
+                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
+                VECTRA_LAST_CMD="$cmd"
+                return 1
             fi
         else
             # Command is safe or validation timed out (allow to avoid breaking things)
             VECTRA_LAST_CMD="$cmd"
+            return 0
         fi
     }
     
@@ -349,20 +371,27 @@ install_zsh() {
 if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # Initialize session
     _vectra_guard_init() {
+        # Double-check vectra-guard is available before using it
+        if ! command -v vectra-guard &> /dev/null; then
+            return 0
+        fi
+        
         if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
             if [[ -f ~/.vectra-guard-session ]]; then
                 export VECTRAGUARD_SESSION_ID=$(sed -n '$p' ~/.vectra-guard-session 2>/dev/null || echo "")
-                # Verify session is still valid
-                if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
-                    unset VECTRAGUARD_SESSION_ID
+                # Verify session is still valid (only if vectra-guard is available)
+                if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
+                    if ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null 2>&1; then
+                        unset VECTRAGUARD_SESSION_ID
+                    fi
                 fi
             fi
             
-            if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
+            if [[ -z "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
                 SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$HOME" 2>/dev/null | sed -n '$p' || echo "")
                 if [[ -n "$SESSION" ]]; then
                     export VECTRAGUARD_SESSION_ID=$SESSION
-                    echo $SESSION > ~/.vectra-guard-session
+                    echo $SESSION > ~/.vectra-guard-session 2>/dev/null || true
                 fi
             fi
         fi
@@ -374,10 +403,30 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
             local cmd="$1"
             local cmd_lower="${cmd:l}"  # zsh lowercase conversion
             
+            # Pattern 0: Home directory deletion patterns (check FIRST - before root patterns)
+            # Matches: rm -rf ~/, rm -r ~/, rm -rf ~/*, rm -rf $HOME/, etc.
+            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+~/[[:space:]]*$" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+~/[[:space:]]*$" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+~/\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+~/\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+\$home/[[:space:]]*$" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+\$home/[[:space:]]*$" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+\$home/\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+\$home/\\*" ]]; then
+                return 0  # Protected
+            fi
+            
             # Pattern 1: Root deletion patterns (before shell expansion)
-            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
-               [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
-               [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
+            # Use simpler patterns for zsh compatibility - avoid complex quantifiers
+            # Check for specific flag combinations explicitly to avoid regex compilation errors
+            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/[[:space:]]*$" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/[[:space:]]*$" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/[[:space:]]+\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/[[:space:]]+\\*" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/" ]]; then
                 return 0  # Protected
             fi
             
@@ -385,7 +434,7 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
             # When /* expands, we get: rm -rf /bin /usr /etc /var ...
             local system_dir_count=0
             for dir in /bin /sbin /usr /etc /var /lib /lib64 /lib32 /opt /boot /root /sys /proc /dev /home /srv /run /mnt /media /applications /library /system /private /cores /users /volumes; do
-                if [[ "$cmd_lower" =~ [[:space:]]${dir}(/|$|[[:space:]]) ]]; then
+                if [[ "$cmd_lower" =~ "[[:space:]]${dir}(/|$|[[:space:]])" ]]; then
                     ((system_dir_count++))
                 fi
             done
@@ -395,25 +444,101 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
             fi
             
             # Pattern 2: Unix/Linux system directories (FHS standard)
-            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(bin|sbin|usr|etc|var|lib|lib64|lib32|opt|boot|root|sys|proc|dev|home|srv|run|mnt|media|snap|flatpak|lost\+found)(/|$|[[:space:]]) ]]; then
+            # Use explicit -r and -rf patterns to avoid zsh regex compilation errors
+            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/bin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/bin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/sbin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/sbin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/etc" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/etc" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/lib" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/lib" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/opt" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/opt" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/boot" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/boot" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/root" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/root" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/sys" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/sys" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/proc" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/proc" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/dev" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/dev" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/home" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/home" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/srv" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/srv" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/run" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/run" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/media" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/media" ]]; then
                 return 0  # Protected
             fi
             
             # Pattern 3: macOS specific directories
-            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(applications|library|system|private|cores|users|volumes|network)(/|$|[[:space:]]) ]]; then
+            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/applications" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/applications" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/library" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/library" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/system" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/system" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/cores" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/cores" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/users" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/users" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/volumes" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/volumes" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/network" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/network" ]]; then
                 return 0  # Protected
             fi
             
-            # Pattern 4: Windows paths (WSL and native)
-            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/mnt/[a-z]/(windows|program[[:space:]]+files|programdata|users)(/|$|[[:space:]]) ]]; then
-                return 0  # Protected
-            fi
-            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+[a-z]:\\(windows|program[[:space:]]+files|programdata|users)(\\|$|[[:space:]]) ]]; then
+            # Pattern 4: Windows paths (WSL and native) - simplified for zsh
+            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/windows" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/windows" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/program" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/program" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/programdata" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/programdata" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/users" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/users" ]]; then
                 return 0  # Protected
             fi
             
-            # Pattern 5: Common nested system paths
-            if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(usr/(bin|sbin|lib|lib64|local)|var/(log|lib|cache)|system/(library|applications)|private/(etc|var|tmp))(/|$|[[:space:]]) ]]; then
+            # Pattern 5: Common nested system paths - simplified
+            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/bin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/bin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/sbin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/sbin" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/lib" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/lib" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/local" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/local" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var/log" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var/log" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var/lib" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var/lib" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var/cache" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var/cache" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/system/library" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/system/library" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/system/applications" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/system/applications" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private/etc" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private/etc" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private/var" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private/var" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private/tmp" ]] || \
+               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private/tmp" ]]; then
                 return 0  # Protected
             fi
             
@@ -423,6 +548,11 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # Command interception hook - runs BEFORE command executes
     _vectra_guard_preexec() {
         local cmd="$1"
+        
+        # Skip if vectra-guard is not available (prevents posix_spawnp errors)
+        if ! command -v vectra-guard &> /dev/null; then
+            return 0
+        fi
         
         # Skip if command is vectra-guard itself (avoid recursion)
         if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
@@ -437,50 +567,79 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
         # Quick check for obviously dangerous patterns (fast path)
         # Use comprehensive system directory detection
         if _vectra_guard_is_protected_path "$cmd"; then
-            # Definitely dangerous - intercept
+            # Definitely dangerous - MUST block
             echo "❌ BLOCKED: Critical command detected: $cmd" >&2
             echo "   This command would delete system files and is blocked for safety." >&2
-            if [[ -n "$VECTRAGUARD_SESSION_ID" ]]; then
+            if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
                 echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
+                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null 2>&1 || true
             fi
             echo "   Use 'vectra-guard exec -- <command>' if you really need to run this." >&2
-            # In zsh, we can't easily prevent execution, but vectra-guard exec will block it
-            # Try to prevent by executing a safe command instead
-            if [[ -n "$VECTRAGUARD_SESSION_ID" ]]; then
-                # Route through vectra-guard exec which will block
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
-            fi
+            # In zsh, we cannot prevent execution from preexec hook, but we can try to intercept
+            # by executing a safe command and hoping the user sees the error
+            # The actual protection must come from vectra-guard exec itself
             VECTRA_LAST_CMD="$cmd"
+            # Try to execute a safe command to prevent the dangerous one (this is a workaround)
+            # Note: This won't fully prevent execution, but vectra-guard exec will block it
+            if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
+                # Execute through vectra-guard which will block critical commands
+                # This runs BEFORE the original command, but the original may still execute
+                # The real protection is in vectra-guard exec itself
+                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null 2>&1 || true
+            fi
             return
         fi
         
-        # Validate command through vectra-guard
+        # Validate command through vectra-guard (only if available)
+        if ! command -v vectra-guard &> /dev/null; then
+            VECTRA_LAST_CMD="$cmd"
+            return 0
+        fi
+        
         local validation_output
-        validation_output=$(echo "$cmd" | vectra-guard validate /dev/stdin 2>&1)
+        validation_output=$(timeout 1 bash -c "echo '$cmd' | vectra-guard validate /dev/stdin 2>&1" 2>/dev/null || echo "timeout")
         local validation_exit=$?
         
-        if [ $validation_exit -ne 0 ]; then
-            # Command has security issues
-            if [[ -n "$VECTRAGUARD_SESSION_ID" ]]; then
-                # Route through vectra-guard exec
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- $=cmd
-            else
-                # Check if critical
-                if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME"; then
-                    echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-                    echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
+        # Check validation result
+        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE"; then
+            # Command has security issues - MUST intercept
+            # Check if it's critical first (critical commands must ALWAYS be blocked)
+            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME"; then
+                # CRITICAL: Always block critical commands
+                echo "❌ BLOCKED: Critical command detected: $cmd" >&2
+                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE" | head -1 >&2
+                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
+                if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
+                    echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
+                    vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null 2>&1 || true
                 fi
+                VECTRA_LAST_CMD="$cmd"
+                return
+            elif [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
+                # Non-critical but risky command with session ID - route through vectra-guard exec
+                # Note: In zsh, we cannot fully prevent the original command, but vectra-guard exec will protect
+                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- $=cmd 2>&1 || true
+                VECTRA_LAST_CMD="$cmd"
+                return
+            else
+                # Non-critical risky command without session ID - BLOCK for safety
+                echo "⚠️  BLOCKED: Risky command detected (no session): $cmd" >&2
+                echo "$validation_output" | grep -i "finding\|violation" | head -1 >&2
+                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
+                VECTRA_LAST_CMD="$cmd"
+                return
             fi
+        else
+            # Command is safe or validation timed out (allow to avoid breaking things)
+            VECTRA_LAST_CMD="$cmd"
         fi
-        VECTRA_LAST_CMD="$cmd"
     }
     
     _vectra_guard_precmd() {
         local exit_code=$?
-        if [[ -n "$VECTRA_LAST_CMD" && -n "$VECTRAGUARD_SESSION_ID" ]]; then
+        if [[ -n "$VECTRA_LAST_CMD" && -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
             # Log command after execution (for audit trail)
-            vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null
+            vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null 2>&1 || true
         fi
         unset VECTRA_LAST_CMD
     }

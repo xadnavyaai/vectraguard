@@ -77,12 +77,16 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			homeDeleteFound := false
 
 			// IMPORTANT: Check home directory deletion patterns FIRST (before root patterns)
-			// Pattern: rm -rf ~/* or rm -rf $HOME/* (could delete user's entire home)
+			// Pattern: rm -rf ~/* or rm -rf ~/ (could delete user's entire home)
 			homeDeletePatterns := []string{
+				"rm -rf ~/",      // Without wildcard - still dangerous!
+				"rm -r ~/",      // Without wildcard - still dangerous!
 				"rm -rf ~/*",
 				"rm -r ~/*",
 				"rm -rf ~/ *",
 				"rm -r ~/ *",
+				"rm -rf $home/", // Without wildcard
+				"rm -r $home/",  // Without wildcard
 				"rm -rf $home/*",
 				"rm -r $home/*",
 				"rm -rf $home/ *",
