@@ -260,9 +260,16 @@ SAFE_COMMANDS=(
     "cat /etc/hostname"
 )
 
+TEMP_HOME="$(mktemp -d)"
+TEMP_WORKDIR="$(mktemp -d)"
+cleanup_temp() {
+    rm -rf "$TEMP_HOME" "$TEMP_WORKDIR"
+}
+trap cleanup_temp EXIT
+
 for cmd in "${SAFE_COMMANDS[@]}"; do
     echo -e "${BLUE}Testing:${NC} Safe: $cmd"
-    output=$(echo "$cmd" | "$BINARY_PATH" validate /dev/stdin 2>&1 || true)
+    output=$(cd "$TEMP_WORKDIR" && HOME="$TEMP_HOME" echo "$cmd" | "$BINARY_PATH" validate /dev/stdin 2>&1 || true)
     
     # Should not have critical/high severity findings
     if echo "$output" | grep -qi "critical\|severity=high"; then
