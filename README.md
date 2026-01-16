@@ -438,6 +438,10 @@ vectra-guard exec npm install
 
 # Execute with interactive approval
 vectra-guard exec --interactive sudo apt update
+
+# Audit npm or python dependencies (auto-installs tools if missing)
+vectra-guard audit npm --path .
+vectra-guard audit python --path .
 ```
 
 ### Session Management

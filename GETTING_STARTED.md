@@ -143,7 +143,19 @@ echo "Hello, Vectra Guard!"
 
 ---
 
-### Test 3: Check if Logged
+### Test 3: Package Audits (npm/python)
+
+```bash
+# npm audit (auto-installs npm if missing)
+vectra-guard audit npm --path .
+
+# python audit (auto-installs pip-audit if missing)
+vectra-guard audit python --path .
+```
+
+---
+
+### Test 4: Check if Logged
 
 ```bash
 # View what was logged
@@ -154,7 +166,7 @@ vectra-guard session show $VECTRAGUARD_SESSION_ID
 
 ---
 
-### Test 4: Try a Risky Command
+### Test 5: Try a Risky Command
 
 ```bash
 # This will show a warning

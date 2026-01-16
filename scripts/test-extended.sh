@@ -737,6 +737,73 @@ test_safe_commands() {
     done
 }
 
+test_audit_tools() {
+    print_header "Package Audit Tools"
+
+    local binary=$(get_binary)
+    if [ -z "$binary" ]; then
+        print_info "vectra-guard binary not found - skipping audit tests"
+        ((TESTS_SKIPPED++))
+        return
+    fi
+
+    local tmp_root
+    tmp_root=$(mktemp -d)
+    mkdir -p "$tmp_root/npm" "$tmp_root/python"
+
+    cat > "$tmp_root/npm/package.json" <<'JSON'
+{
+  "name": "vgaudit-npm",
+  "version": "1.0.0",
+  "private": true,
+  "dependencies": {
+    "lodash": "4.17.21"
+  }
+}
+JSON
+
+    cat > "$tmp_root/python/requirements.txt" <<'REQ'
+requests==2.31.0
+REQ
+
+    local npm_args="--no-install"
+    local py_args="--no-install"
+    if [ "$RUN_DOCKER" = true ]; then
+        npm_args=""
+        py_args=""
+    fi
+
+    print_test "Audit npm"
+    local npm_output
+    npm_output=$($binary audit npm --path "$tmp_root/npm" $npm_args 2>&1)
+    local npm_exit=$?
+    if echo "$npm_output" | grep -qi "npm not found"; then
+        print_info "npm missing - skipping"
+        ((TESTS_SKIPPED++))
+    elif [ $npm_exit -eq 0 ] || [ $npm_exit -eq 2 ]; then
+        print_blocked "Audit npm completed"
+    else
+        print_escaped "Audit npm failed"
+        [ "$VERBOSE" = true ] && echo "  Output: $npm_output"
+    fi
+
+    print_test "Audit python"
+    local py_output
+    py_output=$($binary audit python --path "$tmp_root/python" $py_args 2>&1)
+    local py_exit=$?
+    if echo "$py_output" | grep -qi "pip-audit not found"; then
+        print_info "pip-audit missing - skipping"
+        ((TESTS_SKIPPED++))
+    elif [ $py_exit -eq 0 ] || [ $py_exit -eq 2 ]; then
+        print_blocked "Audit python completed"
+    else
+        print_escaped "Audit python failed"
+        [ "$VERBOSE" = true ] && echo "  Output: $py_output"
+    fi
+
+    rm -rf "$tmp_root"
+}
+
 # ============================================================================
 # MAIN TEST RUNNER
 # ============================================================================
@@ -780,7 +847,8 @@ main() {
         test_injection_attacks
         test_bypass_attempts
     fi
-    
+    test_audit_tools
+
     test_safe_commands
     
     # Print summary

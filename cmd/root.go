@@ -102,6 +102,19 @@ func execute(args []string) error {
 			return usageError()
 		}
 		return runExec(ctx, subFlags.Args(), *interactive, *sessionID)
+	case "audit":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		auditTool := subArgs[0]
+		subFlags := flag.NewFlagSet("audit", flag.ContinueOnError)
+		target := subFlags.String("path", ".", "Target directory for audit")
+		failOn := subFlags.Bool("fail", false, "Exit non-zero if findings exist")
+		noInstall := subFlags.Bool("no-install", false, "Disable auto-install of audit dependencies")
+		if err := subFlags.Parse(subArgs[1:]); err != nil {
+			return err
+		}
+		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall)
 	case "sandbox":
 		if len(subArgs) < 1 {
 			return usageError()
@@ -334,6 +347,7 @@ Commands:
   validate <script>            Validate a shell script for security issues
   explain <script>             Explain security risks in a script
   exec [--interactive] <cmd>   Execute command with security validation
+  audit <npm|python>           Audit package vulnerabilities (npm/pip-audit)
   sandbox deps install         Install sandbox dependencies (Docker/Podman + bubblewrap)
   session start                Start an agent session
   session end <id>             End an agent session

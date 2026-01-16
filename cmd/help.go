@@ -21,6 +21,7 @@ Topics:
   init      Initialize config (including repo-local)
   sandbox   Install sandbox dependencies
   seed      Seed agent instructions into a repo
+  audit     Audit npm/pip packages for vulnerabilities
 `)
 	case "context":
 		return printHelp(`Context summaries:
@@ -83,6 +84,16 @@ or DRY_RUN=1 to preview commands.
 
 Creates agent instruction files for Cursor, Claude, Codex, VS Code,
 Copilot, and Windsurf inside a target repository.
+`)
+	case "audit":
+		return printHelp(`Package auditing:
+
+  vg audit npm [--path .] [--fail] [--no-install]
+  vg audit python [--path .] [--fail] [--no-install]
+
+Uses npm audit and pip-audit to surface known vulnerabilities. If --fail is
+set, exits non-zero when findings exist. By default, missing tools are
+auto-installed; use --no-install to disable.
 `)
 	default:
 		return printHelp(fmt.Sprintf("Unknown help topic: %s\n", topic))
