@@ -13,4 +13,5 @@
 ## Setup helpers
 - `vectra-guard init --local`
 - `vectra-guard sandbox deps install`
+- `vectra-guard roadmap add --title "..." --summary "..." --tags "agent,plan"`
 

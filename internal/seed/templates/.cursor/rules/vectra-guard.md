@@ -16,3 +16,5 @@
 ## Shortcuts
 - `vg` is an alias for `vectra-guard` when shell integration is enabled.
 
+## Roadmap
+- Capture plans and progress with `vectra-guard roadmap add/list/status/log`.

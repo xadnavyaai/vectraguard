@@ -6,30 +6,21 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Debian%20Linux%20(x86%2FARM)-lightgrey.svg)]()
 
-Vectra Guard protects systems from risky shell commands and AI agent activity. It validates scripts, enforces policies, and isolates execution while keeping workflows fast.
-
-**Why it helps agent workflows**
-- **Safety by default**: risky commands are analyzed before they run.
-- **Sandbox + cache**: isolate unknown code and reuse cached dependencies.
-- **Repo-local config**: keep settings and cache local per workspace.
-
----
-
 ## 🎯 Why Vectra Guard?
 
-AI agents in IDEs like Cursor and VSCode execute commands with broad system access. They can:
-- Execute arbitrary terminal commands
-- Modify or delete files across your workspace  
-- Install packages and dependencies
-- Make network requests
-- Interact with git repositories
+AI agents and automation run with your full shell access. One mistaken command can wipe a repo, delete system files, or push risky changes. Vectra Guard adds a safety layer that checks every command, isolates risky execution in a sandbox, and keeps a clear audit trail.
 
-**Vectra Guard provides a security layer that:**
-- ✅ Validates scripts and commands before execution
-- ✅ Sandboxes commands with cache-aware performance
-- ✅ Cross-platform system directory protection
-- ✅ Detects destructive DB and infra operations
-- ✅ Tracks agent activity in auditable sessions
+**At a glance**
+- **Safety by default**: risky commands are analyzed before they run.
+- **Sandbox + cache**: isolate unknown code and reuse cached dependencies.
+- **Cross-platform protection**: protects system directories on macOS and Debian Linux.
+- **Auditability**: track agent activity and decisions.
+
+**What it protects against**
+- Root or system deletion (`rm -rf /`, `rm -rf /etc`)
+- Dangerous operations (`mkfs`, `dd if=`)
+- Risky git actions (force push, history rewrites)
+- Networked installs (`curl | sh`, `wget | bash`)
 
 ---
 

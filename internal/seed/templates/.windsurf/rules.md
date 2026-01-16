@@ -13,3 +13,5 @@
 - Cache-optimized sandbox example:
   - `sandbox: { enabled: true, mode: always, enable_cache: true }`
 
+## Roadmap
+- Capture plans and progress with `vectra-guard roadmap add/list/status/log`.

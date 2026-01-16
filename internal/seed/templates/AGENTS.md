@@ -20,3 +20,9 @@ Use these guidelines for agentic coding tools and IDE assistants.
 ## Shortcuts
 - `vg` is an alias for `vectra-guard` when shell integration is installed.
 
+## Roadmap (Plan + Handoff)
+- Capture plans and decisions so humans and agents stay aligned:
+  - `vectra-guard roadmap add --title "..." --summary "..." --tags "agent,plan"`
+  - `vectra-guard roadmap list`
+  - `vectra-guard roadmap status <id> in-progress`
+  - `vectra-guard roadmap log <id> --note "..." --session $VECTRAGUARD_SESSION_ID`
