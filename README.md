@@ -415,6 +415,15 @@ vectra-guard sandbox deps install
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
 ```
 
+**Seed agent instructions into another repo:**
+```bash
+# From this repo
+./scripts/seed-agent-instructions.sh --target /path/to/other-repo
+
+# Overwrite existing files
+./scripts/seed-agent-instructions.sh --target /path/to/other-repo --force
+```
+
 ---
 
 ## 🚀 Usage

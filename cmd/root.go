@@ -289,6 +289,25 @@ func execute(args []string) error {
 		default:
 			return usageError()
 		}
+	case "seed":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		seedCmd := subArgs[0]
+		seedArgs := subArgs[1:]
+
+		switch seedCmd {
+		case "agents":
+			subFlags := flag.NewFlagSet("seed-agents", flag.ContinueOnError)
+			target := subFlags.String("target", ".", "Target repository directory")
+			force := subFlags.Bool("force", false, "Overwrite existing files")
+			if err := subFlags.Parse(seedArgs); err != nil {
+				return err
+			}
+			return runSeedAgents(ctx, *target, *force)
+		default:
+			return usageError()
+		}
 	case "version":
 		return runVersion(ctx, *outputFormat)
 	default:
@@ -332,6 +351,7 @@ Commands:
   roadmap status <id> <status> Update roadmap item status
   roadmap log <id>             Append a log entry to a roadmap item
   context summarize <mode> <path>  Summarize file or repo (code, docs, advanced)
+  seed agents                  Seed agent instructions into a repo
   help [topic]                 Show help for a command or topic
   version                      Show version information
 `, name)

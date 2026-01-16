@@ -20,6 +20,7 @@ Topics:
   roadmap   Track repo-specific planning items
   init      Initialize config (including repo-local)
   sandbox   Install sandbox dependencies
+  seed      Seed agent instructions into a repo
 `)
 	case "context":
 		return printHelp(`Context summaries:
@@ -74,6 +75,14 @@ Local init creates a repo-scoped cache directory at .vectra-guard/cache.
 Install Docker/Podman + bubblewrap for sandboxing. Use --force to remove
 conflicting binaries (e.g., /usr/local/bin/hub-tool) on macOS. Use --dry-run
 or DRY_RUN=1 to preview commands.
+`)
+	case "seed":
+		return printHelp(`Seed agent instructions:
+
+  vg seed agents [--target .] [--force]
+
+Creates agent instruction files for Cursor, Claude, Codex, VS Code,
+Copilot, and Windsurf inside a target repository.
 `)
 	default:
 		return printHelp(fmt.Sprintf("Unknown help topic: %s\n", topic))
