@@ -71,17 +71,19 @@ sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 ```
 
-**Optional: install via helper script**
+**Install via Vectra Guard**
 ```bash
-# From repo
-./scripts/install-sandbox-deps.sh
+# After installing vectra-guard
+vectra-guard sandbox deps install
 
-# Or via curl
+# Wrapper script (uses vectra-guard under the hood)
+./scripts/install-sandbox-deps.sh
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
 ```
 
 **Dry run (preview commands only):**
 ```bash
+vectra-guard sandbox deps install --dry-run
 DRY_RUN=1 ./scripts/install-sandbox-deps.sh
 ```
 

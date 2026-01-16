@@ -19,6 +19,7 @@ Topics:
   context   Summarize code/docs for navigation
   roadmap   Track repo-specific planning items
   init      Initialize config (including repo-local)
+  sandbox   Install sandbox dependencies
 `)
 	case "context":
 		return printHelp(`Context summaries:
@@ -64,6 +65,15 @@ Roadmaps are stored per workspace under ~/.vectra-guard/roadmaps.
   vg init --local    # writes .vectra-guard/config.yaml and sets cache_dir
 
 Local init creates a repo-scoped cache directory at .vectra-guard/cache.
+`)
+	case "sandbox":
+		return printHelp(`Sandbox dependencies:
+
+  vg sandbox deps install [--force] [--dry-run]
+
+Install Docker/Podman + bubblewrap for sandboxing. Use --force to remove
+conflicting binaries (e.g., /usr/local/bin/hub-tool) on macOS. Use --dry-run
+or DRY_RUN=1 to preview commands.
 `)
 	default:
 		return printHelp(fmt.Sprintf("Unknown help topic: %s\n", topic))

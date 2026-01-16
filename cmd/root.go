@@ -102,6 +102,38 @@ func execute(args []string) error {
 			return usageError()
 		}
 		return runExec(ctx, subFlags.Args(), *interactive, *sessionID)
+	case "sandbox":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		sandboxCmd := subArgs[0]
+		sandboxArgs := subArgs[1:]
+
+		switch sandboxCmd {
+		case "deps":
+			if len(sandboxArgs) < 1 {
+				return usageError()
+			}
+			depsCmd := sandboxArgs[0]
+			depsArgs := sandboxArgs[1:]
+
+			switch depsCmd {
+			case "install":
+				subFlags := flag.NewFlagSet("sandbox-deps-install", flag.ContinueOnError)
+				forceDefault := envBool("VG_FORCE")
+				dryRunDefault := envBool("DRY_RUN")
+				force := subFlags.Bool("force", forceDefault, "Remove conflicting binaries if needed")
+				dryRun := subFlags.Bool("dry-run", dryRunDefault, "Print commands without executing")
+				if err := subFlags.Parse(depsArgs); err != nil {
+					return err
+				}
+				return runSandboxDepsInstall(ctx, *force, *dryRun)
+			default:
+				return usageError()
+			}
+		default:
+			return usageError()
+		}
 	case "session":
 		if len(subArgs) < 1 {
 			return usageError()
@@ -283,6 +315,7 @@ Commands:
   validate <script>            Validate a shell script for security issues
   explain <script>             Explain security risks in a script
   exec [--interactive] <cmd>   Execute command with security validation
+  sandbox deps install         Install sandbox dependencies (Docker/Podman + bubblewrap)
   session start                Start an agent session
   session end <id>             End an agent session
   session list                 List all sessions

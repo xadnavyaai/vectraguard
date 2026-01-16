@@ -15,19 +15,20 @@ if [ "$DRY_RUN" = "1" ]; then
     echo ""
 fi
 
-if [ "$INSTALL_DEPS" = "1" ]; then
-    echo "📦 Installing sandbox dependencies..."
-    if [ "$DRY_RUN" = "1" ]; then
-        curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/scripts/install-sandbox-deps.sh" | DRY_RUN=1 bash
-    else
-        curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/scripts/install-sandbox-deps.sh" | bash
-    fi
-    echo ""
-fi
-
 echo "🚀 Installing vectra-guard..."
 if [ "$DRY_RUN" = "1" ]; then
     echo "→ curl -fsSL https://raw.githubusercontent.com/${REPO}/main/install.sh | INSTALL_DIR=${INSTALL_DIR:-/usr/local/bin} bash"
 else
     curl -fsSL "https://raw.githubusercontent.com/${REPO}/main/install.sh" | INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}" bash
+fi
+
+if [ "$INSTALL_DEPS" = "1" ]; then
+    echo ""
+    echo "📦 Installing sandbox dependencies..."
+    if [ "$DRY_RUN" = "1" ]; then
+        DRY_RUN=1 vectra-guard sandbox deps install
+    else
+        vectra-guard sandbox deps install
+    fi
+    echo ""
 fi

@@ -410,6 +410,8 @@ sandbox:
 
 **Install sandbox dependencies:**
 ```bash
+vectra-guard sandbox deps install
+# Or use the wrapper script
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
 ```
 
