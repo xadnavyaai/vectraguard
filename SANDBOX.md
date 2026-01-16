@@ -59,14 +59,18 @@ open -a Docker
 **Debian/Ubuntu (Docker + bubblewrap)**
 ```bash
 sudo apt-get update -y
-sudo apt-get install -y docker.io docker-compose-plugin bubblewrap uidmap
+sudo apt-get install -y docker.io bubblewrap uidmap
+# Optional: install docker compose plugin (or legacy docker-compose)
+sudo apt-get install -y docker-compose-plugin || sudo apt-get install -y docker-compose
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 ```
 
 **Fedora/RHEL (Docker + bubblewrap)**
 ```bash
-sudo dnf install -y docker docker-compose-plugin bubblewrap
+sudo dnf install -y docker bubblewrap
+# Optional: install docker compose plugin (or legacy docker-compose)
+sudo dnf install -y docker-compose-plugin || sudo dnf install -y docker-compose
 sudo systemctl enable --now docker
 sudo usermod -aG docker $USER
 ```
@@ -89,6 +93,9 @@ DRY_RUN=1 ./scripts/install-sandbox-deps.sh
 
 > **Note (Linux namespaces):** bubblewrap and namespace runtimes require unprivileged user namespaces. On most modern distros this is enabled by default. If not, set:
 > `sudo sysctl -w kernel.unprivileged_userns_clone=1`
+>  
+> On Ubuntu with AppArmor restrictions, you may also need:
+> `sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0`
 
 **Runtime Selection:**
 Vectra Guard intelligently selects the best runtime based on your environment:

@@ -108,8 +108,14 @@ func installSandboxDepsLinux(ctx context.Context, dryRun bool) error {
 		if err := runCommand("sudo", []string{"apt-get", "update", "-y"}, nil, dryRun); err != nil {
 			return err
 		}
-		if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker.io", "docker-compose-plugin", "bubblewrap", "uidmap"}, nil, dryRun); err != nil {
+		if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker.io", "bubblewrap", "uidmap"}, nil, dryRun); err != nil {
 			return err
+		}
+		if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker-compose-plugin"}, nil, dryRun); err != nil {
+			logger.Warn("docker-compose-plugin not available; trying docker-compose", map[string]any{"error": err.Error()})
+			if err := runCommand("sudo", []string{"apt-get", "install", "-y", "docker-compose"}, nil, dryRun); err != nil {
+				logger.Warn("docker-compose not available; continuing without compose plugin", map[string]any{"error": err.Error()})
+			}
 		}
 		if err := runCommand("sudo", []string{"systemctl", "enable", "--now", "docker"}, nil, dryRun); err != nil {
 			return err
@@ -134,6 +140,9 @@ func installSandboxDepsLinux(ctx context.Context, dryRun bool) error {
 	if commandAvailable("sysctl") {
 		if err := runCommand("sudo", []string{"sysctl", "-w", "kernel.unprivileged_userns_clone=1"}, nil, dryRun); err != nil {
 			logger.Warn("unable to enable unprivileged user namespaces (continuing)", map[string]any{"error": err.Error()})
+		}
+		if err := runCommand("sudo", []string{"sysctl", "-w", "kernel.apparmor_restrict_unprivileged_userns=0"}, nil, dryRun); err != nil {
+			logger.Warn("unable to relax AppArmor userns restriction (continuing)", map[string]any{"error": err.Error()})
 		}
 	}
 
