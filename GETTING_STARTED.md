@@ -46,6 +46,13 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/script
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
 ```
 
+### Step 2b: Seed Cursor/IDE Agent Instructions (Optional)
+
+```bash
+# Adds .cursor/rules and other agent guidance files to this repo
+vectra-guard seed agents --target .
+```
+
 ### Step 3: Restart Terminal
 
 ```bash
