@@ -73,6 +73,12 @@ if [ "$OS" = "Darwin" ]; then
         exit 0
     fi
 
+    if [ ! -t 0 ] || [ ! -t 1 ]; then
+        echo "ℹ️  Non-interactive session detected."
+        echo "   Disabling cask binary linking to avoid sudo prompts."
+        export HOMEBREW_CASK_OPTS="${HOMEBREW_CASK_OPTS:+$HOMEBREW_CASK_OPTS }--no-binaries"
+    fi
+
     echo "📦 Installing Docker Desktop..."
     install_docker_desktop() {
         if [ "$DRY_RUN" = "1" ]; then
