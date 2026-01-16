@@ -27,10 +27,29 @@ if [ "$OS" = "Darwin" ]; then
 
     # Docker Desktop cask may conflict with existing hub-tool binary
     if [ -e /usr/local/bin/hub-tool ]; then
-        echo "⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict)."
-        echo "   Skipping Docker Desktop install to avoid forcing changes."
-        echo "   You can install Docker Desktop manually if desired."
-        exit 0
+        if [ "${VG_FORCE:-0}" = "1" ]; then
+            echo "⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict)."
+            echo "   VG_FORCE=1 set - will remove the existing binary and continue."
+            if [ -t 0 ] && [ -c /dev/tty ]; then
+                read -p "Proceed and remove /usr/local/bin/hub-tool? [y/N] " -r < /dev/tty
+                if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+                    echo "❌ Aborted by user."
+                    exit 1
+                fi
+            else
+                echo "❌ No TTY available for confirmation. Re-run in a terminal."
+                exit 1
+            fi
+            run_cmd sudo rm -f /usr/local/bin/hub-tool
+        else
+            echo "⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict)."
+            echo "   Skipping Docker Desktop install to avoid forcing changes."
+            echo "   You can install Docker Desktop manually if desired."
+            echo ""
+            echo "   To force install (will remove the existing /usr/local/bin/hub-tool):"
+            echo "     VG_FORCE=1 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash"
+            exit 0
+        fi
     fi
 
     echo "📦 Installing Docker Desktop..."
