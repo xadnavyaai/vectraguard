@@ -5,7 +5,8 @@
 set -e
 
 REPO="xadnavyaai/vectra-guard"
-INSTALL_DIR="/usr/local/bin"
+# Allow overriding install dir for testing (e.g., INSTALL_DIR=/tmp/vg-install)
+INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 BINARY_NAME="vectra-guard"
 
 echo "🛡️  Vectra Guard Installer"
