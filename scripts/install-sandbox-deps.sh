@@ -34,6 +34,34 @@ run_cmd() {
 OS="$(uname -s)"
 
 if [ "$OS" = "Darwin" ]; then
+    handle_hub_tool_conflict() {
+        if [ -e /usr/local/bin/hub-tool ]; then
+            echo "⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict)."
+            if [ "$VG_FORCE" = "1" ]; then
+                echo "   --force/VG_FORCE=1 set - will remove the existing binary and continue."
+                if [ -t 0 ] && [ -c /dev/tty ]; then
+                    read -p "Proceed and remove /usr/local/bin/hub-tool? [y/N] " -r < /dev/tty
+                    if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
+                        echo "❌ Aborted by user."
+                        return 1
+                    fi
+                fi
+                run_cmd sudo rm -f /usr/local/bin/hub-tool
+                return 0
+            else
+                echo "   Skipping Docker Desktop install to avoid forcing changes."
+                echo "   You can install Docker Desktop manually if desired."
+                echo ""
+                echo "   To force install (will remove the existing /usr/local/bin/hub-tool):"
+                echo "     curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash -s -- --force"
+                echo "   Or:"
+                echo "     VG_FORCE=1 bash -c 'curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | VG_FORCE=1 bash'"
+                return 1
+            fi
+        fi
+        return 0
+    }
+
     if ! command -v brew &> /dev/null; then
         echo "❌ Homebrew not found."
         echo "   Install Homebrew first: https://brew.sh/"
@@ -41,32 +69,26 @@ if [ "$OS" = "Darwin" ]; then
     fi
 
     # Docker Desktop cask may conflict with existing hub-tool binary
-    if [ -e /usr/local/bin/hub-tool ]; then
-        echo "⚠️  Detected /usr/local/bin/hub-tool (Docker Desktop conflict)."
-        if [ "$VG_FORCE" = "1" ]; then
-            echo "   --force/VG_FORCE=1 set - will remove the existing binary and continue."
-            if [ -t 0 ] && [ -c /dev/tty ]; then
-                read -p "Proceed and remove /usr/local/bin/hub-tool? [y/N] " -r < /dev/tty
-                if [[ ! "$REPLY" =~ ^[Yy]$ ]]; then
-                    echo "❌ Aborted by user."
-                    exit 1
-                fi
-            fi
-            run_cmd sudo rm -f /usr/local/bin/hub-tool
-        else
-            echo "   Skipping Docker Desktop install to avoid forcing changes."
-            echo "   You can install Docker Desktop manually if desired."
-            echo ""
-            echo "   To force install (will remove the existing /usr/local/bin/hub-tool):"
-            echo "     curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash -s -- --force"
-            echo "   Or:"
-            echo "     VG_FORCE=1 bash -c 'curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | VG_FORCE=1 bash'"
-            exit 0
-        fi
+    if ! handle_hub_tool_conflict; then
+        exit 0
     fi
 
     echo "📦 Installing Docker Desktop..."
-    run_cmd brew install --cask docker
+    if ! run_cmd brew install --cask docker; then
+        if [ -e /usr/local/bin/hub-tool ]; then
+            echo "⚠️  Docker Desktop install failed due to /usr/local/bin/hub-tool conflict."
+            if [ "$VG_FORCE" = "1" ]; then
+                echo "   Removing /usr/local/bin/hub-tool and retrying install."
+                run_cmd sudo rm -f /usr/local/bin/hub-tool
+                run_cmd brew install --cask docker
+            else
+                echo "   Remove /usr/local/bin/hub-tool or rerun with --force/VG_FORCE=1."
+                exit 1
+            fi
+        else
+            exit 1
+        fi
+    fi
     echo ""
     echo "✅ Docker Desktop installed."
     echo "   Open Docker.app once to finish setup."
