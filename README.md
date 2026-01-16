@@ -6,24 +6,12 @@
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Debian%20Linux%20(x86%2FARM)-lightgrey.svg)]()
 
-Vectra Guard is a comprehensive security tool that protects systems from risky shell commands and AI agent activities. It validates scripts, monitors command execution, detects database operations, tracks agent sessions, and enforces security policies with real-time protection including production environment warnings.
-
-**Agentic development boost:** Vectra Guard now includes **context summarization** and **roadmap planning** so agents can quickly map a repo, capture intent, and move faster without leaving your machine.
+Vectra Guard protects systems from risky shell commands and AI agent activity. It validates scripts, enforces policies, and isolates execution while keeping workflows fast.
 
 **Why it helps agent workflows**
 - **Safety by default**: risky commands are analyzed before they run.
-- **Sandbox + cache**: isolate unknown code, reuse cached dependencies.
-- **Context summaries**: quickly surface key functions or doc sentences.
-- **Roadmap planning**: capture intent, status, and notes per repo.
-- **Repo-local config**: keep workspace settings and cache local (safe to commit config, ignore cache).
-
-## 🆕 What's new (PR #7)
-- **Advanced Go summaries**: `vg context summarize advanced <file|directory> --max N` uses Go AST + call-graph signals to surface high-impact functions; caches results for repeat runs.
-- **Repo-wide summarization**: `vg context summarize code .` processes entire repositories and caches results in `.vectra-guard/cache/` for faster subsequent runs.
-- **JSON output & change detection**: `--output json` for structured data, `--since <commit|date>` to only process changed files (perfect for AI agents and PR reviews).
-- **Roadmap CLI**: `vg roadmap add|list|show|status|log` tracks per-workspace plans under `~/.vectra-guard/roadmaps` (workspace is hashed for isolation).
-- **Repo-local init**: `vg init --local` writes `.vectra-guard/config.(yaml|toml)` and a repo-scoped cache directory `.vectra-guard/cache` (already gitignored).
-- **Built-in help topics**: `vg help [context|roadmap|init]` prints focused usage for the new flows.
+- **Sandbox + cache**: isolate unknown code and reuse cached dependencies.
+- **Repo-local config**: keep settings and cache local per workspace.
 
 ---
 
@@ -38,18 +26,10 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 
 **Vectra Guard provides a security layer that:**
 - ✅ Validates scripts and commands before execution
-- ✅ **Sandboxes ALL commands by default** (NEW! Maximum security)
-- ✅ **Comprehensive caching for 10x speedup** (NEW! Enabled by default)
-- ✅ **Cross-platform system directory protection** (Debian Linux, macOS)
-- ✅ Detects SQL/NoSQL database operations (MySQL, PostgreSQL, MongoDB, Redis, etc.)
-- ✅ Warns about production/staging environment interactions
-- ✅ Tracks all agent activities in auditable sessions
-- ✅ Blocks or requires approval for risky operations
-- ✅ **"Approve and remember" with trust store** (NEW!)
-- ✅ Provides comprehensive audit trails
-- ✅ Enforces security policies with zero-trust defaults
-- ✅ **Full metrics and observability** (NEW!)
-- ✅ Includes convenient `vg` alias for faster workflows
+- ✅ Sandboxes commands with cache-aware performance
+- ✅ Cross-platform system directory protection
+- ✅ Detects destructive DB and infra operations
+- ✅ Tracks agent activity in auditable sessions
 
 ---
 
@@ -62,6 +42,13 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 ```
 
 **Prereqs:** `curl` or `wget` (installer downloads the latest release binary).
+
+### Agentic Usage (Cursor/IDE)
+
+```bash
+# Seed agent instructions into the current repo
+vectra-guard seed agents --target .
+```
 
 ### Use It (3 commands)
 
@@ -413,11 +400,6 @@ sandbox:
 vectra-guard sandbox deps install
 # Or use the wrapper script
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
-```
-
-**Agentic usage (Cursor/IDE) right after install:**
-```bash
-vectra-guard seed agents --target .
 ```
 
 **Seed agent instructions into another repo (Cursor, VS Code, Claude, Codex, Windsurf, Copilot):**
