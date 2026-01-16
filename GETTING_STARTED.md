@@ -13,6 +13,10 @@ After following this guide:
 - ✅ Works transparently - no workflow changes needed
 - ✅ Optional agent helpers: context summaries + roadmap planning
 
+**Supported platforms:** macOS and Debian Linux (x86_64, arm64).
+
+**Prerequisites:** `git` and `go` (install via Homebrew on macOS or apt on Debian/Ubuntu).
+
 ---
 
 ## ⚡ Quick Start (30 Seconds)
@@ -22,11 +26,13 @@ After following this guide:
 **Recommended – one command:**
 
 ```bash
-# Automatically downloads and installs latest release
+# Builds from main and installs locally
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-For alternative installation methods (manual binaries, Homebrew, Go install, build from source), see the **Installation Options** section in `README.md`.
+**Prereqs:** `git` and `go` must be installed.
+
+For alternative installation methods (Go install, build from source), see the **Installation Options** section in `README.md`.
 
 ### Step 2: Install Universal Protection
 

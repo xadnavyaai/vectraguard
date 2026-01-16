@@ -64,14 +64,15 @@ Vectra Guard is a security tool that protects your development and production en
 ## 📦 Installation
 
 ```bash
-# Download for your platform
-# See GitHub Releases: https://github.com/xadnavyaai/vectra-guard/releases
+Supported platforms: macOS and Debian Linux (x86_64, arm64).
 
-# Verify checksum
-shasum -a 256 vectra-guard-<platform> | grep <checksum>
+# Build from source
+git clone https://github.com/xadnavyaai/vectra-guard.git
+cd vectra-guard
+go build -o vectra-guard .
 
 # Make executable
-chmod +x vectra-guard-<platform>
+chmod +x vectra-guard
 ```
 
 ---

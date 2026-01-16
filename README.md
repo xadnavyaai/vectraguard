@@ -4,7 +4,7 @@
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
-[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Linux-lightgrey.svg)]()
+[![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Debian%20Linux%20(x86%2FARM)-lightgrey.svg)]()
 
 Vectra Guard is a comprehensive security tool that protects systems from risky shell commands and AI agent activities. It validates scripts, monitors command execution, detects database operations, tracks agent sessions, and enforces security policies with real-time protection including production environment warnings.
 
@@ -40,7 +40,7 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 - ✅ Validates scripts and commands before execution
 - ✅ **Sandboxes ALL commands by default** (NEW! Maximum security)
 - ✅ **Comprehensive caching for 10x speedup** (NEW! Enabled by default)
-- ✅ **Cross-platform system directory protection** (Linux, macOS, Windows)
+- ✅ **Cross-platform system directory protection** (Debian Linux, macOS)
 - ✅ Detects SQL/NoSQL database operations (MySQL, PostgreSQL, MongoDB, Redis, etc.)
 - ✅ Warns about production/staging environment interactions
 - ✅ Tracks all agent activities in auditable sessions
@@ -61,7 +61,7 @@ AI agents in IDEs like Cursor and VSCode execute commands with broad system acce
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-On **Windows native (PowerShell)**, install the `.exe` and add it to your `PATH` (see below).
+**Prereqs:** `git` and `go` must be installed (installer builds from `main`).
 
 ### Use It (3 commands)
 
@@ -76,7 +76,7 @@ vectra-guard exec -- npm install
 vectra-guard explain risky-script.sh
 ```
 
-**That's it!** The tool protects 30+ system directories across Linux, macOS, and Windows, and detects 200+ risky patterns automatically. **All commands run in sandbox by default** with intelligent caching for maximum security and performance.
+**That's it!** The tool protects 30+ system directories across Debian Linux and macOS, and detects 200+ risky patterns automatically. **All commands run in sandbox by default** with intelligent caching for maximum security and performance.
 
 > **Need more details?** See [GETTING_STARTED.md](GETTING_STARTED.md) for a complete walkthrough.
 
@@ -84,23 +84,15 @@ vectra-guard explain risky-script.sh
 
 ## 📦 Installation
 
-### Recommended (one line, macOS & Linux)
+### Recommended (one line, macOS & Debian Linux)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
-- **Platform**: macOS & Linux  
-- **What it does**: downloads latest release → installs to `/usr/local/bin` → makes `vectra-guard` available
-
-### Windows Native (PowerShell, one line)
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-windows.ps1 | iex
-```
-
-- **What it does**: downloads latest Windows binary → installs to `C:\Program Files\VectraGuard` → adds to User `PATH`
+- **Platform**: macOS & Debian Linux (x86_64, arm64)  
+- **What it does**: builds from `main` → installs to `/usr/local/bin` → makes `vectra-guard` available
+- **Prereqs**: `git` and `go` are required
 
 ### Enable Universal Shell Protection (optional but recommended)
 
@@ -114,32 +106,10 @@ Then restart your terminal or run:
 exec $SHELL
 ```
 
-#### Windows Native (PowerShell) Protection
-
-On Windows, you can enable **PowerShell profile integration** for automatic sessions and command logging:
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-powershell-protection.ps1 | iex
-```
-
-Then restart PowerShell (or run `. $PROFILE`) and verify:
-
-```powershell
-echo $env:VECTRAGUARD_SESSION_ID
-vectra-guard session show $env:VECTRAGUARD_SESSION_ID
-```
-
-You also get a `vg` alias:
-
-```powershell
-vg exec -- npm install
-```
-
 ### Other ways to install
 
-- **Pre-built binaries**: see the [latest release](https://github.com/xadnavyaai/vectra-guard/releases/latest) page  
-- **Go developers**: `go install github.com/xadnavyaai/vectra-guard@latest`  
+- **Build from source**: `git clone https://github.com/xadnavyaai/vectra-guard.git && cd vectra-guard && go build -o vectra-guard .`  
+- **Go developers**: `go install github.com/xadnavyaai/vectra-guard@latest` (builds from source)  
 - **Build from source / advanced options**: see **[GETTING_STARTED.md](GETTING_STARTED.md)** (“Installation options” section)
 
 ### Upgrade
@@ -219,7 +189,6 @@ For a full walkthrough (modes, cache strategy, performance benchmarks, and examp
 **Protected Directories (30+ across platforms):**
 - **Linux/Unix**: `/bin`, `/sbin`, `/usr`, `/etc`, `/var`, `/lib`, `/opt`, `/boot`, `/root`, `/sys`, `/proc`, `/dev`, `/home`, `/srv`, `/run`, `/mnt`, `/media`, `/snap`, `/flatpak`
 - **macOS**: `/Applications`, `/Library`, `/System`, `/private`, `/Users`, `/Volumes`, `/Network`, `/cores`
-- **Windows (WSL)**: `/mnt/c/Windows`, `/mnt/c/Program Files`, `/mnt/c/ProgramData`, `/mnt/c/Users`
 
 **Risky Commands Detected:**
 - Root deletion: `rm -rf /`, `rm -r /*`
@@ -249,24 +218,11 @@ Instead of configuring each IDE separately, Vectra Guard integrates at the **she
 ./scripts/install-universal-shell-protection.sh
 ```
 
-**Windows (PowerShell):**
-
-```powershell
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
-./scripts/install-powershell-protection.ps1
-```
-
-Or use the remote one-liner from the **Installation** section:
-
-```powershell
-irm https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-powershell-protection.ps1 | iex
-```
-
 **Result**: Automatic protection in:
 - ✅ Cursor IDE
 - ✅ VSCode
 - ✅ Any IDE or editor
-- ✅ Terminal (iTerm, Terminal.app, Windows Terminal, etc.)
+- ✅ Terminal (iTerm, Terminal.app)
 - ✅ SSH sessions
 - ✅ Scripts and automation
 
