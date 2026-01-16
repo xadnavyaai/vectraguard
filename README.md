@@ -444,6 +444,22 @@ vectra-guard audit npm --path .
 vectra-guard audit python --path .
 ```
 
+### Package Audits
+
+Use built-in package auditing to surface known vulnerabilities.
+
+```bash
+# npm audit in a project directory
+vectra-guard audit npm --path /path/to/project
+
+# python audit (uses requirements.txt when present)
+vectra-guard audit python --path /path/to/project
+
+# Disable auto-install of audit tools
+vectra-guard audit npm --path . --no-install
+vectra-guard audit python --path . --no-install
+```
+
 ### Session Management
 
 ```bash

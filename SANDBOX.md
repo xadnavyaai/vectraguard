@@ -735,6 +735,24 @@ vg exec "rm -rf /data"
 npm install  # → automatically uses vg exec
 ```
 
+---
+
+## 🔍 Package Audits
+
+Vectra Guard can run dependency audits for npm and Python projects.
+
+```bash
+# npm audit in a project directory
+vectra-guard audit npm --path /path/to/project
+
+# python audit (uses requirements.txt when present)
+vectra-guard audit python --path /path/to/project
+
+# Disable auto-install of audit tools
+vectra-guard audit npm --path . --no-install
+vectra-guard audit python --path . --no-install
+```
+
 ### VS Code / Cursor Integration
 ```bash
 # Setup Cursor protection
