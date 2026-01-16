@@ -415,6 +415,11 @@ vectra-guard sandbox deps install
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
 ```
 
+**Agentic usage (Cursor/IDE) right after install:**
+```bash
+vectra-guard seed agents --target .
+```
+
 **Seed agent instructions into another repo (Cursor, VS Code, Claude, Codex, Windsurf, Copilot):**
 ```bash
 # Recommended (CLI)

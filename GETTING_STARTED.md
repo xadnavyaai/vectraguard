@@ -39,6 +39,13 @@ For alternative installation methods (Go install, build from source), see the **
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
 ```
 
+### Step 1b: Agentic Usage (Cursor/IDE)
+
+```bash
+# Seed agent instructions into the current repo
+vectra-guard seed agents --target .
+```
+
 ### Step 2: Install Universal Protection
 
 ```bash
