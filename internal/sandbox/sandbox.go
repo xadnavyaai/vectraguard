@@ -319,8 +319,16 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) (SandboxConfig
 		return SandboxConfig{}, fmt.Errorf("resolve working directory: %w", err)
 	}
 
+	runtimeChoice := cfg.Runtime
+	if runtimeChoice == "" || runtimeChoice == "auto" {
+		runtimeChoice = pickSandboxRuntime()
+		if runtimeChoice == "" {
+			return SandboxConfig{}, fmt.Errorf("no supported sandbox runtime available")
+		}
+	}
+
 	sandboxCfg := SandboxConfig{
-		Runtime:         cfg.Runtime,
+		Runtime:         runtimeChoice,
 		Image:           cfg.Image,
 		Timeout:         time.Duration(cfg.Timeout) * time.Second,
 		WorkDir:         workDir,
@@ -387,6 +395,21 @@ func (e *Executor) buildSandboxConfig(decision ExecutionDecision) (SandboxConfig
 	}
 
 	return sandboxCfg, nil
+}
+
+func pickSandboxRuntime() string {
+	if _, err := exec.LookPath("docker"); err == nil {
+		return "docker"
+	}
+	if _, err := exec.LookPath("podman"); err == nil {
+		return "podman"
+	}
+	if runtime.GOOS == "linux" {
+		if _, err := exec.LookPath("unshare"); err == nil {
+			return "process"
+		}
+	}
+	return ""
 }
 
 // executeDocker runs command in Docker container

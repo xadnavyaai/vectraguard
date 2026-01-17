@@ -151,6 +151,35 @@ func TestDecideExecutionMode(t *testing.T) {
 	}
 }
 
+func TestPickSandboxRuntimeEmptyPath(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+
+	if got := pickSandboxRuntime(); got != "" {
+		t.Fatalf("expected no runtime, got %q", got)
+	}
+}
+
+func TestBuildSandboxConfigAutoRuntimeNoSupport(t *testing.T) {
+	t.Setenv("PATH", t.TempDir())
+	t.Setenv("HOME", t.TempDir())
+
+	cfg := config.DefaultConfig()
+	cfg.Sandbox.Enabled = true
+	cfg.Sandbox.Mode = config.SandboxModeAlways
+	cfg.Sandbox.Runtime = "auto"
+
+	logger := logging.NewLogger("text", os.Stderr)
+	executor, err := NewExecutor(cfg, logger)
+	if err != nil {
+		t.Fatalf("NewExecutor failed: %v", err)
+	}
+
+	_, err = executor.buildSandboxConfig(ExecutionDecision{})
+	if err == nil {
+		t.Fatal("expected error when no runtime is available")
+	}
+}
+
 func TestIsNetworkedInstall(t *testing.T) {
 	logger := logging.NewLogger("text", os.Stderr)
 	cfg := config.Config{
