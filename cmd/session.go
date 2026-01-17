@@ -33,8 +33,8 @@ func runSessionStart(ctx context.Context, agentName, workspace string) error {
 		return fmt.Errorf("start session: %w", err)
 	}
 
-	// Set current session in environment
-	session.SetCurrentSession(sess.ID)
+	// Set current session in environment and index by workspace
+	session.SetCurrentSessionForWorkspace(workspace, sess.ID)
 
 	logger.Info("session started", map[string]any{
 		"session_id": sess.ID,

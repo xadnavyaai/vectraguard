@@ -53,3 +53,8 @@ roadmap.md
 *_ACTION_PLAN.md
 *_CHECKLIST.md
 *_FIX.md
+
+.cache/*
+.tmp-home/*
+
+.vscode/*

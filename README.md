@@ -78,18 +78,6 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
 ```
 
-### Enable Universal Shell Protection (optional but recommended)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
-```
-
-Then restart your terminal or run:
-
-```bash
-exec $SHELL
-```
-
 ### Other ways to install
 
 - **Build from source**: `git clone https://github.com/xadnavyaai/vectra-guard.git && cd vectra-guard && go build -o vectra-guard .`  
@@ -116,23 +104,6 @@ rm -rf ~/.vectra-guard  # Optional: removes all data
 
 ### After Installation
 
-**Option 1: Universal Protection (Recommended)**
-
-Install shell-level protection for automatic monitoring:
-
-```bash
-# Download and run the protection installer
-curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
-
-# Restart terminal, then verify:
-echo $VECTRAGUARD_SESSION_ID
-vectra-guard session show $VECTRAGUARD_SESSION_ID
-```
-
-**🎁 Bonus**: Universal protection automatically adds a `vg` alias for convenience!
-
-**Option 2: Manual Usage**
-
 Use Vectra Guard commands directly:
 
 ```bash
@@ -142,9 +113,8 @@ vectra-guard init
 # Initialize repo-local config + cache
 vectra-guard init --local
 
-# Validate a script (use 'vg' as shorthand if you have universal protection)
+# Validate a script
 vectra-guard validate your-script.sh
-vg validate your-script.sh  # Same thing!
 
 # Execute a command safely
 vectra-guard exec "npm install"
@@ -187,42 +157,6 @@ $ vectra-guard exec -- rm -rf /etc
 [ERROR] risky command blocked
 high risk command blocked by guard level medium
 ```
-
----
-
-## 🛡️ Universal Shell Protection (Advanced)
-
-Instead of configuring each IDE separately, Vectra Guard integrates at the **shell level** to protect everything automatically.
-
-### One Installation, Universal Protection
-
-**macOS / Linux (bash, zsh, fish):**
-
-```bash
-./scripts/install-universal-shell-protection.sh
-```
-
-**Result**: Automatic protection in:
-- ✅ Cursor IDE
-- ✅ VSCode
-- ✅ Any IDE or editor
-- ✅ Terminal (iTerm, Terminal.app)
-- ✅ SSH sessions
-- ✅ Scripts and automation
-
-### How It Works
-
-All tools use shells (bash/zsh/fish) to execute commands. Vectra Guard installs hooks in your shell that intercept and validate every command before execution.
-
-```
-Any Tool → bash/zsh → vectra-guard validates → executes (if safe)
-```
-
-**Benefits**:
-- **One setup, works everywhere** - No per-IDE configuration
-- **Cannot be bypassed** - All shell commands go through protection
-- **Completely transparent** - No workflow changes needed
-- **Team-friendly** - Share one setup script with entire team
 
 ---
 
@@ -1005,10 +939,7 @@ vg exec npm install  # shorthand
 ✅ Good for: Development, testing, trusted environments  
 ⚠️ Can be bypassed if not using `exec` command
 
-### Level 2: Universal Shell Integration (Recommended) ⭐
-```bash
-./scripts/install-universal-shell-protection.sh
-```
+### Level 2: Shell Integration (Recommended) ⭐
 ✅ **Automatic protection** for all shell commands  
 ✅ Works in Cursor, VSCode, Terminal, everywhere  
 ✅ Transparent, no workflow changes  
@@ -1285,7 +1216,6 @@ vectra-guard/
 │   ├── session/           # Session tracking
 │   └── daemon/            # Background monitoring
 ├── scripts/               # Installation & setup scripts
-│   ├── install-universal-shell-protection.sh
 │   ├── install-shell-wrapper.sh
 │   ├── setup-cursor-protection.sh
 │   └── container-entrypoint.sh
@@ -1371,7 +1301,6 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 
 | Task | Command |
 |------|---------|
-| **Install protection** | `./scripts/install-universal-shell-protection.sh` |
 | **Initialize config** | `vectra-guard init` (or `vg init`) |
 | **Validate script** | `vg validate script.sh` |
 | **Explain risks** | `vg explain script.sh` |
@@ -1397,7 +1326,7 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 
 ### General Usage
 1. **Use `level: auto`** for intelligent context-aware protection (recommended)
-2. **Install universal shell protection** for comprehensive coverage
+2. **Enable shell integration** for comprehensive coverage
 3. **Configure policies per project** with `vectra-guard.yaml` in repo root
 4. **Override when needed**: `VECTRA_GUARD_LEVEL=low vg exec command`
 5. **Use the `vg` alias** for faster workflows

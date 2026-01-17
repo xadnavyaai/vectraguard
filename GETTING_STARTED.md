@@ -7,7 +7,7 @@
 ## 🎯 What You'll Achieve
 
 After following this guide:
-- ✅ All commands in Cursor, VSCode, and Terminal will be protected
+- ✅ Commands run with `vectra-guard exec` will be protected
 - ✅ Risky commands will be caught automatically
 - ✅ Full audit trail of everything executed
 - ✅ Works transparently - no workflow changes needed
@@ -39,11 +39,11 @@ For alternative installation methods (Go install, build from source), see the **
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-all.sh | bash
 ```
 
-### Step 2: Install Universal Protection
+### Step 2: Start a Session (Recommended)
 
 ```bash
-# This makes it work everywhere (Cursor, VSCode, Terminal)
-curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-universal-shell-protection.sh | bash
+SESSION=$(vectra-guard session start --agent "manual")
+export VECTRAGUARD_SESSION_ID=$SESSION
 ```
 
 ### Step 2b: Agentic Usage (Cursor/IDE)
@@ -53,14 +53,13 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/script
 vectra-guard seed agents --target .
 ```
 
-### Step 3: Restart Terminal
+### Step 3: Run a Protected Command
 
 ```bash
-# Close and reopen your terminal (or run):
-exec $SHELL
+vectra-guard exec -- echo "Hello, Vectra Guard!"
 ```
 
-**That's it!** Vectra Guard is now protecting all your commands.
+**That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
 
 ---
 
@@ -137,8 +136,8 @@ vg help roadmap
 ### Test 2: Run a Command
 
 ```bash
-# Run any command
-echo "Hello, Vectra Guard!"
+# Run any command through the guard
+vectra-guard exec -- echo "Hello, Vectra Guard!"
 ```
 
 ---
@@ -170,7 +169,7 @@ vectra-guard session show $VECTRAGUARD_SESSION_ID
 
 ```bash
 # This will show a warning
-rm -rf /tmp/test-file
+vectra-guard exec -- rm -rf /tmp/test-file
 ```
 
 **Expected**: You'll see risk warnings, but command still logged
@@ -184,25 +183,25 @@ rm -rf /tmp/test-file
 **In Cursor**:
 ```bash
 # Open Cursor terminal
-npm install
-# ✅ Automatically protected and logged
+vectra-guard exec -- npm install
+# ✅ Protected and logged
 ```
 
 **In VSCode**:
 ```bash
 # Open VSCode terminal
-git push
-# ✅ Automatically protected and logged
+vectra-guard exec -- git push
+# ✅ Protected and logged
 ```
 
 **In Regular Terminal**:
 ```bash
 # Open Terminal app
-sudo apt update
+vectra-guard exec -- sudo apt update
 # ✅ Shows risk warning, requires approval (if configured)
 ```
 
-**Everything just works!** No special commands needed.
+**Everything just works!** Use `vectra-guard exec` to protect commands.
 
 ---
 
@@ -243,7 +242,7 @@ rm -rf node_modules && npm install
 ```
 
 **What happens**:
-1. ✅ Command intercepted automatically
+1. ✅ Command validated automatically
 2. ✅ Risk assessed (medium risk for rm -rf)
 3. ✅ Logged to your session
 4. ✅ Executes normally
@@ -268,7 +267,7 @@ vectra-guard validate deploy.sh
 vectra-guard explain deploy.sh
 
 # If safe, run it
-./deploy.sh  # Automatically protected
+vectra-guard exec -- ./deploy.sh
 ```
 
 ---
@@ -386,10 +385,10 @@ policies:
 cd ~/my-project
 
 # Work normally
-npm install
-npm test
+vectra-guard exec -- npm install
+vectra-guard exec -- npm test
 git commit -m "Fix bug"
-git push
+vectra-guard exec -- git push
 
 # Everything logged automatically! ✅
 ```
@@ -467,7 +466,7 @@ docker-compose up agent-prod
 
 ### Cursor IDE
 
-Already protected after universal shell installation! Just use Cursor normally.
+Use `vectra-guard exec` in the Cursor terminal to protect commands.
 
 **Optional**: Add tasks to `.vscode/tasks.json`:
 
@@ -521,9 +520,11 @@ which vectra-guard
 
 **Fix**:
 ```bash
-# Reinstall
-./scripts/install-universal-shell-protection.sh
-# Restart terminal
+# Reinstall the binary
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+# Start a new session
+SESSION=$(vectra-guard session start --agent "manual")
+export VECTRAGUARD_SESSION_ID=$SESSION
 ```
 
 ---
@@ -660,7 +661,6 @@ cat vectra-guard.yaml
 
 After setup, you should have:
 - [x] `vectra-guard` binary installed
-- [x] Universal shell protection active
 - [x] Session ID in `$VECTRAGUARD_SESSION_ID`
 - [x] Commands being logged
 - [x] Risky commands showing warnings

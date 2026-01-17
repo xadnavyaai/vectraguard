@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/vectra-guard/vectra-guard/internal/logging"
@@ -59,10 +60,14 @@ type Manager struct {
 
 // NewManager creates a new session manager.
 func NewManager(workspace string, logger *logging.Logger) (*Manager, error) {
-	// Always use home directory for global session storage
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		return nil, fmt.Errorf("get home directory: %w", err)
+	// Always use home directory for global session storage (respect HOME when set)
+	homeDir := os.Getenv("HOME")
+	if homeDir == "" {
+		var err error
+		homeDir, err = os.UserHomeDir()
+		if err != nil {
+			return nil, fmt.Errorf("get home directory: %w", err)
+		}
 	}
 	sessionDir := filepath.Join(homeDir, ".vectra-guard", "sessions")
 	if err := os.MkdirAll(sessionDir, 0o755); err != nil {
@@ -224,3 +229,167 @@ func SetCurrentSession(sessionID string) {
 	os.Setenv("VECTRAGUARD_SESSION_ID", sessionID)
 }
 
+// GetCurrentSessionForWorkspace resolves the session ID by checking:
+// env var (validated against workspace), then global per-workspace index,
+// and finally a global "last session" file for fallback cases.
+func GetCurrentSessionForWorkspace(workdir string) string {
+	normalized := normalizeWorkspacePath(workdir)
+	if sessionID := GetCurrentSession(); sessionID != "" {
+		if normalized == "" || sessionMatchesWorkspace(sessionID, normalized) {
+			return sessionID
+		}
+	}
+
+	if normalized != "" {
+		index := readSessionIndex()
+		if sessionID := index[normalized]; sessionID != "" {
+			return sessionID
+		}
+	}
+
+	if normalized == "" {
+		if path := globalSessionFilePath(); path != "" {
+			return readSessionIDFromFile(path)
+		}
+	}
+
+	return ""
+}
+
+// SetCurrentSessionForWorkspace stores the session in env and syncs to global index.
+// File writes are best-effort; failures do not block execution.
+func SetCurrentSessionForWorkspace(workdir, sessionID string) {
+	if sessionID == "" {
+		return
+	}
+	SetCurrentSession(sessionID)
+
+	normalized := normalizeWorkspacePath(workdir)
+	if normalized != "" {
+		index := readSessionIndex()
+		index[normalized] = sessionID
+		_ = writeSessionIndex(index)
+	}
+
+	if path := globalSessionFilePath(); path != "" {
+		_ = writeSessionIDToFile(path, sessionID)
+	}
+}
+
+func normalizeWorkspacePath(workdir string) string {
+	if workdir == "" {
+		return ""
+	}
+	abs, err := filepath.Abs(workdir)
+	if err == nil {
+		workdir = abs
+	}
+	if real, err := filepath.EvalSymlinks(workdir); err == nil {
+		workdir = real
+	}
+	return filepath.Clean(workdir)
+}
+
+func sessionMatchesWorkspace(sessionID, workdir string) bool {
+	sessionPath := filepath.Join(sessionDirPath(), sessionID+".json")
+	data, err := os.ReadFile(sessionPath)
+	if err != nil {
+		return false
+	}
+	var sess Session
+	if err := json.Unmarshal(data, &sess); err != nil {
+		return false
+	}
+	return normalizeWorkspacePath(sess.Workspace) == workdir
+}
+
+func sessionDirPath() string {
+	if homeEnv := os.Getenv("HOME"); homeEnv != "" {
+		return filepath.Join(homeEnv, ".vectra-guard", "sessions")
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(homeDir, ".vectra-guard", "sessions")
+	}
+	return ""
+}
+
+func sessionIndexPath() string {
+	if homeEnv := os.Getenv("HOME"); homeEnv != "" {
+		return filepath.Join(homeEnv, ".vectra-guard", "session-index.json")
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(homeDir, ".vectra-guard", "session-index.json")
+	}
+	return ""
+}
+
+func globalSessionFilePath() string {
+	if homeEnv := os.Getenv("HOME"); homeEnv != "" {
+		return filepath.Join(homeEnv, ".vectra-guard-session")
+	}
+	if homeDir, err := os.UserHomeDir(); err == nil {
+		return filepath.Join(homeDir, ".vectra-guard-session")
+	}
+	return ""
+}
+
+func readSessionIndex() map[string]string {
+	path := sessionIndexPath()
+	if path == "" {
+		return map[string]string{}
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return map[string]string{}
+	}
+	var index map[string]string
+	if err := json.Unmarshal(data, &index); err != nil {
+		return map[string]string{}
+	}
+	if index == nil {
+		return map[string]string{}
+	}
+	return index
+}
+
+func writeSessionIndex(index map[string]string) error {
+	path := sessionIndexPath()
+	if path == "" {
+		return nil
+	}
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	data, err := json.MarshalIndent(index, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(path, data, 0o644)
+}
+
+func readSessionIDFromFile(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+	if len(lines) == 0 {
+		return ""
+	}
+	last := strings.TrimSpace(lines[len(lines)-1])
+	return last
+}
+
+func writeSessionIDToFile(path, sessionID string) error {
+	if path == "" || sessionID == "" {
+		return nil
+	}
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return err
+		}
+	}
+	return os.WriteFile(path, []byte(sessionID+"\n"), 0o644)
+}

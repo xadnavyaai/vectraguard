@@ -93,7 +93,7 @@ func (d *Daemon) Start(ctx context.Context) error {
 		return fmt.Errorf("start session: %w", err)
 	}
 	d.session = sess
-	session.SetCurrentSession(sess.ID)
+	session.SetCurrentSessionForWorkspace(d.workspace, sess.ID)
 
 	d.logger.Info("daemon started", map[string]any{
 		"session_id": sess.ID,
