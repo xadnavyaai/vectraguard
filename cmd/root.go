@@ -325,10 +325,13 @@ func execute(args []string) error {
 			subFlags := flag.NewFlagSet("seed-agents", flag.ContinueOnError)
 			target := subFlags.String("target", ".", "Target repository directory")
 			force := subFlags.Bool("force", false, "Overwrite existing files")
+				targets := subFlags.String("targets", "", "Comma/space-separated targets (e.g., agents,claude,cursor)")
+				list := subFlags.Bool("list", false, "List available targets and exit")
 			if err := subFlags.Parse(seedArgs); err != nil {
 				return err
 			}
-			return runSeedAgents(ctx, *target, *force)
+				selected := parseSeedTargets(*targets)
+				return runSeedAgents(ctx, *target, *force, selected, *list)
 		default:
 			return usageError()
 		}

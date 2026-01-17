@@ -80,10 +80,11 @@ or DRY_RUN=1 to preview commands.
 	case "seed":
 		return printHelp(`Seed agent instructions:
 
-  vg seed agents [--target .] [--force]
+  vg seed agents [--target .] [--force] [--targets "agents,cursor"]
+  vg seed agents --list
 
-Creates agent instruction files for Cursor, Claude, Codex, VS Code,
-Copilot, and Windsurf inside a target repository.
+Defaults to seeding only AGENTS.md unless --targets is provided.
+Use --list to see available targets.
 `)
 	case "audit":
 		return printHelp(`Package auditing:

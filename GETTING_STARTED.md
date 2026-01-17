@@ -58,7 +58,7 @@ export VECTRAGUARD_SESSION_ID=$SESSION
 
 ```bash
 # Seed agent instructions into the current repo
-vectra-guard seed agents --target .
+vectra-guard seed agents --target . --targets "agents,cursor"
 ```
 
 ### Step 3: Run a Protected Command

@@ -49,7 +49,7 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/script
 
 ```bash
 # Seed agent instructions into the current repo
-vectra-guard seed agents --target .
+vectra-guard seed agents --target . --targets "agents,cursor"
 ```
 
 ### Use It (5 commands)
