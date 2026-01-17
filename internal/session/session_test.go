@@ -2,6 +2,8 @@ package session
 
 import (
 	"io"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -235,3 +237,98 @@ func TestSessionPersistence(t *testing.T) {
 	}
 }
 
+
+func TestWorkspaceSessionIndex(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	logger := logging.NewLogger("text", io.Discard)
+
+	workspace1 := t.TempDir()
+	mgr, err := NewManager(workspace1, logger)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	sess1, err := mgr.Start("agent1", workspace1)
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	SetCurrentSessionForWorkspace(workspace1, sess1.ID)
+	_ = os.Unsetenv("VECTRAGUARD_SESSION_ID")
+
+	if got := GetCurrentSessionForWorkspace(workspace1); got != sess1.ID {
+		t.Fatalf("expected session %s, got %s", sess1.ID, got)
+	}
+
+	workspace2 := t.TempDir()
+	sess2, err := mgr.Start("agent2", workspace2)
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	SetCurrentSessionForWorkspace(workspace2, sess2.ID)
+	os.Setenv("VECTRAGUARD_SESSION_ID", sess1.ID)
+
+	if got := GetCurrentSessionForWorkspace(workspace2); got != sess2.ID {
+		t.Fatalf("expected workspace2 session %s, got %s", sess2.ID, got)
+	}
+}
+
+
+
+func TestWorkspaceSessionIndexHonorsEnvMismatch(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+	logger := logging.NewLogger("text", io.Discard)
+
+	workspace1 := t.TempDir()
+	mgr, err := NewManager(workspace1, logger)
+	if err != nil {
+		t.Fatalf("NewManager failed: %v", err)
+	}
+
+	sess1, err := mgr.Start("agent1", workspace1)
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	workspace2 := t.TempDir()
+	sess2, err := mgr.Start("agent2", workspace2)
+	if err != nil {
+		t.Fatalf("Start failed: %v", err)
+	}
+
+	SetCurrentSessionForWorkspace(workspace2, sess2.ID)
+	t.Setenv("VECTRAGUARD_SESSION_ID", sess1.ID)
+
+	if got := GetCurrentSessionForWorkspace(workspace2); got != sess2.ID {
+		t.Fatalf("expected workspace2 session %s, got %s", sess2.ID, got)
+	}
+}
+
+func TestWorkspaceSessionIndexFallbackGlobalWhenNoWorkdir(t *testing.T) {
+	tempHome := t.TempDir()
+	t.Setenv("HOME", tempHome)
+
+	path := globalSessionFilePath()
+	if path == "" {
+		t.Fatal("expected global session path")
+	}
+	if err := os.WriteFile(path, []byte("session-fallback\n"), 0o644); err != nil {
+		t.Fatalf("write fallback file: %v", err)
+	}
+	_ = os.Unsetenv("VECTRAGUARD_SESSION_ID")
+
+	if got := GetCurrentSessionForWorkspace(""); got != "session-fallback" {
+		t.Fatalf("expected fallback session, got %s", got)
+	}
+}
+
+func TestNormalizeWorkspacePath(t *testing.T) {
+	base := t.TempDir()
+	nested := base + string(os.PathSeparator) + ".." + string(os.PathSeparator) + filepath.Base(base)
+	if got := normalizeWorkspacePath(nested); got != normalizeWorkspacePath(base) {
+		t.Fatalf("expected normalized paths to match, got %s vs %s", got, base)
+	}
+}

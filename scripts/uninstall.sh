@@ -9,7 +9,8 @@ echo "============================"
 echo ""
 
 BINARY_NAME="vectra-guard"
-INSTALL_DIR="/usr/local/bin"
+BIN_PATH="$(command -v vectra-guard 2>/dev/null || true)"
+INSTALL_DIR="${BIN_PATH%/*}"
 
 # Check if installed
 if ! command -v vectra-guard &> /dev/null; then
@@ -17,22 +18,26 @@ if ! command -v vectra-guard &> /dev/null; then
     exit 0
 fi
 
-echo "Found Vectra Guard at: $(which vectra-guard)"
+echo "Found Vectra Guard at: ${BIN_PATH}"
 echo ""
 
 # Confirm uninstall
 # Use /dev/tty to read from terminal even when piped through curl | bash
-if [ ! -t 0 ]; then
-    # Check if we have access to /dev/tty (real terminal)
-    if [ ! -c /dev/tty ]; then
-        echo "⚠️  Running in non-interactive environment"
-        echo "   Uninstall cancelled (requires interactive terminal)"
-        exit 0
-    fi
-    # Read directly from /dev/tty when piped
-    read -p "Remove Vectra Guard? [y/N] " -n 1 -r < /dev/tty
+if [ -n "${VECTRAGUARD_UNINSTALL_AUTO:-}" ]; then
+    REPLY="y"
 else
-    read -p "Remove Vectra Guard? [y/N] " -n 1 -r
+    if [ ! -t 0 ]; then
+        # Check if we have access to /dev/tty (real terminal)
+        if [ ! -c /dev/tty ]; then
+            echo "⚠️  Running in non-interactive environment"
+            echo "   Uninstall cancelled (requires interactive terminal)"
+            exit 0
+        fi
+        # Read directly from /dev/tty when piped
+        read -p "Remove Vectra Guard? [y/N] " -n 1 -r < /dev/tty
+    else
+        read -p "Remove Vectra Guard? [y/N] " -n 1 -r
+    fi
 fi
 echo
 
@@ -46,12 +51,12 @@ echo "📋 Uninstalling components..."
 echo ""
 
 # 1. Remove binary
-echo "1/5: Removing binary..."
-if [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
+echo "1/6: Removing binary..."
+if [ -n "$BIN_PATH" ] && [ -f "$BIN_PATH" ]; then
     if [ -w "$INSTALL_DIR" ]; then
-        rm -f "$INSTALL_DIR/$BINARY_NAME"
+        rm -f "$BIN_PATH"
     else
-        sudo rm -f "$INSTALL_DIR/$BINARY_NAME"
+        sudo rm -f "$BIN_PATH"
     fi
     echo "  ✅ Binary removed"
 else
@@ -62,7 +67,7 @@ DATA_REMOVED=false
 
 # 2. Remove shell integration and restore from backups
 echo ""
-echo "2/5: Removing shell integration..."
+echo "2/6: Removing shell integration..."
 REMOVED_INTEGRATION=false
 RESTORED_FROM_BACKUP=false
 
@@ -89,7 +94,8 @@ for shell_rc in ~/.bashrc ~/.zshrc ~/.config/fish/config.fish; do
     
     if [ -f "$shell_rc_expanded" ]; then
         # Check if integration exists
-        if grep -q "Vectra Guard Integration" "$shell_rc_expanded" 2>/dev/null; then
+        if grep -q "Vectra Guard Integration" "$shell_rc_expanded" 2>/dev/null || \
+           grep -q "vectra-guard/tracker" "$shell_rc_expanded" 2>/dev/null; then
             # If backup exists, restore from backup
             if [ -f "$backup_file" ]; then
                 echo "  ✅ Restoring $(basename $shell_rc_expanded) from backup"
@@ -105,11 +111,17 @@ for shell_rc in ~/.bashrc ~/.zshrc ~/.config/fish/config.fish; do
                     sed -i '' '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc_expanded"
                     sed -i '' '/# Vectra Guard Safety Aliases/,/fi/d' "$shell_rc_expanded"
                     sed -i '' '/# Vectra Guard Safety Aliases/,/end/d' "$shell_rc_expanded"
+                    sed -i '' '/vectra-guard\/tracker\.bash/d' "$shell_rc_expanded"
+                    sed -i '' '/vectra-guard\/tracker\.zsh/d' "$shell_rc_expanded"
+                    sed -i '' '/vectra-guard\/tracker\.fish/d' "$shell_rc_expanded"
                 else
                     # Linux (GNU sed)
                     sed -i '/# ====.*Vectra Guard Integration/,/# End Vectra Guard Integration/d' "$shell_rc_expanded"
                     sed -i '/# Vectra Guard Safety Aliases/,/fi/d' "$shell_rc_expanded"
                     sed -i '/# Vectra Guard Safety Aliases/,/end/d' "$shell_rc_expanded"
+                    sed -i '/vectra-guard\/tracker\.bash/d' "$shell_rc_expanded"
+                    sed -i '/vectra-guard\/tracker\.zsh/d' "$shell_rc_expanded"
+                    sed -i '/vectra-guard\/tracker\.fish/d' "$shell_rc_expanded"
                 fi
                 echo "  ✅ Removed from $(basename $shell_rc_expanded)"
                 REMOVED_INTEGRATION=true
@@ -132,7 +144,7 @@ fi
 
 # 3. Remove session file
 echo ""
-echo "3/5: Cleaning up session data..."
+echo "3/6: Cleaning up session data..."
 if [ -f ~/.vectra-guard-session ]; then
     rm -f ~/.vectra-guard-session
     echo "  ✅ Session file removed"
@@ -142,11 +154,19 @@ fi
 
 # 4. Remove configs and data
 echo ""
-echo "4/5: Configuration and data cleanup..."
-if [ -c /dev/tty ]; then
-    read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r < /dev/tty
+echo "4/6: Configuration and data cleanup..."
+if [ -n "${VECTRAGUARD_UNINSTALL_AUTO:-}" ]; then
+    if [ -n "${VECTRAGUARD_UNINSTALL_PURGE:-}" ]; then
+        REPLY="y"
+    else
+        REPLY="n"
+    fi
 else
-    read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r
+    if [ -c /dev/tty ]; then
+        read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r < /dev/tty
+    else
+        read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r
+    fi
 fi
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
@@ -170,14 +190,52 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
         rm -f ~/.vectra-guard-session
         echo "  ✅ Removed session file: ~/.vectra-guard-session"
     fi
+    if [ -f ~/.vectra-guard/session-index.json ]; then
+        rm -f ~/.vectra-guard/session-index.json
+        echo "  ✅ Removed session index: ~/.vectra-guard/session-index.json"
+    fi
     DATA_REMOVED=true
 else
     echo "  ℹ️  Kept configs/data (remove manually if desired)."
+    if [ -n "${VECTRAGUARD_UNINSTALL_AUTO:-}" ]; then
+        if [ -n "${VECTRAGUARD_UNINSTALL_CACHE_ONLY:-}" ]; then
+            REPLY="y"
+        else
+            REPLY="n"
+        fi
+    else
+        if [ -c /dev/tty ]; then
+            read -p "Remove cache/metrics only (~/.vectra-guard/cache, ~/.vectra-guard/metrics.json, ~/.vectra-guard/sessions)? [y/N] " -n 1 -r < /dev/tty
+        else
+            read -p "Remove cache/metrics only (~/.vectra-guard/cache, ~/.vectra-guard/metrics.json, ~/.vectra-guard/sessions)? [y/N] " -n 1 -r
+        fi
+    fi
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf ~/.vectra-guard/cache ~/.vectra-guard/sessions
+        rm -f ~/.vectra-guard/metrics.json
+        echo "  ✅ Cache/metrics removed"
+    fi
 fi
 
-# 5. Remove pre-commit hook (current repo only if present)
+# 5. Remove tracker files (if any remain)
 echo ""
-echo "5/6: Removing git pre-commit hook (current repo if present)..."
+echo "5/6: Removing shell tracker files..."
+TRACKER_REMOVED=false
+for tracker in ~/.vectra-guard/tracker.bash ~/.vectra-guard/tracker.zsh ~/.vectra-guard/tracker.fish; do
+    if [ -f "$tracker" ]; then
+        rm -f "$tracker"
+        echo "  ✅ Removed $(basename "$tracker")"
+        TRACKER_REMOVED=true
+    fi
+done
+if [ "$TRACKER_REMOVED" = false ]; then
+    echo "  ℹ️  No tracker files found"
+fi
+
+# 6. Remove pre-commit hook (current repo only if present)
+echo ""
+echo "6/6: Removing git pre-commit hook (current repo if present)..."
 if [ -d .git ] && [ -f .git/hooks/pre-commit ]; then
     if grep -q "Vectra Guard Pre-commit Hook" .git/hooks/pre-commit 2>/dev/null; then
         rm -f .git/hooks/pre-commit

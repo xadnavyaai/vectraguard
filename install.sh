@@ -6,7 +6,7 @@ set -e
 
 REPO="xadnavyaai/vectra-guard"
 # Allow overriding install dir for testing (e.g., INSTALL_DIR=/tmp/vg-install)
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 BINARY_NAME="vectra-guard"
 
 echo "🛡️  Vectra Guard Installer"
@@ -82,6 +82,7 @@ case "$ARCH" in
 esac
 
 echo "📋 System: $OS $ARCH"
+echo "📦 Install dir: $INSTALL_DIR"
 echo ""
 
 # Download pre-built release binary
@@ -95,9 +96,7 @@ CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
 # Ensure a download tool exists
 if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
     echo "❌ Neither curl nor wget is installed."
-    echo "   Please install one of them and re-run:"
-    echo "   - macOS: brew install curl"
-    echo "   - Debian/Ubuntu: sudo apt-get install -y curl"
+    echo "   Please install one of them and re-run (no sudo recommended)."
     exit 1
 fi
 
@@ -159,12 +158,20 @@ chmod +x "$TEMP_FILE"
 
 # Install
 echo "📝 Installing to $INSTALL_DIR..."
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
-else
-    echo "   (requires sudo)"
-    sudo mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
+mkdir -p "$INSTALL_DIR"
+if [ ! -w "$INSTALL_DIR" ]; then
+    echo "❌ Install directory is not writable: $INSTALL_DIR"
+    echo "   Set INSTALL_DIR to a writable path (e.g., $HOME/.local/bin) and re-run."
+    exit 1
 fi
+if [[ "$INSTALL_DIR" == "/usr/local/bin" || "$INSTALL_DIR" == "/usr/bin" || "$INSTALL_DIR" == "/bin" ]]; then
+    if [ -z "${VECTRAGUARD_ALLOW_SYSTEM_INSTALL:-}" ]; then
+        echo "❌ System-wide installs are disabled by default."
+        echo "   Use INSTALL_DIR=\"$HOME/.local/bin\" or set VECTRAGUARD_ALLOW_SYSTEM_INSTALL=1 to override."
+        exit 1
+    fi
+fi
+mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
 
 # Verify installation
 if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
@@ -183,11 +190,20 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
         fi
         echo "   New: $NEW_VERSION"
     else
-        echo "✅ Vectra Guard installed successfully!"
+    echo "✅ Vectra Guard installed successfully!"
         echo "   Version: $NEW_VERSION"
     fi
     
     echo ""
+    # Optional: add a lightweight shell hook to track all commands
+    if [ -t 0 ]; then
+        read -p "Enable Shell Tracker (adds a small hook)? [y/N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-shell-tracker.sh | bash
+            echo ""
+        fi
+    fi
     echo "🚀 Quick Start:"
     echo ""
     echo "   1. Validate a script (safe - never executes):"
@@ -202,8 +218,8 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
     echo "   4. Optional - Initialize configuration:"
     echo "      vectra-guard init"
     echo ""
-    echo "   5. Optional - Enable Universal Shell Protection (recommended):"
-    echo "      curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install-universal-shell-protection.sh | bash"
+    echo "   5. Optional - Enable Shell Tracker (recommended):"
+    echo "      curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install-shell-tracker.sh | bash"
     echo ""
     echo "📚 Full Documentation: https://github.com/${REPO}"
     echo "🗑️  Uninstall: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh | bash"

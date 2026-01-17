@@ -111,10 +111,12 @@ func execute(args []string) error {
 		target := subFlags.String("path", ".", "Target directory for audit")
 		failOn := subFlags.Bool("fail", false, "Exit non-zero if findings exist")
 		noInstall := subFlags.Bool("no-install", false, "Disable auto-install of audit dependencies")
+		sessionID := subFlags.String("session", "", "Session ID for session audit")
+		allSessions := subFlags.Bool("all", false, "Audit across all sessions (session tool only)")
 		if err := subFlags.Parse(subArgs[1:]); err != nil {
 			return err
 		}
-		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall)
+		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall, *sessionID, *allSessions)
 	case "sandbox":
 		if len(subArgs) < 1 {
 			return usageError()
@@ -175,6 +177,15 @@ func execute(args []string) error {
 				return usageError()
 			}
 			return runSessionShow(ctx, sessionArgs[0])
+		case "record":
+			subFlags := flag.NewFlagSet("session-record", flag.ContinueOnError)
+			command := subFlags.String("command", "", "Command string to record")
+			exitCode := subFlags.Int("exit-code", 0, "Exit code of the command")
+			sessionID := subFlags.String("session", "", "Session ID (optional)")
+			if err := subFlags.Parse(sessionArgs); err != nil {
+				return err
+			}
+			return runSessionRecord(ctx, *sessionID, *command, *exitCode)
 		default:
 			return usageError()
 		}
@@ -314,10 +325,13 @@ func execute(args []string) error {
 			subFlags := flag.NewFlagSet("seed-agents", flag.ContinueOnError)
 			target := subFlags.String("target", ".", "Target repository directory")
 			force := subFlags.Bool("force", false, "Overwrite existing files")
+				targets := subFlags.String("targets", "", "Comma/space-separated targets (e.g., agents,claude,cursor)")
+				list := subFlags.Bool("list", false, "List available targets and exit")
 			if err := subFlags.Parse(seedArgs); err != nil {
 				return err
 			}
-			return runSeedAgents(ctx, *target, *force)
+				selected := parseSeedTargets(*targets)
+				return runSeedAgents(ctx, *target, *force, selected, *list)
 		default:
 			return usageError()
 		}

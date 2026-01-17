@@ -2,7 +2,7 @@
 
 ## 🎉 First Stable Release
 
-This is the first release focused on **macOS** and **Debian Linux** (x86_64, arm64) with a secure-by-default command guard, sandboxing, and universal shell protection.
+This is the first release focused on **macOS** and **Debian Linux** (x86_64, arm64) with a secure-by-default command guard, sandboxing, and shell tracking.
 
 ---
 
@@ -30,7 +30,7 @@ This is the first release focused on **macOS** and **Debian Linux** (x86_64, arm
 
 ---
 
-## 🧰 Universal Shell Protection
+## 🧰 Shell Tracker
 
 - **Bash and Zsh integration** for automatic pre-exec validation
 - **Session tracking** across shells

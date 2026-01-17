@@ -8,9 +8,17 @@ Use these guidelines for agentic coding tools and IDE assistants.
 - If you need a sandboxed environment, use `vectra-guard sandbox deps install` and keep sandbox enabled.
 
 ## Recommended Setup
+- Install locally (no sudo):
+  - `INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
+  - Ensure `~/.local/bin` is on `PATH`
 - Initialize a repo-local config and cache:
   - `vectra-guard init --local`
 - Default config file: `vectra-guard.yaml` (or `.vectra-guard/config.yaml` for local mode).
+
+## Security Practices (Lightweight)
+- Prefer user-space installs and avoid `sudo`.
+- Avoid `curl | bash`; download and review scripts first.
+- Keep secrets out of logs, command history, and outputs.
 
 ## Sandboxing
 - Default behavior is safe-by-default; sandbox can be set to `auto` or `always`.

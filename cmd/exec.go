@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -28,11 +30,16 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 
 	// Build command string for analysis
 	cmdString := strings.Join(cmdArgs, " ")
+	tracker := initSessionTracker(sessionID, logger)
+	if tracker != nil {
+		sessionID = tracker.id
+	}
 
 	// CRITICAL: Always analyze commands FIRST, even if guard level is OFF
 	// This ensures critical commands like "rm -rf /" are ALWAYS blocked
 	// regardless of guard level configuration
 	findings := analyzer.AnalyzeScript("inline-command", []byte(cmdString), cfg.Policies)
+	trackingRiskLevel, trackingFindingCodes := summarizeFindings(findings)
 	
 	// Check for CRITICAL commands that MUST be blocked regardless of guard level
 	// These commands can destroy the system and should NEVER execute
@@ -56,6 +63,23 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					"severity":   f.Severity,
 					"description": f.Description,
 				})
+				recordCommandAttempt(tracker, session.Command{
+					Timestamp: time.Now(),
+					Command:   cmdName,
+					Args:      args,
+					ExitCode:  3,
+					Duration:  0,
+					RiskLevel: trackingRiskLevel,
+					Approved:  false,
+					Findings:  trackingFindingCodes,
+					Metadata: map[string]interface{}{
+						"blocked":       true,
+						"block_reason":  "critical_command",
+						"block_code":    code,
+						"guard_level":   cfg.GuardLevel.Level,
+						"repeat_detect": false,
+					},
+				})
 				return &exitError{
 					message: fmt.Sprintf("CRITICAL: Command '%s' is blocked for safety. %s", cmdString, f.Recommendation),
 					code:    3,
@@ -67,15 +91,6 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 	}
 
-	// Check guard level AFTER critical command check
-	// Only non-critical commands can bypass when guard level is OFF
-	if cfg.GuardLevel.Level == config.GuardLevelOff {
-		logger.Info("guard level is OFF - executing without protection", map[string]any{
-			"command": cmdString,
-		})
-		return executeCommandDirectly(cmdArgs)
-	}
-	
 	riskLevel := "low"
 	var findingCodes []string
 	
@@ -139,6 +154,21 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					logger.Info("command execution denied by user", map[string]any{
 						"command": cmdString,
 					})
+					recordCommandAttempt(tracker, session.Command{
+						Timestamp: time.Now(),
+						Command:   cmdName,
+						Args:      args,
+						ExitCode:  3,
+						Duration:  0,
+						RiskLevel: trackingRiskLevel,
+						Approved:  false,
+						Findings:  trackingFindingCodes,
+						Metadata: map[string]interface{}{
+							"blocked":      true,
+							"block_reason": "user_denied",
+							"guard_level":  cfg.GuardLevel.Level,
+						},
+					})
 					return &exitError{message: "execution denied", code: 3}
 				}
 				
@@ -164,11 +194,153 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					"risk_level": riskLevel,
 					"guard_level": cfg.GuardLevel.Level,
 				})
+				recordCommandAttempt(tracker, session.Command{
+					Timestamp: time.Now(),
+					Command:   cmdName,
+					Args:      args,
+					ExitCode:  3,
+					Duration:  0,
+					RiskLevel: trackingRiskLevel,
+					Approved:  false,
+					Findings:  trackingFindingCodes,
+					Metadata: map[string]interface{}{
+						"blocked":      true,
+						"block_reason": "guard_level_block",
+						"guard_level":  cfg.GuardLevel.Level,
+					},
+				})
 				return &exitError{
 					message: fmt.Sprintf("%s risk command blocked by guard level %s (use --interactive to approve, or set bypass)", 
 						riskLevel, cfg.GuardLevel.Level),
 					code: 3,
 				}
+			}
+		}
+	}
+
+	// Repeated action detection (prevents rapid destructive loops)
+	if tracker != nil {
+		repeatDecision := evaluateRepeatProtection(tracker.sess, cmdName, args, trackingRiskLevel, trackingFindingCodes)
+		if repeatDecision.block {
+			logger.Error("repeated high-risk action blocked", map[string]any{
+				"command":     cmdString,
+				"risk_level":  trackingRiskLevel,
+				"repeat_key":  repeatDecision.key,
+				"repeat_count": repeatDecision.count,
+				"repeat_window_seconds": int(repeatDecision.window.Seconds()),
+			})
+			recordCommandAttempt(tracker, session.Command{
+				Timestamp: time.Now(),
+				Command:   cmdName,
+				Args:      args,
+				ExitCode:  3,
+				Duration:  0,
+				RiskLevel: trackingRiskLevel,
+				Approved:  false,
+				Findings:  trackingFindingCodes,
+				Metadata: map[string]interface{}{
+					"blocked":       true,
+					"block_reason":  "repeat_protection",
+					"repeat_key":    repeatDecision.key,
+					"repeat_count":  repeatDecision.count,
+					"repeat_window": repeatDecision.window.String(),
+				},
+			})
+			return &exitError{
+				message: fmt.Sprintf("repeated action blocked (%d times in %s). Slow down or review command intent.", repeatDecision.count, repeatDecision.window.String()),
+				code:    3,
+			}
+		}
+		if repeatDecision.warn {
+			logger.Warn("repeated action warning", map[string]any{
+				"command":     cmdString,
+				"risk_level":  trackingRiskLevel,
+				"repeat_key":  repeatDecision.key,
+				"repeat_count": repeatDecision.count,
+				"repeat_window_seconds": int(repeatDecision.window.Seconds()),
+			})
+			fmt.Fprintf(os.Stderr, "Warning: repeated action detected (%d/%d in %s). Slow down to avoid a block.\n",
+				repeatDecision.count,
+				repeatDecision.limit,
+				repeatDecision.window.String(),
+			)
+		}
+	}
+
+	// Block external HTTP(S) endpoints when using vg/vectra-guard
+	if hasExternalHTTP(cmdString) && os.Getenv("VECTRAGUARD_ALLOW_NET") == "" {
+		logger.Error("external http(s) blocked in guarded execution", map[string]any{
+			"command": cmdString,
+		})
+		recordCommandAttempt(tracker, session.Command{
+			Timestamp: time.Now(),
+			Command:   cmdName,
+			Args:      args,
+			ExitCode:  3,
+			Duration:  0,
+			RiskLevel: trackingRiskLevel,
+			Approved:  false,
+			Findings:  trackingFindingCodes,
+			Metadata: map[string]interface{}{
+				"blocked":      true,
+				"block_reason": "external_http_blocked",
+			},
+		})
+		return &exitError{
+			message: "external http(s) endpoints are blocked when using vg/vectra-guard. Set VECTRAGUARD_ALLOW_NET=1 or run directly to override.",
+			code:    3,
+		}
+	}
+
+	// Check guard level AFTER critical command check
+	// Only non-critical commands can bypass when guard level is OFF
+	if cfg.GuardLevel.Level == config.GuardLevelOff {
+		logger.Info("guard level is OFF - executing without protection", map[string]any{
+			"command": cmdString,
+		})
+		start := time.Now()
+		exitCode, err := executeCommandDirectly(cmdArgs)
+		duration := time.Since(start)
+		recordCommandAttempt(tracker, session.Command{
+			Timestamp: start,
+			Command:   cmdName,
+			Args:      args,
+			ExitCode:  exitCode,
+			Duration:  duration,
+			RiskLevel: trackingRiskLevel,
+			Approved:  true,
+			Findings:  trackingFindingCodes,
+			Metadata: map[string]interface{}{
+				"guard_level": "off",
+				"execution":   "direct",
+			},
+		})
+		return err
+	}
+
+	// Block sudo when using vg/vectra-guard unless explicitly allowed
+	if cmdName == "sudo" {
+		if os.Getenv("VECTRAGUARD_ALLOW_SUDO") == "" {
+			logger.Error("sudo blocked in guarded execution", map[string]any{
+				"command": cmdString,
+			})
+			recordCommandAttempt(tracker, session.Command{
+				Timestamp: time.Now(),
+				Command:   cmdName,
+				Args:      args,
+				ExitCode:  3,
+				Duration:  0,
+				RiskLevel: trackingRiskLevel,
+				Approved:  false,
+				Findings:  trackingFindingCodes,
+				Metadata: map[string]interface{}{
+					"blocked":      true,
+					"block_reason": "sudo_blocked",
+				},
+			})
+			return &exitError{
+				message: "sudo is blocked when using vg/vectra-guard. Run sudo directly or set VECTRAGUARD_ALLOW_SUDO=1 to override.",
+				code:    3,
 			}
 		}
 	}
@@ -213,6 +385,21 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			// Even if sandbox is disabled, we MUST enforce it for critical commands
 			// This is a safety override that cannot be bypassed
 			if !cfg.Sandbox.Enabled {
+				recordCommandAttempt(tracker, session.Command{
+					Timestamp: time.Now(),
+					Command:   cmdName,
+					Args:      args,
+					ExitCode:  3,
+					Duration:  0,
+					RiskLevel: trackingRiskLevel,
+					Approved:  false,
+					Findings:  trackingFindingCodes,
+					Metadata: map[string]interface{}{
+						"blocked":      true,
+						"block_reason": "sandbox_required",
+						"guard_level":  cfg.GuardLevel.Level,
+					},
+				})
 				return &exitError{
 					message: fmt.Sprintf("CRITICAL: Command '%s' requires sandboxing but sandbox is disabled. Enable sandbox in config to proceed.", cmdString),
 					code:    3,
@@ -276,7 +463,25 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				"bypass":  "user authenticated",
 			})
 			// Execute without protection (only for non-critical commands)
-			return executeCommandDirectly(cmdArgs)
+			start := time.Now()
+			exitCode, err := executeCommandDirectly(cmdArgs)
+			duration := time.Since(start)
+			recordCommandAttempt(tracker, session.Command{
+				Timestamp: start,
+				Command:   cmdName,
+				Args:      args,
+				ExitCode:  exitCode,
+				Duration:  duration,
+				RiskLevel: trackingRiskLevel,
+				Approved:  true,
+				Findings:  trackingFindingCodes,
+				Metadata: map[string]interface{}{
+					"bypass":     true,
+					"execution":  "direct",
+					"guard_level": cfg.GuardLevel.Level,
+				},
+			})
+			return err
 		}
 	}
 	
@@ -289,6 +494,21 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		
 		// For critical commands, we cannot fallback to direct execution
 		if riskLevel == "critical" {
+			recordCommandAttempt(tracker, session.Command{
+				Timestamp: time.Now(),
+				Command:   cmdName,
+				Args:      args,
+				ExitCode:  3,
+				Duration:  0,
+				RiskLevel: trackingRiskLevel,
+				Approved:  false,
+				Findings:  trackingFindingCodes,
+				Metadata: map[string]interface{}{
+					"blocked":      true,
+					"block_reason": "sandbox_init_failed",
+					"guard_level":  cfg.GuardLevel.Level,
+				},
+			})
 			return &exitError{
 				message: fmt.Sprintf("CRITICAL: Cannot execute critical command without sandbox. Sandbox initialization failed: %v", err),
 				code:    3,
@@ -296,7 +516,24 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 		
 		// Fallback to direct execution only for non-critical commands
-		return executeCommandDirectly(cmdArgs)
+		start := time.Now()
+		exitCode, execErr := executeCommandDirectly(cmdArgs)
+		duration := time.Since(start)
+		recordCommandAttempt(tracker, session.Command{
+			Timestamp: start,
+			Command:   cmdName,
+			Args:      args,
+			ExitCode:  exitCode,
+			Duration:  duration,
+			RiskLevel: trackingRiskLevel,
+			Approved:  true,
+			Findings:  trackingFindingCodes,
+			Metadata: map[string]interface{}{
+				"execution":          "direct",
+				"sandbox_init_failed": true,
+			},
+		})
+		return execErr
 	}
 	
 	// Decide execution mode (host vs sandbox)
@@ -325,31 +562,19 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 	}
 
-	// Track in session if available
-	if sessionID != "" || session.GetCurrentSession() != "" {
-		if sessionID == "" {
-			sessionID = session.GetCurrentSession()
-		}
-		
-		workspace, _ := os.Getwd()
-		mgr, err := session.NewManager(workspace, logger)
-		if err == nil {
-			sess, err := mgr.Load(sessionID)
-			if err == nil {
-				cmdRecord := session.Command{
-					Timestamp: start,
-					Command:   cmdName,
-					Args:      args,
-					ExitCode:  exitCode,
-					Duration:  duration,
-					RiskLevel: riskLevel,
-					Approved:  interactive || riskLevel == "low",
-					Findings:  findingCodes,
-				}
-				_ = mgr.AddCommand(sess, cmdRecord)
-			}
-		}
-	}
+	recordCommandAttempt(tracker, session.Command{
+		Timestamp: start,
+		Command:   cmdName,
+		Args:      args,
+		ExitCode:  exitCode,
+		Duration:  duration,
+		RiskLevel: trackingRiskLevel,
+		Approved:  interactive || riskLevel == "low",
+		Findings:  trackingFindingCodes,
+		Metadata: map[string]interface{}{
+			"execution": decision.Mode,
+		},
+	})
 
 	logger.Info("command executed", map[string]any{
 		"command":   cmdString,
@@ -535,10 +760,218 @@ func displayExecutionNotice(decision sandbox.ExecutionDecision, riskLevel string
 	fmt.Fprintln(os.Stderr, notice)
 }
 
+type sessionTracker struct {
+	id   string
+	mgr  *session.Manager
+	sess *session.Session
+}
+
+func initSessionTracker(sessionID string, logger *logging.Logger) *sessionTracker {
+	if sessionID == "" {
+		workspace, err := os.Getwd()
+		if err != nil {
+			return nil
+		}
+		sessionID = session.GetCurrentSessionForWorkspace(workspace)
+	}
+	if sessionID == "" {
+		return nil
+	}
+
+	workspace, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+
+	mgr, err := session.NewManager(workspace, logger)
+	if err != nil {
+		return nil
+	}
+
+	sess, err := mgr.Load(sessionID)
+	if err != nil {
+		return nil
+	}
+
+	return &sessionTracker{
+		id:   sessionID,
+		mgr:  mgr,
+		sess: sess,
+	}
+}
+
+func recordCommandAttempt(tracker *sessionTracker, cmd session.Command) {
+	if tracker == nil {
+		return
+	}
+	_ = tracker.mgr.AddCommand(tracker.sess, cmd)
+}
+
+func summarizeFindings(findings []analyzer.Finding) (string, []string) {
+	riskLevel := "low"
+	var codes []string
+	for _, f := range findings {
+		codes = append(codes, f.Code)
+		switch f.Severity {
+		case "critical":
+			riskLevel = "critical"
+		case "high":
+			if riskLevel != "critical" {
+				riskLevel = "high"
+			}
+		case "medium":
+			if riskLevel != "critical" && riskLevel != "high" {
+				riskLevel = "medium"
+			}
+		}
+	}
+	return riskLevel, codes
+}
+
+type repeatDecision struct {
+	block  bool
+	warn   bool
+	count  int
+	limit  int
+	window time.Duration
+	key    string
+}
+
+func evaluateRepeatProtection(sess *session.Session, cmdName string, args []string, riskLevel string, findingCodes []string) repeatDecision {
+	const (
+		repeatWindow    = 30 * time.Second
+		repeatMaxHigh   = 3
+		repeatMaxMedium = 5
+	)
+
+	if sess == nil {
+		return repeatDecision{}
+	}
+
+	sensitive := isRepeatSensitiveCommand(cmdName) || hasSensitiveFinding(findingCodes)
+	threshold := 0
+	switch riskLevel {
+	case "critical", "high":
+		threshold = repeatMaxHigh
+	case "medium":
+		threshold = repeatMaxMedium
+	default:
+		if sensitive {
+			threshold = repeatMaxMedium
+		}
+	}
+
+	if threshold == 0 {
+		return repeatDecision{}
+	}
+
+	now := time.Now()
+	key := normalizeCommand(cmdName, args)
+	if sensitive {
+		key = cmdName
+	}
+
+	count := 0
+	for _, cmd := range sess.Commands {
+		if now.Sub(cmd.Timestamp) > repeatWindow {
+			continue
+		}
+		if sensitive {
+			if cmd.Command == cmdName {
+				count++
+			}
+			continue
+		}
+		if normalizeCommand(cmd.Command, cmd.Args) == key {
+			count++
+		}
+	}
+
+	if count+1 > threshold {
+		return repeatDecision{
+			block:  true,
+			count:  count + 1,
+			limit:  threshold,
+			window: repeatWindow,
+			key:    key,
+		}
+	}
+
+	warn := count+1 == threshold
+	return repeatDecision{
+		block:  false,
+		warn:   warn,
+		count:  count + 1,
+		limit:  threshold,
+		window: repeatWindow,
+		key:    key,
+	}
+}
+
+func isRepeatSensitiveCommand(cmdName string) bool {
+	switch cmdName {
+	case "rm", "mv", "cp", "chmod", "chown", "dd", "mkfs":
+		return true
+	default:
+		return false
+	}
+}
+
+func hasSensitiveFinding(codes []string) bool {
+	sensitiveCodes := map[string]struct{}{
+		"DANGEROUS_DELETE_ROOT":     {},
+		"DANGEROUS_DELETE_HOME":     {},
+		"PROTECTED_DIRECTORY_ACCESS": {},
+		"FORK_BOMB":                 {},
+		"SENSITIVE_ENV_ACCESS":      {},
+		"DOTENV_FILE_READ":          {},
+		"PRIVATE_KEY_ACCESS":        {},
+	}
+	for _, code := range codes {
+		if _, ok := sensitiveCodes[code]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func normalizeCommand(cmdName string, args []string) string {
+	parts := append([]string{cmdName}, args...)
+	return strings.Join(parts, " ")
+}
+
+var urlPattern = regexp.MustCompile(`https?://[^\s'"]+`)
+
+func hasExternalHTTP(cmdString string) bool {
+	matches := urlPattern.FindAllString(cmdString, -1)
+	for _, raw := range matches {
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			continue
+		}
+		host := parsed.Hostname()
+		if host == "" {
+			continue
+		}
+		if isLocalHost(host) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func isLocalHost(host string) bool {
+	if host == "localhost" || host == "::1" || host == "127.0.0.1" {
+		return true
+	}
+	return strings.HasPrefix(host, "127.")
+}
+
 // executeCommandDirectly executes a command without protection
-func executeCommandDirectly(cmdArgs []string) error {
+func executeCommandDirectly(cmdArgs []string) (int, error) {
 	if len(cmdArgs) == 0 {
-		return fmt.Errorf("no command specified")
+		return 1, fmt.Errorf("no command specified")
 	}
 	
 	cmdName := cmdArgs[0]
@@ -552,14 +985,14 @@ func executeCommandDirectly(cmdArgs []string) error {
 	err := cmd.Run()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
-			return &exitError{
+			return exitErr.ExitCode(), &exitError{
 				message: fmt.Sprintf("command exited with code %d", exitErr.ExitCode()),
 				code:    exitErr.ExitCode(),
 			}
 		}
-		return fmt.Errorf("execute command: %w", err)
+		return 1, fmt.Errorf("execute command: %w", err)
 	}
 	
-	return nil
+	return 0, nil
 }
 

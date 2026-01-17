@@ -668,6 +668,17 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				Recommendation: "BLOCK this operation. Provide sanitized config instead of exposing raw .env files.",
 			})
 		}
+
+		// Private key access detection (PEM/SSH keys)
+		if isPrivateKeyAccess(lower) {
+			findings = append(findings, Finding{
+				Severity:       "critical",
+				Code:           "PRIVATE_KEY_ACCESS",
+				Description:    "Attempt to access private key material",
+				Line:           lineNum,
+				Recommendation: "BLOCK this operation. Use secure secret storage and avoid exposing private keys.",
+			})
+		}
 	}
 
 	// Incorporate file extension heuristics if script extension implies something unexpected.
@@ -733,6 +744,63 @@ func containsAnyWord(line string, words []string) bool {
 			}
 		}
 	}
+	return false
+}
+
+func isPrivateKeyAccess(line string) bool {
+	if line == "" {
+		return false
+	}
+
+	accessVerbs := []string{
+		"cat", "less", "head", "tail", "grep", "awk", "sed",
+		"cp", "mv", "rsync", "scp", "sftp", "tar", "zip",
+		"openssl", "ssh-keygen", "ssh-add",
+	}
+	hasAccessVerb := false
+	for _, verb := range accessVerbs {
+		if strings.Contains(line, verb) {
+			hasAccessVerb = true
+			break
+		}
+	}
+	if !hasAccessVerb {
+		return false
+	}
+
+	privateKeyTokens := []string{
+		"id_rsa", "id_ed25519", "id_ecdsa", "id_dsa",
+		"ssh_host_rsa_key", "ssh_host_ed25519_key", "ssh_host_ecdsa_key",
+		"private_key", "id_rsa.pem", "id_ed25519.pem",
+	}
+	for _, token := range privateKeyTokens {
+		if strings.Contains(line, token) {
+			return true
+		}
+	}
+
+	if strings.Contains(line, "openssl") && strings.Contains(line, ".pem") {
+		return true
+	}
+
+	if strings.Contains(line, ".pem") {
+		if strings.Contains(line, "key") || strings.Contains(line, "private") || strings.Contains(line, "ssh") {
+			return true
+		}
+	}
+
+	if strings.Contains(line, ".key") {
+		if strings.Contains(line, "private") || strings.Contains(line, "ssh") {
+			return true
+		}
+	}
+
+	if strings.Contains(line, "begin rsa private key") ||
+		strings.Contains(line, "begin openssh private key") ||
+		strings.Contains(line, "begin private key") {
+		return true
+	}
+
 	return false
 }
 

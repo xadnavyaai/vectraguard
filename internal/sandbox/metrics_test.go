@@ -324,6 +324,31 @@ func TestMetricsCollector(t *testing.T) {
 			t.Error("Metrics should persist across collector instances")
 		}
 	})
+
+	t.Run("DisabledCollectorNoop", func(t *testing.T) {
+		collector, err := NewMetricsCollector(filepath.Join(tmpDir, "metrics-disabled.json"), false)
+		if err != nil {
+			t.Fatalf("NewMetricsCollector() error = %v", err)
+		}
+
+		record := ExecutionRecord{
+			Timestamp: time.Now(),
+			Command:   "echo test",
+			Mode:      ExecutionModeHost,
+			Duration:  100 * time.Millisecond,
+			RiskLevel: "low",
+			ExitCode:  0,
+		}
+
+		if err := collector.Record(record); err != nil {
+			t.Fatalf("Record() error = %v", err)
+		}
+
+		metrics := collector.GetMetrics()
+		if metrics.TotalExecutions != 0 {
+			t.Fatalf("expected no metrics when disabled, got %d", metrics.TotalExecutions)
+		}
+	})
 }
 
 func TestPercentage(t *testing.T) {

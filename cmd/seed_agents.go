@@ -4,13 +4,29 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"sort"
+	"strings"
 
 	"github.com/vectra-guard/vectra-guard/internal/seed"
 )
 
-func runSeedAgents(ctx context.Context, target string, force bool) error {
+func runSeedAgents(ctx context.Context, target string, force bool, targets []string, listOnly bool) error {
 	if target == "" {
 		target = "."
+	}
+
+	if listOnly {
+		available := seed.AvailableTargets()
+		keys := make([]string, 0, len(available))
+		for key := range available {
+			keys = append(keys, key)
+		}
+		sort.Strings(keys)
+		fmt.Println("Available targets:")
+		for _, key := range keys {
+			fmt.Printf("- %s\n", key)
+		}
+		return nil
 	}
 
 	info, err := os.Stat(target)
@@ -22,7 +38,7 @@ func runSeedAgents(ctx context.Context, target string, force bool) error {
 	}
 
 	fmt.Printf("🧭 Seeding agent instructions into: %s\n", target)
-	results, err := seed.WriteAgentInstructions(target, force)
+	results, err := seed.WriteAgentInstructions(target, force, targets)
 	if err != nil {
 		return err
 	}
@@ -40,4 +56,21 @@ func runSeedAgents(ctx context.Context, target string, force bool) error {
 
 	fmt.Println("Done.")
 	return nil
+}
+
+func parseSeedTargets(raw string) []string {
+	if raw == "" {
+		return nil
+	}
+	parts := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == ' '
+	})
+	var out []string
+	for _, part := range parts {
+		trimmed := strings.TrimSpace(part)
+		if trimmed != "" {
+			out = append(out, strings.ToLower(trimmed))
+		}
+	}
+	return out
 }

@@ -2,9 +2,11 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
+	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
 func TestFilterFindingsByGuardLevel(t *testing.T) {
@@ -505,5 +507,133 @@ func TestSecurityImprovementsRegression(t *testing.T) {
 		if !found {
 			t.Errorf("REGRESSION: Variation '%s' is NOT detected!", variant)
 		}
+	}
+}
+
+func TestSummarizeFindings(t *testing.T) {
+	findings := []analyzer.Finding{
+		{Severity: "medium", Code: "MEDIUM_RISK"},
+		{Severity: "high", Code: "HIGH_RISK"},
+		{Severity: "critical", Code: "CRITICAL_RISK"},
+	}
+
+	risk, codes := summarizeFindings(findings)
+	if risk != "critical" {
+		t.Fatalf("expected risk critical, got %s", risk)
+	}
+	if len(codes) != 3 {
+		t.Fatalf("expected 3 codes, got %d", len(codes))
+	}
+}
+
+func TestEvaluateRepeatProtectionBlocksHighRisk(t *testing.T) {
+	now := time.Now()
+	sess := &session.Session{
+		Commands: []session.Command{
+			{Timestamp: now.Add(-10 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-8 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-5 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+		},
+	}
+
+	decision := evaluateRepeatProtection(sess, "rm", []string{"-rf", "/tmp/a"}, "high", nil)
+	if !decision.block {
+		t.Fatal("expected repeat protection to block high-risk repetition")
+	}
+	if decision.count < 4 {
+		t.Fatalf("expected count >= 4, got %d", decision.count)
+	}
+}
+
+func TestEvaluateRepeatProtectionAllowsBelowThreshold(t *testing.T) {
+	now := time.Now()
+	sess := &session.Session{
+		Commands: []session.Command{
+			{Timestamp: now.Add(-20 * time.Second), Command: "echo", Args: []string{"hello"}},
+		},
+	}
+
+	decision := evaluateRepeatProtection(sess, "echo", []string{"hello"}, "medium", nil)
+	if decision.block {
+		t.Fatal("expected repeat protection to allow below threshold")
+	}
+}
+
+func TestEvaluateRepeatProtectionWarnsAtThreshold(t *testing.T) {
+	now := time.Now()
+	sess := &session.Session{
+		Commands: []session.Command{
+			{Timestamp: now.Add(-12 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-10 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+		},
+	}
+
+	decision := evaluateRepeatProtection(sess, "rm", []string{"-rf", "/tmp/a"}, "high", nil)
+	if decision.block {
+		t.Fatal("expected repeat protection to warn, not block at threshold")
+	}
+	if !decision.warn {
+		t.Fatal("expected repeat protection to warn at threshold")
+	}
+}
+
+func TestEvaluateRepeatProtectionSensitiveLowRisk(t *testing.T) {
+	now := time.Now()
+	sess := &session.Session{
+		Commands: []session.Command{
+			{Timestamp: now.Add(-15 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-12 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-10 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-8 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-5 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+		},
+	}
+
+	decision := evaluateRepeatProtection(sess, "rm", []string{"-rf", "/tmp/a"}, "low", nil)
+	if !decision.block {
+		t.Fatal("expected repeat protection to block sensitive low-risk repetition")
+	}
+}
+
+func TestHasExternalHTTP(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmd      string
+		expected bool
+	}{
+		{"local http", "curl http://127.0.0.1:8080/health", false},
+		{"local https", "curl https://localhost/api", false},
+		{"external http", "curl http://example.com", true},
+		{"external https", "wget https://api.example.com/v1", true},
+		{"no url", "echo hello", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hasExternalHTTP(tt.cmd); got != tt.expected {
+				t.Fatalf("expected %v, got %v", tt.expected, got)
+			}
+		})
+	}
+}
+
+func TestRepeatHelpers(t *testing.T) {
+	if !isRepeatSensitiveCommand("rm") {
+		t.Fatal("expected rm to be repeat-sensitive")
+	}
+	if isRepeatSensitiveCommand("echo") {
+		t.Fatal("did not expect echo to be repeat-sensitive")
+	}
+	if !hasSensitiveFinding([]string{"DANGEROUS_DELETE_ROOT"}) {
+		t.Fatal("expected sensitive finding to be detected")
+	}
+	if !hasSensitiveFinding([]string{"PRIVATE_KEY_ACCESS"}) {
+		t.Fatal("expected private key access to be sensitive")
+	}
+	if hasSensitiveFinding([]string{"LOW_RISK"}) {
+		t.Fatal("did not expect low risk finding to be sensitive")
+	}
+	if normalizeCommand("git", []string{"status"}) != "git status" {
+		t.Fatal("unexpected normalized command output")
 	}
 }

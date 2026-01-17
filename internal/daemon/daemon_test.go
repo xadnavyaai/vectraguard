@@ -16,6 +16,7 @@ func TestCommandApprovalDeniesDenylist(t *testing.T) {
 	if err := os.Setenv("HOME", home); err != nil {
 		t.Fatalf("set HOME: %v", err)
 	}
+	t.Setenv("VECTRAGUARD_BYPASS", "")
 
 	logger := logging.NewLogger("text", io.Discard)
 	cfg := config.DefaultConfig()
@@ -63,6 +64,7 @@ func TestCommandApprovalRespectsGuardLevelOff(t *testing.T) {
 	if err := os.Setenv("HOME", home); err != nil {
 		t.Fatalf("set HOME: %v", err)
 	}
+	t.Setenv("VECTRAGUARD_BYPASS", "")
 
 	logger := logging.NewLogger("text", io.Discard)
 	cfg := config.DefaultConfig()
@@ -95,6 +97,7 @@ func TestCommandApprovalAllowsAllowlist(t *testing.T) {
 	if err := os.Setenv("HOME", home); err != nil {
 		t.Fatalf("set HOME: %v", err)
 	}
+	t.Setenv("VECTRAGUARD_BYPASS", "")
 
 	logger := logging.NewLogger("text", io.Discard)
 	cfg := config.DefaultConfig()
