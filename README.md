@@ -52,6 +52,42 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/script
 vectra-guard seed agents --target . --targets "agents,cursor"
 ```
 
+### Agentic Workflow Examples
+
+**1) Safe install workflow**
+
+```bash
+# Start a session for traceability
+SESSION=$(vectra-guard session start --agent "agent-install")
+export VECTRAGUARD_SESSION_ID=$SESSION
+
+# Use guarded execution for installs
+vectra-guard exec -- npm install
+
+# Review what ran
+vectra-guard audit session
+```
+
+**2) Risk review before deployment**
+
+```bash
+# Validate scripts before running them
+vectra-guard validate scripts/deploy.sh
+
+# Explain why a script is risky
+vectra-guard explain scripts/deploy.sh
+```
+
+**3) Non-invasive tracking in normal shells**
+
+```bash
+# Log all shell commands (no blocking)
+./scripts/install-shell-tracker.sh
+
+# Use vg/vectra-guard only when you want enforcement
+vg exec -- make build
+```
+
 ### Use It (5 commands)
 
 ```bash

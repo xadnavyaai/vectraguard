@@ -61,6 +61,31 @@ export VECTRAGUARD_SESSION_ID=$SESSION
 vectra-guard seed agents --target . --targets "agents,cursor"
 ```
 
+### Agentic Workflow Examples
+
+**A) Install safely with traceability**
+
+```bash
+SESSION=$(vectra-guard session start --agent "agent-install")
+export VECTRAGUARD_SESSION_ID=$SESSION
+vectra-guard exec -- npm install
+vectra-guard audit session
+```
+
+**B) Review a risky script before running**
+
+```bash
+vectra-guard validate scripts/deploy.sh
+vectra-guard explain scripts/deploy.sh
+```
+
+**C) Track everything, enforce only when needed**
+
+```bash
+./scripts/install-shell-tracker.sh
+vg exec -- make build
+```
+
 ### Step 3: Run a Protected Command
 
 ```bash
