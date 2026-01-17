@@ -30,6 +30,8 @@ After following this guide:
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
+The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin` is on `PATH`.
+
 **Prereqs:** `curl` or `wget` must be installed.
 
 For alternative installation methods (Go install, build from source), see the **Installation Options** section in `README.md`.
@@ -523,7 +525,7 @@ Now scripts are checked automatically on every commit!
 **Check**:
 ```bash
 which vectra-guard
-# Should show: /usr/local/bin/vectra-guard
+# Should show: /Users/<you>/.local/bin/vectra-guard
 ```
 
 **Fix**:

@@ -34,6 +34,8 @@ AI agents and automation run with your full shell access. One mistaken command c
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
 ```
 
+The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin` is on `PATH`.
+
 **Prereqs:** `curl` or `wget` (installer downloads the latest release binary).
 
 ### Agentic Usage (Cursor/IDE)
@@ -71,7 +73,7 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 ```
 
 - **Platform**: macOS & Debian Linux (x86_64, arm64)  
-- **What it does**: downloads latest release → installs to `/usr/local/bin` → makes `vectra-guard` available
+- **What it does**: downloads latest release → installs to `~/.local/bin` → makes `vectra-guard` available
 - **Prereqs**: `curl` or `wget` is required
 
 ### One-command full setup (deps + tool)
@@ -100,7 +102,7 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
 
 # Manual uninstall
-sudo rm /usr/local/bin/vectra-guard
+rm -f ~/.local/bin/vectra-guard
 rm -rf ~/.vectra-guard  # Optional: removes all data
 ```
 

@@ -82,6 +82,7 @@ case "$ARCH" in
 esac
 
 echo "📋 System: $OS $ARCH"
+echo "📦 Install dir: $INSTALL_DIR"
 echo ""
 
 # Download pre-built release binary
@@ -162,6 +163,13 @@ if [ ! -w "$INSTALL_DIR" ]; then
     echo "❌ Install directory is not writable: $INSTALL_DIR"
     echo "   Set INSTALL_DIR to a writable path (e.g., $HOME/.local/bin) and re-run."
     exit 1
+fi
+if [[ "$INSTALL_DIR" == "/usr/local/bin" || "$INSTALL_DIR" == "/usr/bin" || "$INSTALL_DIR" == "/bin" ]]; then
+    if [ -z "${VECTRAGUARD_ALLOW_SYSTEM_INSTALL:-}" ]; then
+        echo "❌ System-wide installs are disabled by default."
+        echo "   Use INSTALL_DIR=\"$HOME/.local/bin\" or set VECTRAGUARD_ALLOW_SYSTEM_INSTALL=1 to override."
+        exit 1
+    fi
 fi
 mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
 
