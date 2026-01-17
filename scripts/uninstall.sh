@@ -23,17 +23,21 @@ echo ""
 
 # Confirm uninstall
 # Use /dev/tty to read from terminal even when piped through curl | bash
-if [ ! -t 0 ]; then
-    # Check if we have access to /dev/tty (real terminal)
-    if [ ! -c /dev/tty ]; then
-        echo "⚠️  Running in non-interactive environment"
-        echo "   Uninstall cancelled (requires interactive terminal)"
-        exit 0
-    fi
-    # Read directly from /dev/tty when piped
-    read -p "Remove Vectra Guard? [y/N] " -n 1 -r < /dev/tty
+if [ -n "${VECTRAGUARD_UNINSTALL_AUTO:-}" ]; then
+    REPLY="y"
 else
-    read -p "Remove Vectra Guard? [y/N] " -n 1 -r
+    if [ ! -t 0 ]; then
+        # Check if we have access to /dev/tty (real terminal)
+        if [ ! -c /dev/tty ]; then
+            echo "⚠️  Running in non-interactive environment"
+            echo "   Uninstall cancelled (requires interactive terminal)"
+            exit 0
+        fi
+        # Read directly from /dev/tty when piped
+        read -p "Remove Vectra Guard? [y/N] " -n 1 -r < /dev/tty
+    else
+        read -p "Remove Vectra Guard? [y/N] " -n 1 -r
+    fi
 fi
 echo
 
@@ -151,10 +155,18 @@ fi
 # 4. Remove configs and data
 echo ""
 echo "4/6: Configuration and data cleanup..."
-if [ -c /dev/tty ]; then
-    read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r < /dev/tty
+if [ -n "${VECTRAGUARD_UNINSTALL_AUTO:-}" ]; then
+    if [ -n "${VECTRAGUARD_UNINSTALL_PURGE:-}" ]; then
+        REPLY="y"
+    else
+        REPLY="n"
+    fi
 else
-    read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r
+    if [ -c /dev/tty ]; then
+        read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r < /dev/tty
+    else
+        read -p "Remove all Vectra Guard configs/data (~/.config/vectra-guard, ~/.vectra-guard, ~/.vectra-guard-session, ~/vectra-guard.yaml)? [Y/n] " -n 1 -r
+    fi
 fi
 echo
 if [[ ! $REPLY =~ ^[Nn]$ ]]; then
@@ -185,10 +197,18 @@ if [[ ! $REPLY =~ ^[Nn]$ ]]; then
     DATA_REMOVED=true
 else
     echo "  ℹ️  Kept configs/data (remove manually if desired)."
-    if [ -c /dev/tty ]; then
-        read -p "Remove cache/metrics only (~/.vectra-guard/cache, ~/.vectra-guard/metrics.json, ~/.vectra-guard/sessions)? [y/N] " -n 1 -r < /dev/tty
+    if [ -n "${VECTRAGUARD_UNINSTALL_AUTO:-}" ]; then
+        if [ -n "${VECTRAGUARD_UNINSTALL_CACHE_ONLY:-}" ]; then
+            REPLY="y"
+        else
+            REPLY="n"
+        fi
     else
-        read -p "Remove cache/metrics only (~/.vectra-guard/cache, ~/.vectra-guard/metrics.json, ~/.vectra-guard/sessions)? [y/N] " -n 1 -r
+        if [ -c /dev/tty ]; then
+            read -p "Remove cache/metrics only (~/.vectra-guard/cache, ~/.vectra-guard/metrics.json, ~/.vectra-guard/sessions)? [y/N] " -n 1 -r < /dev/tty
+        else
+            read -p "Remove cache/metrics only (~/.vectra-guard/cache, ~/.vectra-guard/metrics.json, ~/.vectra-guard/sessions)? [y/N] " -n 1 -r
+        fi
     fi
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
