@@ -15,6 +15,11 @@ Use these guidelines for agentic coding tools and IDE assistants.
   - `vectra-guard init --local`
 - Default config file: `vectra-guard.yaml` (or `.vectra-guard/config.yaml` for local mode).
 
+## Security Practices (Lightweight)
+- Prefer user-space installs and avoid `sudo`.
+- Avoid `curl | bash`; download and review scripts first.
+- Keep secrets out of logs, command history, and outputs.
+
 ## Sandboxing
 - Default behavior is safe-by-default; sandbox can be set to `auto` or `always`.
 - Use cache-optimized sandboxing for builds:

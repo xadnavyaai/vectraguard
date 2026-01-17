@@ -6,7 +6,7 @@ set -e
 
 REPO="xadnavyaai/vectra-guard"
 # Allow overriding install dir for testing (e.g., INSTALL_DIR=/tmp/vg-install)
-INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
 BINARY_NAME="vectra-guard"
 
 echo "🛡️  Vectra Guard Installer"
@@ -95,9 +95,7 @@ CHECKSUM_URL="https://github.com/${REPO}/releases/latest/download/checksums.txt"
 # Ensure a download tool exists
 if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
     echo "❌ Neither curl nor wget is installed."
-    echo "   Please install one of them and re-run:"
-    echo "   - macOS: brew install curl"
-    echo "   - Debian/Ubuntu: sudo apt-get install -y curl"
+    echo "   Please install one of them and re-run (no sudo recommended)."
     exit 1
 fi
 
@@ -159,12 +157,13 @@ chmod +x "$TEMP_FILE"
 
 # Install
 echo "📝 Installing to $INSTALL_DIR..."
-if [ -w "$INSTALL_DIR" ]; then
-    mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
-else
-    echo "   (requires sudo)"
-    sudo mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
+mkdir -p "$INSTALL_DIR"
+if [ ! -w "$INSTALL_DIR" ]; then
+    echo "❌ Install directory is not writable: $INSTALL_DIR"
+    echo "   Set INSTALL_DIR to a writable path (e.g., $HOME/.local/bin) and re-run."
+    exit 1
 fi
+mv "$TEMP_FILE" "$INSTALL_DIR/$BINARY_NAME"
 
 # Verify installation
 if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then

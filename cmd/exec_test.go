@@ -559,6 +559,24 @@ func TestEvaluateRepeatProtectionAllowsBelowThreshold(t *testing.T) {
 	}
 }
 
+func TestEvaluateRepeatProtectionWarnsAtThreshold(t *testing.T) {
+	now := time.Now()
+	sess := &session.Session{
+		Commands: []session.Command{
+			{Timestamp: now.Add(-12 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+			{Timestamp: now.Add(-10 * time.Second), Command: "rm", Args: []string{"-rf", "/tmp/a"}},
+		},
+	}
+
+	decision := evaluateRepeatProtection(sess, "rm", []string{"-rf", "/tmp/a"}, "high", nil)
+	if decision.block {
+		t.Fatal("expected repeat protection to warn, not block at threshold")
+	}
+	if !decision.warn {
+		t.Fatal("expected repeat protection to warn at threshold")
+	}
+}
+
 func TestEvaluateRepeatProtectionSensitiveLowRisk(t *testing.T) {
 	now := time.Now()
 	sess := &session.Session{
@@ -608,6 +626,9 @@ func TestRepeatHelpers(t *testing.T) {
 	}
 	if !hasSensitiveFinding([]string{"DANGEROUS_DELETE_ROOT"}) {
 		t.Fatal("expected sensitive finding to be detected")
+	}
+	if !hasSensitiveFinding([]string{"PRIVATE_KEY_ACCESS"}) {
+		t.Fatal("expected private key access to be sensitive")
 	}
 	if hasSensitiveFinding([]string{"LOW_RISK"}) {
 		t.Fatal("did not expect low risk finding to be sensitive")

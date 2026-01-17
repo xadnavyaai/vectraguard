@@ -251,6 +251,20 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				code:    3,
 			}
 		}
+		if repeatDecision.warn {
+			logger.Warn("repeated action warning", map[string]any{
+				"command":     cmdString,
+				"risk_level":  trackingRiskLevel,
+				"repeat_key":  repeatDecision.key,
+				"repeat_count": repeatDecision.count,
+				"repeat_window_seconds": int(repeatDecision.window.Seconds()),
+			})
+			fmt.Fprintf(os.Stderr, "Warning: repeated action detected (%d/%d in %s). Slow down to avoid a block.\n",
+				repeatDecision.count,
+				repeatDecision.limit,
+				repeatDecision.window.String(),
+			)
+		}
 	}
 
 	// Block external HTTP(S) endpoints when using vg/vectra-guard
@@ -816,7 +830,9 @@ func summarizeFindings(findings []analyzer.Finding) (string, []string) {
 
 type repeatDecision struct {
 	block  bool
+	warn   bool
 	count  int
+	limit  int
 	window time.Duration
 	key    string
 }
@@ -875,14 +891,18 @@ func evaluateRepeatProtection(sess *session.Session, cmdName string, args []stri
 		return repeatDecision{
 			block:  true,
 			count:  count + 1,
+			limit:  threshold,
 			window: repeatWindow,
 			key:    key,
 		}
 	}
 
+	warn := count+1 == threshold
 	return repeatDecision{
 		block:  false,
+		warn:   warn,
 		count:  count + 1,
+		limit:  threshold,
 		window: repeatWindow,
 		key:    key,
 	}
@@ -905,6 +925,7 @@ func hasSensitiveFinding(codes []string) bool {
 		"FORK_BOMB":                 {},
 		"SENSITIVE_ENV_ACCESS":      {},
 		"DOTENV_FILE_READ":          {},
+		"PRIVATE_KEY_ACCESS":        {},
 	}
 	for _, code := range codes {
 		if _, ok := sensitiveCodes[code]; ok {

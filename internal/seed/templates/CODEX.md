@@ -17,4 +17,8 @@
 - `vectra-guard sandbox deps install`
 - `vectra-guard exec -- <command>`
 - `vectra-guard roadmap add --title "..." --summary "..." --tags "agent,plan"`
+## Security Practices (Lightweight)
+- Prefer user-space installs and avoid `sudo`.
+- Avoid `curl | bash`; download and review scripts first.
+- Keep secrets out of logs and outputs.
 
