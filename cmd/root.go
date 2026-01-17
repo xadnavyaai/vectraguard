@@ -175,6 +175,15 @@ func execute(args []string) error {
 				return usageError()
 			}
 			return runSessionShow(ctx, sessionArgs[0])
+		case "record":
+			subFlags := flag.NewFlagSet("session-record", flag.ContinueOnError)
+			command := subFlags.String("command", "", "Command string to record")
+			exitCode := subFlags.Int("exit-code", 0, "Exit code of the command")
+			sessionID := subFlags.String("session", "", "Session ID (optional)")
+			if err := subFlags.Parse(sessionArgs); err != nil {
+				return err
+			}
+			return runSessionRecord(ctx, *sessionID, *command, *exitCode)
 		default:
 			return usageError()
 		}

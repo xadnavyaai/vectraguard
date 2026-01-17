@@ -34,7 +34,7 @@ class VectraGuard < Formula
     ohai "  vectra-guard init                # Initialize configuration"
     ohai ""
     ohai "Install universal protection (recommended):"
-    ohai "  #{prefix}/scripts/install-universal-shell-protection.sh"
+    ohai "  #{prefix}/scripts/install-shell-tracker.sh"
     ohai ""
     ohai "Documentation: #{doc}"
   end

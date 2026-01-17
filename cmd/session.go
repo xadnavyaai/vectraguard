@@ -7,6 +7,7 @@ import (
 	"text/tabwriter"
 	"time"
 
+	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 	"github.com/vectra-guard/vectra-guard/internal/session"
@@ -45,6 +46,79 @@ func runSessionStart(ctx context.Context, agentName, workspace string) error {
 	// Print for easy capture in scripts
 	fmt.Println(sess.ID)
 	return nil
+}
+
+func runSessionRecord(ctx context.Context, sessionID, command string, exitCode int) error {
+	logger := logging.FromContext(ctx)
+	cfg := config.FromContext(ctx)
+
+	if command == "" {
+		return fmt.Errorf("command is required")
+	}
+
+	workspace, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("get workspace: %w", err)
+	}
+
+	if sessionID == "" {
+		sessionID = session.GetCurrentSessionForWorkspace(workspace)
+	}
+	if sessionID == "" {
+		return fmt.Errorf("no active session found")
+	}
+
+	mgr, err := session.NewManager(workspace, logger)
+	if err != nil {
+		return fmt.Errorf("create session manager: %w", err)
+	}
+
+	sess, err := mgr.Load(sessionID)
+	if err != nil {
+		return fmt.Errorf("load session: %w", err)
+	}
+
+	findings := analyzer.AnalyzeScript("inline-command", []byte(command), cfg.Policies)
+	riskLevel, findingCodes := summarizeSessionFindings(findings)
+
+	record := session.Command{
+		Timestamp: time.Now(),
+		Command:   command,
+		ExitCode:  exitCode,
+		RiskLevel: riskLevel,
+		Approved:  true,
+		Findings:  findingCodes,
+		Metadata: map[string]interface{}{
+			"source": "shell-tracker",
+		},
+	}
+
+	if err := mgr.AddCommand(sess, record); err != nil {
+		return fmt.Errorf("record command: %w", err)
+	}
+
+	return nil
+}
+
+func summarizeSessionFindings(findings []analyzer.Finding) (string, []string) {
+	riskLevel := "low"
+	var codes []string
+	for _, f := range findings {
+		codes = append(codes, f.Code)
+		switch f.Severity {
+		case "critical":
+			riskLevel = "critical"
+		case "high":
+			if riskLevel != "critical" {
+				riskLevel = "high"
+			}
+		case "medium":
+			if riskLevel != "critical" && riskLevel != "high" {
+				riskLevel = "medium"
+			}
+		}
+	}
+	return riskLevel, codes
 }
 
 func runSessionEnd(ctx context.Context, sessionID string) error {

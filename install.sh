@@ -183,11 +183,20 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
         fi
         echo "   New: $NEW_VERSION"
     else
-        echo "✅ Vectra Guard installed successfully!"
+    echo "✅ Vectra Guard installed successfully!"
         echo "   Version: $NEW_VERSION"
     fi
     
     echo ""
+    # Optional: add a lightweight shell hook to track all commands
+    if [ -t 0 ]; then
+        read -p "Enable Shell Tracker (adds a small hook)? [y/N] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-shell-tracker.sh | bash
+            echo ""
+        fi
+    fi
     echo "🚀 Quick Start:"
     echo ""
     echo "   1. Validate a script (safe - never executes):"
@@ -202,8 +211,8 @@ if [ -x "$INSTALL_DIR/$BINARY_NAME" ]; then
     echo "   4. Optional - Initialize configuration:"
     echo "      vectra-guard init"
     echo ""
-    echo "   5. Optional - Enable Universal Shell Protection (recommended):"
-    echo "      curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install-universal-shell-protection.sh | bash"
+    echo "   5. Optional - Enable Shell Tracker (recommended):"
+    echo "      curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/install-shell-tracker.sh | bash"
     echo ""
     echo "📚 Full Documentation: https://github.com/${REPO}"
     echo "🗑️  Uninstall: curl -fsSL https://raw.githubusercontent.com/${REPO}/main/scripts/uninstall.sh | bash"

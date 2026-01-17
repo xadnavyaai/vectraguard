@@ -1,6 +1,6 @@
 #!/bin/bash
-# Vectra Guard: Universal Shell Protection Installer
-# Integrates with bash, zsh, and fish to protect ALL tools
+# Vectra Guard: Shell Tracker Installer
+# Integrates with bash, zsh, and fish to track ALL commands
 
 set -uo pipefail
 
@@ -19,7 +19,7 @@ while [ $# -gt 0 ]; do
             REQUESTED_SHELLS="${1#*=}"
             ;;
         -h|--help)
-            echo "Usage: install-universal-shell-protection.sh [--shells \"bash zsh\"]" >&2
+            echo "Usage: install-shell-tracker.sh [--shells \"bash zsh\"]" >&2
             echo "       (or set VG_SHELLS=\"bash zsh\" for non-interactive selection)" >&2
             exit 0
             ;;
@@ -31,10 +31,10 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-echo "🛡️  Vectra Guard - Universal Shell Protection Installer"
-echo "======================================================="
+echo "🛡️  Vectra Guard - Shell Tracker Installer"
+echo "========================================="
 echo ""
-echo "For a full walkthrough, see README.md (Universal Shell Protection) and GETTING_STARTED.md."
+echo "For a full walkthrough, see README.md and GETTING_STARTED.md."
 echo ""
 
 # Check if vectra-guard is installed
@@ -260,85 +260,27 @@ if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # Command interception hook - runs BEFORE command executes
     _vectra_guard_preexec() {
         local cmd="$BASH_COMMAND"
-        
+
         # Skip if command is vectra-guard itself (avoid recursion)
         # Also skip vg alias (shorthand for vectra-guard)
         if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
             return 0
         fi
-        
+
         # Skip empty commands, comments, and variable assignments
         if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
             return 0
         fi
-        
-        # Quick check for obviously dangerous patterns (fast path)
-        # Use comprehensive system directory detection
-        if _vectra_guard_is_protected_path "$cmd"; then
-            # Definitely dangerous - BLOCK immediately (critical commands should never execute)
-            echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-            echo "   This command would delete system files and is blocked for safety." >&2
-            if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-                echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
-                # Log the blocked command
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
-            fi
-            echo "   Use 'vectra-guard exec -- <command>' if you really need to run this." >&2
-            # Return 1 to prevent command execution (with extdebug, this skips execution)
-            VECTRA_LAST_CMD="$cmd"
-            return 1
-        fi
-        
-        # Validate command through vectra-guard (for other dangerous patterns)
-        # Use a timeout to avoid hanging
-        local validation_output
-        validation_output=$(timeout 1 bash -c "echo '$cmd' | vectra-guard validate /dev/stdin 2>&1" 2>/dev/null || echo "timeout")
-        local validation_exit=$?
-        
-        # Check validation result
-        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY"; then
-            # Command has security issues - MUST intercept it
-            # Check if it's critical first (critical commands must ALWAYS be blocked)
-            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME\|PROTECTED_DIRECTORY_ACCESS"; then
-                # CRITICAL: Always block critical commands, regardless of session ID
-                echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY" | head -1 >&2
-                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                if [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-                    echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
-                    vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null || true
-                fi
-                # Return 1 to prevent command execution (with extdebug, this skips execution)
-                VECTRA_LAST_CMD="$cmd"
-                return 1
-            elif [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-                # Non-critical but risky command with session ID - route through vectra-guard exec
-                # This ensures proper protection and logging
-                BASH_COMMAND="vectra-guard exec --session '$VECTRAGUARD_SESSION_ID' -- $(printf '%q' "$cmd")"
-                VECTRA_LAST_CMD="$cmd"
-                # Return 0 to allow the modified command to execute
-                return 0
-            else
-                # Non-critical risky command without session ID - BLOCK for safety
-                # We cannot route through vectra-guard exec without a session, so we must block
-                echo "⚠️  BLOCKED: Risky command detected (no session): $cmd" >&2
-                echo "$validation_output" | grep -i "finding\|violation" | head -1 >&2
-                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                VECTRA_LAST_CMD="$cmd"
-                return 1
-            fi
-        else
-            # Command is safe or validation timed out (allow to avoid breaking things)
-            VECTRA_LAST_CMD="$cmd"
-            return 0
-        fi
+
+        VECTRA_LAST_CMD="$cmd"
+        return 0
     }
-    
+
     _vectra_guard_precmd() {
         local exit_code=$?
         if [ -n "$VECTRA_LAST_CMD" ] && [ -n "$VECTRAGUARD_SESSION_ID" ]; then
             # Log command after execution (for audit trail)
-            vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null
+            vectra-guard session record --session "$VECTRAGUARD_SESSION_ID" --command "$VECTRA_LAST_CMD" --exit-code "$exit_code" &>/dev/null
         fi
         unset VECTRA_LAST_CMD
     }
@@ -552,99 +494,31 @@ if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
     # Command interception hook - runs BEFORE command executes
     _vectra_guard_preexec() {
         local cmd="$1"
-        
+
         # Skip if vectra-guard is not available (prevents posix_spawnp errors)
         if ! command -v vectra-guard &> /dev/null; then
             return 0
         fi
-        
+
         # Skip if command is vectra-guard itself (avoid recursion)
         # Also skip vg alias (shorthand for vectra-guard)
         if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
             return 0
         fi
-        
+
         # Skip empty commands, comments, and variable assignments
         if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
             return 0
         fi
-        
-        # Quick check for obviously dangerous patterns (fast path)
-        # Use comprehensive system directory detection
-        if _vectra_guard_is_protected_path "$cmd"; then
-            # Definitely dangerous - MUST block
-            echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-            echo "   This command would delete system files and is blocked for safety." >&2
-            if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-                echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null 2>&1 || true
-            fi
-            echo "   Use 'vectra-guard exec -- <command>' if you really need to run this." >&2
-            # In zsh, we cannot prevent execution from preexec hook, but we can try to intercept
-            # by executing a safe command and hoping the user sees the error
-            # The actual protection must come from vectra-guard exec itself
-            VECTRA_LAST_CMD="$cmd"
-            # Try to execute a safe command to prevent the dangerous one (this is a workaround)
-            # Note: This won't fully prevent execution, but vectra-guard exec will block it
-            if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-                # Execute through vectra-guard which will block critical commands
-                # This runs BEFORE the original command, but the original may still execute
-                # The real protection is in vectra-guard exec itself
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null 2>&1 || true
-            fi
-            return
-        fi
-        
-        # Validate command through vectra-guard (only if available)
-        if ! command -v vectra-guard &> /dev/null; then
-            VECTRA_LAST_CMD="$cmd"
-            return 0
-        fi
-        
-        local validation_output
-        validation_output=$(timeout 1 bash -c "echo '$cmd' | vectra-guard validate /dev/stdin 2>&1" 2>/dev/null || echo "timeout")
-        local validation_exit=$?
-        
-        # Check validation result
-        if [ "$validation_output" != "timeout" ] && echo "$validation_output" | grep -qi "violations\|finding\|critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY"; then
-            # Command has security issues - MUST intercept
-            # Check if it's critical first (critical commands must ALWAYS be blocked)
-            if echo "$validation_output" | grep -qi "critical\|DANGEROUS_DELETE_ROOT\|DANGEROUS_DELETE_HOME\|PROTECTED_DIRECTORY_ACCESS"; then
-                # CRITICAL: Always block critical commands
-                echo "❌ BLOCKED: Critical command detected: $cmd" >&2
-                echo "$validation_output" | grep -i "critical\|DANGEROUS_DELETE\|PROTECTED_DIRECTORY" | head -1 >&2
-                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-                    echo "   Session: $VECTRAGUARD_SESSION_ID" >&2
-                    vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "BLOCKED: $cmd" &>/dev/null 2>&1 || true
-                fi
-                VECTRA_LAST_CMD="$cmd"
-                return
-            elif [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-                # Non-critical but risky command with session ID - route through vectra-guard exec
-                # Note: In zsh, we cannot fully prevent the original command, but vectra-guard exec will protect
-                vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- $=cmd 2>&1 || true
-                VECTRA_LAST_CMD="$cmd"
-                return
-            else
-                # Non-critical risky command without session ID - BLOCK for safety
-                echo "⚠️  BLOCKED: Risky command detected (no session): $cmd" >&2
-                echo "$validation_output" | grep -i "finding\|violation" | head -1 >&2
-                echo "   Use 'vectra-guard exec -- <command>' to execute with protection" >&2
-                VECTRA_LAST_CMD="$cmd"
-                return
-            fi
-        else
-            # Command is safe or validation timed out (allow to avoid breaking things)
-            VECTRA_LAST_CMD="$cmd"
-        fi
+
+        VECTRA_LAST_CMD="$cmd"
     }
-    
+
     _vectra_guard_precmd() {
         local exit_code=$?
         if [[ -n "$VECTRA_LAST_CMD" && -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
             # Log command after execution (for audit trail)
-            vectra-guard exec --session "$VECTRAGUARD_SESSION_ID" -- echo "logged: $VECTRA_LAST_CMD" &>/dev/null 2>&1 || true
+            vectra-guard session record --session "$VECTRAGUARD_SESSION_ID" --command "$VECTRA_LAST_CMD" --exit-code "$exit_code" &>/dev/null 2>&1 || true
         fi
         unset VECTRA_LAST_CMD
     }
@@ -708,7 +582,7 @@ if command -v vectra-guard > /dev/null
     function _vectra_guard_postexec --on-event fish_postexec
         if set -q VECTRA_LAST_CMD; and set -q VECTRAGUARD_SESSION_ID
             # Log command synchronously to avoid background job notifications
-            fish -c "vectra-guard exec --session $VECTRAGUARD_SESSION_ID -- echo 'logged: $VECTRA_LAST_CMD' &> /dev/null"
+            fish -c "vectra-guard session record --session $VECTRAGUARD_SESSION_ID --command \"$VECTRA_LAST_CMD\" --exit-code $status &> /dev/null"
         end
     end
     
