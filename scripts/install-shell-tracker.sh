@@ -152,396 +152,98 @@ echo "Step 2/5: Installing shell integrations..."
 
 # Function to add bash integration
 install_bash() {
-    cat >> ~/.bashrc << 'BASH_EOF'
-
-# ============================================================================
-# Vectra Guard Integration (Auto-generated)
-# ============================================================================
-
-# Only run in bash (protect against sourcing in zsh)
+    mkdir -p ~/.vectra-guard
+    cat > ~/.vectra-guard/tracker.bash << 'BASH_TRACKER'
+# Vectra Guard Shell Tracker (Auto-generated)
 if [ -n "$BASH_VERSION" ] && command -v vectra-guard &> /dev/null; then
-    # Initialize session
-    _vectra_guard_init() {
-        if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
-            if [ -f ~/.vectra-guard-session ]; then
-                export VECTRAGUARD_SESSION_ID=$(sed -n '$p' ~/.vectra-guard-session 2>/dev/null || echo "")
-                # Verify session is still valid
-                if [ -n "$VECTRAGUARD_SESSION_ID" ] && ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null; then
-                    # Session expired, start new one
-                    unset VECTRAGUARD_SESSION_ID
-                fi
-            fi
-            
-            if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
-                SESSION=$(vectra-guard session start --agent "${USER}-bash" --workspace "$HOME" 2>/dev/null | sed -n '$p' || echo "")
-                if [ -n "$SESSION" ]; then
-                    export VECTRAGUARD_SESSION_ID=$SESSION
-                    echo $SESSION > ~/.vectra-guard-session
-                fi
-            fi
-        fi
-    }
-    
-    # Helper function to check if command targets protected system directories
-    # This comprehensive pattern matches system directories across Linux, macOS, and Windows (WSL)
-    _vectra_guard_is_protected_path() {
-        local cmd="$1"
-        local cmd_lower
-        
-        # Check bash version FIRST before using bash 4.0+ syntax
-        # If bash version < 4.0, use tr for lowercase conversion
-        if [ "${BASH_VERSION%%.*}" -lt 4 ] 2>/dev/null; then
-            cmd_lower=$(echo "$cmd" | tr '[:upper:]' '[:lower:]')
-        else
-            cmd_lower="${cmd,,}"  # Convert to lowercase (bash 4.0+)
-        fi
-        
-        # Pattern 0: Home directory deletion patterns (check FIRST - before root patterns)
-        # Matches: rm -rf ~/, rm -r ~/, rm -rf ~/*, rm -rf $HOME/, etc.
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+~/[[:space:]]*$ ]] || \
-           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+~/\* ]] || \
-           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+\$home/[[:space:]]*$ ]] || \
-           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+\$home/\* ]]; then
-            return 0  # Protected
-        fi
-        
-        # Pattern 1: Root deletion patterns (before shell expansion)
-        # Matches: rm -rf /, rm -r /, rm -rf /*, rm -rf / *, etc.
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]*$ ]] || \
-           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/\* ]] || \
-           [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/[[:space:]]+\* ]]; then
-            return 0  # Protected
-        fi
-        
-        # Pattern 1.5: Detect multiple system directories (after shell expansion of /*)
-        # When /* expands, we get: rm -rf /bin /usr /etc /var ...
-        # Count system directories in the command
-        local system_dir_count=0
-        for dir in /bin /sbin /usr /etc /var /lib /lib64 /lib32 /opt /boot /root /sys /proc /dev /home /srv /run /mnt /media /applications /library /system /private /cores /users /volumes; do
-            if [[ "$cmd_lower" =~ [[:space:]]${dir}(/|$|[[:space:]]) ]]; then
-                ((system_dir_count++))
-            fi
-        done
-        # If 3+ system directories are being deleted, it's likely /* expansion
-        if [ "$system_dir_count" -ge 3 ]; then
-            return 0  # Protected
-        fi
-        
-        # Pattern 2: Unix/Linux system directories (FHS standard)
-        # Core system directories
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(bin|sbin|usr|etc|var|lib|lib64|lib32|opt|boot|root|sys|proc|dev|home|srv|run|mnt|media|snap|flatpak|lost\+found)(/|$|[[:space:]]) ]]; then
-            return 0  # Protected
-        fi
-        
-        # Pattern 3: macOS specific directories
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(applications|library|system|private|cores|users|volumes|network)(/|$|[[:space:]]) ]]; then
-            return 0  # Protected
-        fi
-        
-        # Pattern 4: Windows paths (WSL and native)
-        # WSL paths: /mnt/c/Windows, /mnt/c/Program Files, etc.
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/mnt/[a-z]/(windows|program[[:space:]]+files|programdata|users)(/|$|[[:space:]]) ]]; then
-            return 0  # Protected
-        fi
-        # Windows native paths: C:\Windows, C:\Program Files, etc.
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+[a-z]:\\(windows|program[[:space:]]+files|programdata|users)(\\|$|[[:space:]]) ]]; then
-            return 0  # Protected
-        fi
-        
-        # Pattern 5: Common nested system paths
-        # /usr/bin, /usr/sbin, /usr/lib, /usr/local, /var/log, /var/lib, etc.
-        if [[ "$cmd_lower" =~ rm[[:space:]]+-[rf]*[[:space:]]+/(usr/(bin|sbin|lib|lib64|local)|var/(log|lib|cache)|system/(library|applications)|private/(etc|var|tmp))(/|$|[[:space:]]) ]]; then
-            return 0  # Protected
-        fi
-        
-        return 1  # Not protected
-    }
-    
-    # Command interception hook - runs BEFORE command executes
-    _vectra_guard_preexec() {
-        local cmd="$BASH_COMMAND"
+  _vectra_guard_init() {
+    if [ -z "$VECTRAGUARD_SESSION_ID" ]; then
+      SESSION=$(vectra-guard session start --agent "${USER}-bash" --workspace "$PWD" 2>/dev/null | tail -n 1 || echo "")
+      if [ -n "$SESSION" ]; then
+        export VECTRAGUARD_SESSION_ID=$SESSION
+        echo $SESSION > ~/.vectra-guard-session
+      fi
+    fi
+  }
 
-        # Skip if command is vectra-guard itself (avoid recursion)
-        # Also skip vg alias (shorthand for vectra-guard)
-        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
-            return 0
-        fi
+  _vectra_guard_preexec() {
+    local cmd="$BASH_COMMAND"
+    if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
+      return 0
+    fi
+    if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      return 0
+    fi
+    VECTRA_LAST_CMD="$cmd"
+  }
 
-        # Skip empty commands, comments, and variable assignments
-        if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
-            return 0
-        fi
+  _vectra_guard_precmd() {
+    local exit_code=$?
+    if [ -n "$VECTRA_LAST_CMD" ] && [ -n "$VECTRAGUARD_SESSION_ID" ]; then
+      vectra-guard session record --session "$VECTRAGUARD_SESSION_ID" --command "$VECTRA_LAST_CMD" --exit-code "$exit_code" &>/dev/null
+    fi
+    unset VECTRA_LAST_CMD
+  }
 
-        VECTRA_LAST_CMD="$cmd"
-        return 0
-    }
-
-    _vectra_guard_precmd() {
-        local exit_code=$?
-        if [ -n "$VECTRA_LAST_CMD" ] && [ -n "$VECTRAGUARD_SESSION_ID" ]; then
-            # Log command after execution (for audit trail)
-            vectra-guard session record --session "$VECTRAGUARD_SESSION_ID" --command "$VECTRA_LAST_CMD" --exit-code "$exit_code" &>/dev/null
-        fi
-        unset VECTRA_LAST_CMD
-    }
-    
-    # Set up hooks - DEBUG trap intercepts BEFORE execution
-    # extdebug enables extended debugging which allows us to modify BASH_COMMAND
-    shopt -s extdebug
-    trap '_vectra_guard_preexec' DEBUG
-    PROMPT_COMMAND="_vectra_guard_precmd${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
-    
-    # Initialize on shell start
-    _vectra_guard_init
-    
-    # Convenience alias
-    alias vg='vectra-guard'
+  shopt -s extdebug
+  trap '_vectra_guard_preexec' DEBUG
+  PROMPT_COMMAND="_vectra_guard_precmd${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
+  _vectra_guard_init
 fi
+BASH_TRACKER
 
-# End Vectra Guard Integration
-# ============================================================================
-BASH_EOF
-    
-    echo "  ✅ Bash integration installed"
+    if ! grep -q "vectra-guard/tracker.bash" ~/.bashrc 2>/dev/null; then
+        echo "source ~/.vectra-guard/tracker.bash" >> ~/.bashrc
+    fi
+    echo "  ✅ Bash tracker installed"
 }
 
 # Function to add zsh integration
 install_zsh() {
-    cat >> ~/.zshrc << 'ZSH_EOF'
-
-# ============================================================================
-# Vectra Guard Integration (Auto-generated)
-# ============================================================================
-
-# Only run in zsh (protect against sourcing in bash)
+    mkdir -p ~/.vectra-guard
+    cat > ~/.vectra-guard/tracker.zsh << 'ZSH_TRACKER'
+# Vectra Guard Shell Tracker (Auto-generated)
 if [ -n "$ZSH_VERSION" ] && command -v vectra-guard &> /dev/null; then
-    # Initialize session
-    _vectra_guard_init() {
-        # Double-check vectra-guard is available before using it
-        if ! command -v vectra-guard &> /dev/null; then
-            return 0
-        fi
-        
-        if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
-            if [[ -f ~/.vectra-guard-session ]]; then
-                export VECTRAGUARD_SESSION_ID=$(sed -n '$p' ~/.vectra-guard-session 2>/dev/null || echo "")
-                # Verify session is still valid (only if vectra-guard is available)
-                if [[ -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-                    if ! vectra-guard session show "$VECTRAGUARD_SESSION_ID" &>/dev/null 2>&1; then
-                        unset VECTRAGUARD_SESSION_ID
-                    fi
-                fi
-            fi
-            
-            if [[ -z "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-                SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$HOME" 2>/dev/null | sed -n '$p' || echo "")
-                if [[ -n "$SESSION" ]]; then
-                    export VECTRAGUARD_SESSION_ID=$SESSION
-                    echo $SESSION > ~/.vectra-guard-session 2>/dev/null || true
-                fi
-            fi
-        fi
-    }
-    
-    # Helper function to check if command targets protected system directories
-    # This comprehensive pattern matches system directories across Linux, macOS, and Windows (WSL)
-    _vectra_guard_is_protected_path() {
-            local cmd="$1"
-            local cmd_lower="${cmd:l}"  # zsh lowercase conversion
-            
-            # Pattern 0: Home directory deletion patterns (check FIRST - before root patterns)
-            # Matches: rm -rf ~/, rm -r ~/, rm -rf ~/*, rm -rf $HOME/, etc.
-            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+~/[[:space:]]*$" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+~/[[:space:]]*$" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+~/\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+~/\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+\$home/[[:space:]]*$" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+\$home/[[:space:]]*$" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+\$home/\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+\$home/\\*" ]]; then
-                return 0  # Protected
-            fi
-            
-            # Pattern 1: Root deletion patterns (before shell expansion)
-            # Use simpler patterns for zsh compatibility - avoid complex quantifiers
-            # Check for specific flag combinations explicitly to avoid regex compilation errors
-            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/[[:space:]]*$" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/[[:space:]]*$" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/[[:space:]]+\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/[[:space:]]+\\*" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/" ]]; then
-                return 0  # Protected
-            fi
-            
-            # Pattern 1.5: Detect multiple system directories (after shell expansion of /*)
-            # When /* expands, we get: rm -rf /bin /usr /etc /var ...
-            local system_dir_count=0
-            for dir in /bin /sbin /usr /etc /var /lib /lib64 /lib32 /opt /boot /root /sys /proc /dev /home /srv /run /mnt /media /applications /library /system /private /cores /users /volumes; do
-                if [[ "$cmd_lower" =~ "[[:space:]]${dir}(/|$|[[:space:]])" ]]; then
-                    ((system_dir_count++))
-                fi
-            done
-            # If 3+ system directories are being deleted, it's likely /* expansion
-            if [ "$system_dir_count" -ge 3 ]; then
-                return 0  # Protected
-            fi
-            
-            # Pattern 2: Unix/Linux system directories (FHS standard)
-            # Use explicit -r and -rf patterns to avoid zsh regex compilation errors
-            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/bin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/bin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/sbin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/sbin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/etc" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/etc" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/lib" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/lib" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/opt" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/opt" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/boot" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/boot" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/root" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/root" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/sys" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/sys" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/proc" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/proc" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/dev" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/dev" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/home" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/home" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/srv" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/srv" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/run" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/run" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/media" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/media" ]]; then
-                return 0  # Protected
-            fi
-            
-            # Pattern 3: macOS specific directories
-            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/applications" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/applications" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/library" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/library" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/system" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/system" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/cores" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/cores" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/users" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/users" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/volumes" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/volumes" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/network" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/network" ]]; then
-                return 0  # Protected
-            fi
-            
-            # Pattern 4: Windows paths (WSL and native) - simplified for zsh
-            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/windows" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/windows" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/program" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/program" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/programdata" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/programdata" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/mnt/[a-z]/users" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/mnt/[a-z]/users" ]]; then
-                return 0  # Protected
-            fi
-            
-            # Pattern 5: Common nested system paths - simplified
-            if [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/bin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/bin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/sbin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/sbin" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/lib" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/lib" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/usr/local" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/usr/local" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var/log" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var/log" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var/lib" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var/lib" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/var/cache" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/var/cache" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/system/library" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/system/library" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/system/applications" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/system/applications" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private/etc" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private/etc" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private/var" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private/var" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-r[[:space:]]+/private/tmp" ]] || \
-               [[ "$cmd_lower" =~ "rm[[:space:]]+-rf[[:space:]]+/private/tmp" ]]; then
-                return 0  # Protected
-            fi
-            
-            return 1  # Not protected
-    }
-    
-    # Command interception hook - runs BEFORE command executes
-    _vectra_guard_preexec() {
-        local cmd="$1"
-
-        # Skip if vectra-guard is not available (prevents posix_spawnp errors)
-        if ! command -v vectra-guard &> /dev/null; then
-            return 0
-        fi
-
-        # Skip if command is vectra-guard itself (avoid recursion)
-        # Also skip vg alias (shorthand for vectra-guard)
-        if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
-            return 0
-        fi
-
-        # Skip empty commands, comments, and variable assignments
-        if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
-            return 0
-        fi
-
-        VECTRA_LAST_CMD="$cmd"
-    }
-
-    _vectra_guard_precmd() {
-        local exit_code=$?
-        if [[ -n "$VECTRA_LAST_CMD" && -n "$VECTRAGUARD_SESSION_ID" ]] && command -v vectra-guard &> /dev/null; then
-            # Log command after execution (for audit trail)
-            vectra-guard session record --session "$VECTRAGUARD_SESSION_ID" --command "$VECTRA_LAST_CMD" --exit-code "$exit_code" &>/dev/null 2>&1 || true
-        fi
-        unset VECTRA_LAST_CMD
-    }
-    
-    # Register hooks (only in zsh)
-    if [ -n "$ZSH_VERSION" ]; then
-        autoload -Uz add-zsh-hook 2>/dev/null || true
-        add-zsh-hook preexec _vectra_guard_preexec 2>/dev/null || true
-        add-zsh-hook precmd _vectra_guard_precmd 2>/dev/null || true
+  _vectra_guard_init() {
+    if [[ -z "$VECTRAGUARD_SESSION_ID" ]]; then
+      SESSION=$(vectra-guard session start --agent "${USER}-zsh" --workspace "$PWD" 2>/dev/null | tail -n 1 || echo "")
+      if [[ -n "$SESSION" ]]; then
+        export VECTRAGUARD_SESSION_ID=$SESSION
+        echo $SESSION > ~/.vectra-guard-session 2>/dev/null || true
+      fi
     fi
-    
-    # Initialize
-    _vectra_guard_init
-    
-    # Convenience alias
-    alias vg='vectra-guard'
-fi
+  }
 
-# End Vectra Guard Integration
-# ============================================================================
-ZSH_EOF
-    
-    echo "  ✅ Zsh integration installed"
+  _vectra_guard_preexec() {
+    local cmd="$1"
+    if [[ "$cmd" =~ ^vectra-guard ]] || [[ "$cmd" =~ ^vg[[:space:]] ]] || [[ "$cmd" =~ _vectra_guard ]] || [[ "$cmd" =~ VECTRAGUARD ]]; then
+      return 0
+    fi
+    if [[ -z "$cmd" ]] || [[ "$cmd" =~ ^[[:space:]]*# ]] || [[ "$cmd" =~ ^[[:space:]]*[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      return 0
+    fi
+    VECTRA_LAST_CMD="$cmd"
+  }
+
+  _vectra_guard_precmd() {
+    local exit_code=$?
+    if [[ -n "$VECTRA_LAST_CMD" && -n "$VECTRAGUARD_SESSION_ID" ]]; then
+      vectra-guard session record --session "$VECTRAGUARD_SESSION_ID" --command "$VECTRA_LAST_CMD" --exit-code "$exit_code" &>/dev/null 2>&1 || true
+    fi
+    unset VECTRA_LAST_CMD
+  }
+
+  autoload -Uz add-zsh-hook 2>/dev/null || true
+  add-zsh-hook preexec _vectra_guard_preexec 2>/dev/null || true
+  add-zsh-hook precmd _vectra_guard_precmd 2>/dev/null || true
+  _vectra_guard_init
+fi
+ZSH_TRACKER
+
+    if ! grep -q "vectra-guard/tracker.zsh" ~/.zshrc 2>/dev/null; then
+        echo "source ~/.vectra-guard/tracker.zsh" >> ~/.zshrc
+    fi
+    echo "  ✅ Zsh tracker installed"
 }
 
 # Function to add fish integration
@@ -694,10 +396,10 @@ echo ""
 
 # Summary
 echo "=========================================="
-echo "✅ Universal Shell Protection Installed!"
+echo "✅ Shell Tracker Installed!"
 echo "=========================================="
 echo ""
-echo "Protected shells: ${SELECTED_SHELLS[*]}"
+echo "Tracked shells: ${SELECTED_SHELLS[*]}"
 echo "Convenience alias: vg (shorthand for vectra-guard)"
 echo ""
 echo "Next steps:"

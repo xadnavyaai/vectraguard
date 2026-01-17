@@ -5,12 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/vectra-guard/vectra-guard/internal/logging"
+	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
 type auditSummary struct {
@@ -21,13 +23,32 @@ type auditSummary struct {
 	Mode   string
 }
 
-func runAudit(ctx context.Context, tool string, targetPath string, failOnFindings bool, autoInstall bool) error {
+type sessionAuditSummary struct {
+	SessionID       string
+	Workspace       string
+	Agent           string
+	SessionCount    int
+	Total           int
+	RiskCounts      map[string]int
+	SourceCounts    map[string]int
+	ExecutionCounts map[string]int
+	Bypassed        int
+	Blocked         int
+}
+
+func runAudit(ctx context.Context, tool string, targetPath string, failOnFindings bool, autoInstall bool, sessionID string, allSessions bool) error {
 	logger := logging.FromContext(ctx)
 	if targetPath == "" {
 		targetPath = "."
 	}
 
 	switch strings.ToLower(tool) {
+	case "session":
+		summary, err := runSessionAudit(ctx, sessionID, allSessions)
+		if err != nil {
+			return err
+		}
+		logSessionAuditSummary(logger, summary)
 	case "npm":
 		if autoInstall {
 			if err := ensureNpm(ctx); err != nil {
@@ -61,6 +82,124 @@ func runAudit(ctx context.Context, tool string, targetPath string, failOnFinding
 	}
 
 	return nil
+}
+
+func runSessionAudit(ctx context.Context, sessionID string, allSessions bool) (sessionAuditSummary, error) {
+	logger := logging.FromContext(ctx)
+	workspace, err := os.Getwd()
+	if err != nil {
+		return sessionAuditSummary{}, fmt.Errorf("get workspace: %w", err)
+	}
+
+	mgr, err := session.NewManager(workspace, logger)
+	if err != nil {
+		return sessionAuditSummary{}, fmt.Errorf("create session manager: %w", err)
+	}
+
+	if allSessions {
+		sessions, err := mgr.List()
+		if err != nil {
+			return sessionAuditSummary{}, fmt.Errorf("list sessions: %w", err)
+		}
+		if len(sessions) == 0 {
+			return sessionAuditSummary{}, fmt.Errorf("no sessions found")
+		}
+		return buildSessionAuditSummaryFromSessions(sessions), nil
+	}
+
+	if sessionID == "" {
+		sessionID = session.GetCurrentSessionForWorkspace(workspace)
+	}
+	if sessionID == "" {
+		return sessionAuditSummary{}, fmt.Errorf("no active session found")
+	}
+
+	sess, err := mgr.Load(sessionID)
+	if err != nil {
+		return sessionAuditSummary{}, fmt.Errorf("load session: %w", err)
+	}
+
+	return buildSessionAuditSummary(sess), nil
+}
+
+func buildSessionAuditSummary(sess *session.Session) sessionAuditSummary {
+	summary := sessionAuditSummary{
+		SessionID:       sess.ID,
+		Workspace:       sess.Workspace,
+		Agent:           sess.AgentName,
+		SessionCount:    1,
+		Total:           len(sess.Commands),
+		RiskCounts:      map[string]int{},
+		SourceCounts:    map[string]int{},
+		ExecutionCounts: map[string]int{},
+	}
+
+	for _, cmd := range sess.Commands {
+		risk := strings.TrimSpace(cmd.RiskLevel)
+		if risk == "" {
+			risk = "unknown"
+		}
+		summary.RiskCounts[risk] = summary.RiskCounts[risk] + 1
+
+		source := "exec"
+		execution := ""
+		if cmd.Metadata != nil {
+			if val, ok := cmd.Metadata["source"].(string); ok && val != "" {
+				source = val
+			}
+			if val, ok := cmd.Metadata["execution"].(string); ok && val != "" {
+				execution = val
+			}
+			if val, ok := cmd.Metadata["bypass"].(bool); ok && val {
+				summary.Bypassed++
+			}
+			if val, ok := cmd.Metadata["blocked"].(bool); ok && val {
+				summary.Blocked++
+			}
+		}
+
+		summary.SourceCounts[source] = summary.SourceCounts[source] + 1
+		if execution != "" {
+			summary.ExecutionCounts[execution] = summary.ExecutionCounts[execution] + 1
+		}
+	}
+
+	return summary
+}
+
+func buildSessionAuditSummaryFromSessions(sessions []*session.Session) sessionAuditSummary {
+	summary := sessionAuditSummary{
+		SessionID:       "all",
+		SessionCount:    len(sessions),
+		Total:           0,
+		RiskCounts:      map[string]int{},
+		SourceCounts:    map[string]int{},
+		ExecutionCounts: map[string]int{},
+	}
+
+	for _, sess := range sessions {
+		if summary.Workspace == "" {
+			summary.Workspace = sess.Workspace
+		}
+		if summary.Agent == "" {
+			summary.Agent = sess.AgentName
+		}
+		summary.Total += len(sess.Commands)
+		single := buildSessionAuditSummary(sess)
+		mergeCounts(summary.RiskCounts, single.RiskCounts)
+		mergeCounts(summary.SourceCounts, single.SourceCounts)
+		mergeCounts(summary.ExecutionCounts, single.ExecutionCounts)
+		summary.Bypassed += single.Bypassed
+		summary.Blocked += single.Blocked
+	}
+
+	return summary
+}
+
+func mergeCounts(dst, src map[string]int) {
+	for key, val := range src {
+		dst[key] = dst[key] + val
+	}
 }
 
 func runNpmAudit(targetPath string) (auditSummary, error) {
@@ -209,6 +348,33 @@ func logAuditSummary(logger *logging.Logger, summary auditSummary) {
 	} else {
 		logger.Info("package audit clean", fields)
 	}
+}
+
+func logSessionAuditSummary(logger *logging.Logger, summary sessionAuditSummary) {
+	fields := map[string]any{
+		"session_id": summary.SessionID,
+		"workspace":  summary.Workspace,
+		"agent":      summary.Agent,
+		"sessions":   summary.SessionCount,
+		"total":      summary.Total,
+	}
+	if len(summary.RiskCounts) > 0 {
+		fields["risk_counts"] = summary.RiskCounts
+	}
+	if len(summary.SourceCounts) > 0 {
+		fields["source_counts"] = summary.SourceCounts
+	}
+	if len(summary.ExecutionCounts) > 0 {
+		fields["execution_counts"] = summary.ExecutionCounts
+	}
+	if summary.Bypassed > 0 {
+		fields["bypassed"] = summary.Bypassed
+	}
+	if summary.Blocked > 0 {
+		fields["blocked"] = summary.Blocked
+	}
+
+	logger.Info("session audit summary", fields)
 }
 
 func ensureNpm(ctx context.Context) error {

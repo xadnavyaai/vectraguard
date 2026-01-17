@@ -111,10 +111,12 @@ func execute(args []string) error {
 		target := subFlags.String("path", ".", "Target directory for audit")
 		failOn := subFlags.Bool("fail", false, "Exit non-zero if findings exist")
 		noInstall := subFlags.Bool("no-install", false, "Disable auto-install of audit dependencies")
+		sessionID := subFlags.String("session", "", "Session ID for session audit")
+		allSessions := subFlags.Bool("all", false, "Audit across all sessions (session tool only)")
 		if err := subFlags.Parse(subArgs[1:]); err != nil {
 			return err
 		}
-		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall)
+		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall, *sessionID, *allSessions)
 	case "sandbox":
 		if len(subArgs) < 1 {
 			return usageError()

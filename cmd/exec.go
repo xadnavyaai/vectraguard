@@ -3,8 +3,10 @@ package cmd
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"strings"
 	"time"
 
@@ -251,6 +253,31 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 	}
 
+	// Block external HTTP(S) endpoints when using vg/vectra-guard
+	if hasExternalHTTP(cmdString) && os.Getenv("VECTRAGUARD_ALLOW_NET") == "" {
+		logger.Error("external http(s) blocked in guarded execution", map[string]any{
+			"command": cmdString,
+		})
+		recordCommandAttempt(tracker, session.Command{
+			Timestamp: time.Now(),
+			Command:   cmdName,
+			Args:      args,
+			ExitCode:  3,
+			Duration:  0,
+			RiskLevel: trackingRiskLevel,
+			Approved:  false,
+			Findings:  trackingFindingCodes,
+			Metadata: map[string]interface{}{
+				"blocked":      true,
+				"block_reason": "external_http_blocked",
+			},
+		})
+		return &exitError{
+			message: "external http(s) endpoints are blocked when using vg/vectra-guard. Set VECTRAGUARD_ALLOW_NET=1 or run directly to override.",
+			code:    3,
+		}
+	}
+
 	// Check guard level AFTER critical command check
 	// Only non-critical commands can bypass when guard level is OFF
 	if cfg.GuardLevel.Level == config.GuardLevelOff {
@@ -275,6 +302,33 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			},
 		})
 		return err
+	}
+
+	// Block sudo when using vg/vectra-guard unless explicitly allowed
+	if cmdName == "sudo" {
+		if os.Getenv("VECTRAGUARD_ALLOW_SUDO") == "" {
+			logger.Error("sudo blocked in guarded execution", map[string]any{
+				"command": cmdString,
+			})
+			recordCommandAttempt(tracker, session.Command{
+				Timestamp: time.Now(),
+				Command:   cmdName,
+				Args:      args,
+				ExitCode:  3,
+				Duration:  0,
+				RiskLevel: trackingRiskLevel,
+				Approved:  false,
+				Findings:  trackingFindingCodes,
+				Metadata: map[string]interface{}{
+					"blocked":      true,
+					"block_reason": "sudo_blocked",
+				},
+			})
+			return &exitError{
+				message: "sudo is blocked when using vg/vectra-guard. Run sudo directly or set VECTRAGUARD_ALLOW_SUDO=1 to override.",
+				code:    3,
+			}
+		}
 	}
 
 	// PRE-EXECUTION PERMISSION ASSESSMENT
@@ -863,6 +917,34 @@ func hasSensitiveFinding(codes []string) bool {
 func normalizeCommand(cmdName string, args []string) string {
 	parts := append([]string{cmdName}, args...)
 	return strings.Join(parts, " ")
+}
+
+var urlPattern = regexp.MustCompile(`https?://[^\s'"]+`)
+
+func hasExternalHTTP(cmdString string) bool {
+	matches := urlPattern.FindAllString(cmdString, -1)
+	for _, raw := range matches {
+		parsed, err := url.Parse(raw)
+		if err != nil {
+			continue
+		}
+		host := parsed.Hostname()
+		if host == "" {
+			continue
+		}
+		if isLocalHost(host) {
+			continue
+		}
+		return true
+	}
+	return false
+}
+
+func isLocalHost(host string) bool {
+	if host == "localhost" || host == "::1" || host == "127.0.0.1" {
+		return true
+	}
+	return strings.HasPrefix(host, "127.")
 }
 
 // executeCommandDirectly executes a command without protection

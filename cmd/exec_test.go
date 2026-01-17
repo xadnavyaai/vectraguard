@@ -577,6 +577,28 @@ func TestEvaluateRepeatProtectionSensitiveLowRisk(t *testing.T) {
 	}
 }
 
+func TestHasExternalHTTP(t *testing.T) {
+	tests := []struct {
+		name     string
+		cmd      string
+		expected bool
+	}{
+		{"local http", "curl http://127.0.0.1:8080/health", false},
+		{"local https", "curl https://localhost/api", false},
+		{"external http", "curl http://example.com", true},
+		{"external https", "wget https://api.example.com/v1", true},
+		{"no url", "echo hello", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := hasExternalHTTP(tt.cmd); got != tt.expected {
+				t.Fatalf("expected %v, got %v", tt.expected, got)
+			}
+		})
+	}
+}
+
 func TestRepeatHelpers(t *testing.T) {
 	if !isRepeatSensitiveCommand("rm") {
 		t.Fatal("expected rm to be repeat-sensitive")

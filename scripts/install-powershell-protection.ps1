@@ -9,7 +9,7 @@
   - Commands are logged to Vectra Guard sessions
   - A convenient `vg` alias is available
 
-  This is the Windows-native equivalent of the universal shell protection for bash/zsh/fish.
+  This is the Windows-native equivalent of the shell tracker for bash/zsh/fish.
 
 .NOTES
   - Works on Windows PowerShell and PowerShell 7+

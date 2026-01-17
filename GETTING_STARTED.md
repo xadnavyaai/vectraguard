@@ -61,6 +61,14 @@ vectra-guard exec -- echo "Hello, Vectra Guard!"
 
 **That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
 
+### Optional: Shell Tracker (logging only)
+
+```bash
+./scripts/install-shell-tracker.sh
+```
+
+This adds a lightweight shell hook to log commands. Protection still requires `vg`/`vectra-guard`.
+
 ---
 
 ## ✅ Verify It's Working
