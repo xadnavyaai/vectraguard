@@ -12,9 +12,10 @@ AI agents and automation run with your full shell access. One mistaken command c
 
 **At a glance**
 - **Safety by default**: risky commands are analyzed before they run.
+- **Non-invasive install**: user-space by default with a one-line install and easy uninstall.
 - **Sandbox + cache**: isolate unknown code and reuse cached dependencies.
-- **Cross-platform protection**: protects system directories on macOS and Debian Linux.
-- **Auditability**: track agent activity and decisions.
+- **Auditability**: review what ran, what was blocked, and why.
+- **Agent confidence**: clear guardrails for agentic workflows without disrupting normal shells.
 
 **What it protects against**
 - Root or system deletion (`rm -rf /`, `rm -rf /etc`)
@@ -38,6 +39,12 @@ The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin`
 
 **Prereqs:** `curl` or `wget` (installer downloads the latest release binary).
 
+**One-line uninstall:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
+```
+
 ### Agentic Usage (Cursor/IDE)
 
 ```bash
@@ -45,16 +52,23 @@ The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin`
 vectra-guard seed agents --target .
 ```
 
-### Use It (3 commands)
+### Use It (5 commands)
 
 ```bash
 # 1. Validate scripts (safe - never executes)
 vectra-guard validate my-script.sh
 
-# 2. Execute commands safely
+# 2. Start a session (recommended)
+SESSION=$(vectra-guard session start --agent "manual")
+export VECTRAGUARD_SESSION_ID=$SESSION
+
+# 3. Execute commands safely
 vectra-guard exec -- npm install
 
-# 3. Explain security risks
+# 4. Audit what happened
+vectra-guard audit session
+
+# 5. Explain security risks
 vectra-guard explain risky-script.sh
 ```
 

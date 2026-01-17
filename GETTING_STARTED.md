@@ -32,6 +32,12 @@ curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/instal
 
 The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin` is on `PATH`.
 
+**One-line uninstall:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
+```
+
 **Prereqs:** `curl` or `wget` must be installed.
 
 For alternative installation methods (Go install, build from source), see the **Installation Options** section in `README.md`.
@@ -59,6 +65,12 @@ vectra-guard seed agents --target .
 
 ```bash
 vectra-guard exec -- echo "Hello, Vectra Guard!"
+```
+
+### Step 4: Audit the session
+
+```bash
+vectra-guard audit session
 ```
 
 **That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
