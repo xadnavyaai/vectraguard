@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package namespace
@@ -26,4 +27,3 @@ func GetCapabilityInfo() (string, error) {
 func EnsureNoNewPrivs() error {
 	return nil
 }
-

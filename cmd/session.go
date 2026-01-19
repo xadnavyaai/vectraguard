@@ -15,7 +15,7 @@ import (
 
 func runSessionStart(ctx context.Context, agentName, workspace string) error {
 	logger := logging.FromContext(ctx)
-	
+
 	if workspace == "" {
 		var err error
 		workspace, err = os.Getwd()
@@ -123,7 +123,7 @@ func summarizeSessionFindings(findings []analyzer.Finding) (string, []string) {
 
 func runSessionEnd(ctx context.Context, sessionID string) error {
 	logger := logging.FromContext(ctx)
-	
+
 	workspace, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get workspace: %w", err)
@@ -155,7 +155,7 @@ func runSessionEnd(ctx context.Context, sessionID string) error {
 
 func runSessionList(ctx context.Context) error {
 	logger := logging.FromContext(ctx)
-	
+
 	workspace, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get workspace: %w", err)
@@ -186,7 +186,7 @@ func runSessionList(ctx context.Context) error {
 		if sess.EndTime != nil {
 			duration = sess.EndTime.Sub(sess.StartTime).Round(time.Second).String()
 		}
-		
+
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%d\t%d\t%d\n",
 			sess.ID,
 			sess.AgentName,
@@ -205,7 +205,7 @@ func runSessionList(ctx context.Context) error {
 func runSessionShow(ctx context.Context, sessionID string) error {
 	logger := logging.FromContext(ctx)
 	cfg := config.FromContext(ctx)
-	
+
 	workspace, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("get workspace: %w", err)
@@ -291,4 +291,3 @@ func runSessionShow(ctx context.Context, sessionID string) error {
 
 	return nil
 }
-

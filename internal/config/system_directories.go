@@ -16,15 +16,15 @@ var SystemDirectories = struct {
 }{
 	// Common Unix/Linux directories (FHS standard)
 	UnixLinux: []string{
-		"/",           // Root directory
-		"/bin",        // Essential system binaries
-		"/sbin",       // Essential system admin binaries
-		"/usr",        // User programs and data
-		"/usr/bin",    // User binaries
-		"/usr/sbin",   // User admin binaries
-		"/usr/lib",    // User libraries
-		"/usr/lib64",  // 64-bit libraries (some distros)
-		"/usr/local",  // Local programs
+		"/",          // Root directory
+		"/bin",       // Essential system binaries
+		"/sbin",      // Essential system admin binaries
+		"/usr",       // User programs and data
+		"/usr/bin",   // User binaries
+		"/usr/sbin",  // User admin binaries
+		"/usr/lib",   // User libraries
+		"/usr/lib64", // 64-bit libraries (some distros)
+		"/usr/local", // Local programs
 		"/usr/local/bin",
 		"/usr/local/sbin",
 		"/etc",        // System configuration
@@ -70,26 +70,26 @@ var SystemDirectories = struct {
 		"/sbin",
 		"/etc",
 		"/var",
-		"/private",             // Private system files
-		"/private/etc",         // System configuration
-		"/private/var",         // Variable data
-		"/private/tmp",         // Temporary files
-		"/cores",               // Core dumps
+		"/private",     // Private system files
+		"/private/etc", // System configuration
+		"/private/var", // Variable data
+		"/private/tmp", // Temporary files
+		"/cores",       // Core dumps
 		"/dev",
 		"/home",
-		"/Users",               // User directories (macOS)
-		"/Volumes",             // Mounted volumes
-		"/Network",             // Network resources
-		"/opt",                 // Optional software
+		"/Users",   // User directories (macOS)
+		"/Volumes", // Mounted volumes
+		"/Network", // Network resources
+		"/opt",     // Optional software
 		"/tmp",
-		"/var/folders",         // macOS user data
+		"/var/folders", // macOS user data
 	},
 
 	// Windows system directories (when using Unix-style paths in WSL/Git Bash)
 	Windows: []string{
-		"/",                    // Root (WSL)
-		"/mnt/c",               // Windows C: drive (WSL)
-		"/mnt/c/Windows",       // Windows system
+		"/",              // Root (WSL)
+		"/mnt/c",         // Windows C: drive (WSL)
+		"/mnt/c/Windows", // Windows system
 		"/mnt/c/Windows/System32",
 		"/mnt/c/Program Files",
 		"/mnt/c/Program Files (x86)",
@@ -110,21 +110,21 @@ var SystemDirectories = struct {
 
 	// Common across all Unix-like systems (Linux, macOS, BSD, etc.)
 	CommonUnix: []string{
-		"/",      // Root
-		"/bin",   // Binaries
-		"/sbin",  // System binaries
-		"/usr",   // User programs
-		"/etc",   // Configuration
-		"/var",   // Variable data
-		"/lib",   // Libraries
-		"/opt",   // Optional
-		"/boot",  // Boot
-		"/root",  // Root home
-		"/sys",   // System
-		"/proc",  // Process
-		"/dev",   // Devices
-		"/home",  // User homes
-		"/srv",   // Service data
+		"/",     // Root
+		"/bin",  // Binaries
+		"/sbin", // System binaries
+		"/usr",  // User programs
+		"/etc",  // Configuration
+		"/var",  // Variable data
+		"/lib",  // Libraries
+		"/opt",  // Optional
+		"/boot", // Boot
+		"/root", // Root home
+		"/sys",  // System
+		"/proc", // Process
+		"/dev",  // Devices
+		"/home", // User homes
+		"/srv",  // Service data
 	},
 }
 

@@ -37,7 +37,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 		}
 
 		lower := strings.ToLower(trimmed)
-		
+
 		// Smart Python command parsing: Extract shell commands from Python code
 		if isPythonCommand(trimmed) {
 			pythonCode := extractPythonCodeFromCommand(trimmed)
@@ -79,8 +79,8 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 			// IMPORTANT: Check home directory deletion patterns FIRST (before root patterns)
 			// Pattern: rm -rf ~/* or rm -rf ~/ (could delete user's entire home)
 			homeDeletePatterns := []string{
-				"rm -rf ~/",      // Without wildcard - still dangerous!
-				"rm -r ~/",      // Without wildcard - still dangerous!
+				"rm -rf ~/", // Without wildcard - still dangerous!
+				"rm -r ~/",  // Without wildcard - still dangerous!
 				"rm -rf ~/*",
 				"rm -r ~/*",
 				"rm -rf ~/ *",
@@ -143,15 +143,15 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 					"rm -rf /boot",  // System directories
 					"rm -rf /root",  // Root home directory
 					"rm -rf /usr/local",
-					"rm -rf /home",  // Entire /home directory (not /home/* which is caught above)
+					"rm -rf /home", // Entire /home directory (not /home/* which is caught above)
 					"rm -rf /srv",
 					"rm -rf /var/log",
 					"rm -rf /etc/ssh",
 					"rm -rf /system",
 					"rm -rf /library",
 					"rm -rf /applications",
-					"rm -rf /tmp/*",  // Temp directory wildcard deletion
-					"rm -r /tmp/*",   // Temp directory wildcard deletion (without force)
+					"rm -rf /tmp/*", // Temp directory wildcard deletion
+					"rm -r /tmp/*",  // Temp directory wildcard deletion (without force)
 				}
 
 				for _, pattern := range rootDeletePatterns {
@@ -168,7 +168,7 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 				}
 			}
 		}
-		
+
 		if containsAny(lower, policy.Denylist) {
 			// Always record a policy denylist hit so callers can see that the
 			// command matched an explicit policy rule, even if we also classify it
@@ -397,34 +397,34 @@ func AnalyzeScript(path string, content []byte, policy config.PolicyConfig) []Fi
 		}
 		// Reverse shell detection - multiple patterns
 		isReverseShell := false
-		
+
 		// Pattern 1: socket.socket + dup2 + shell
 		if strings.Contains(lower, "socket.socket") && strings.Contains(lower, "dup2") &&
 			(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash")) {
 			isReverseShell = true
 		}
-		
+
 		// Pattern 2: nc/netcat with -e flag and shell
-		if (strings.Contains(lower, "nc ") || strings.Contains(lower, "netcat ")) && 
+		if (strings.Contains(lower, "nc ") || strings.Contains(lower, "netcat ")) &&
 			strings.Contains(lower, " -e ") &&
 			(strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash")) {
 			isReverseShell = true
 		}
-		
+
 		// Pattern 3: bash/dev/tcp reverse shell
 		if strings.Contains(lower, "/dev/tcp/") && strings.Contains(lower, "bash -i") {
 			isReverseShell = true
 		}
-		
+
 		// Pattern 4: /bin/sh -i or /bin/bash -i (interactive shell, often used in reverse shells)
 		// Especially when combined with subprocess or socket operations
 		if (strings.Contains(lower, "/bin/sh") || strings.Contains(lower, "/bin/bash")) &&
 			strings.Contains(lower, "-i") &&
-			(strings.Contains(lower, "subprocess") || strings.Contains(lower, "socket") || 
-			 strings.Contains(lower, "dup2") || strings.Contains(lower, "connect")) {
+			(strings.Contains(lower, "subprocess") || strings.Contains(lower, "socket") ||
+				strings.Contains(lower, "dup2") || strings.Contains(lower, "connect")) {
 			isReverseShell = true
 		}
-		
+
 		if isReverseShell {
 			findings = append(findings, Finding{
 				Severity:       "critical",
@@ -701,13 +701,13 @@ func analyzeExtractedCommand(cmd string, lineNum int, policy config.PolicyConfig
 	content := []byte(cmd)
 	// Use a special path to indicate this is an extracted command
 	extractedFindings := AnalyzeScript("extracted-from-python", content, policy)
-	
+
 	// Update line numbers to point to the original Python command
 	for i := range extractedFindings {
 		extractedFindings[i].Line = lineNum
 		extractedFindings[i].Description = fmt.Sprintf("Extracted from Python code: %s", extractedFindings[i].Description)
 	}
-	
+
 	return extractedFindings
 }
 

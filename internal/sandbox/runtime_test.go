@@ -13,9 +13,9 @@ import (
 
 func TestRuntimeSelection(t *testing.T) {
 	tests := []struct {
-		name           string
-		config         config.Config
-		expectedType   string // "bubblewrap", "namespace", "docker", or "error"
+		name            string
+		config          config.Config
+		expectedType    string // "bubblewrap", "namespace", "docker", or "error"
 		shouldHaveError bool
 	}{
 		{
@@ -27,7 +27,7 @@ func TestRuntimeSelection(t *testing.T) {
 					PreferFast:    true,
 				},
 			},
-			expectedType:   "", // Depends on system capabilities
+			expectedType:    "", // Depends on system capabilities
 			shouldHaveError: false,
 		},
 		{
@@ -38,7 +38,7 @@ func TestRuntimeSelection(t *testing.T) {
 					AutoDetectEnv: false,
 				},
 			},
-			expectedType:   "bubblewrap",
+			expectedType:    "bubblewrap",
 			shouldHaveError: !namespace.IsBubblewrapAvailable(), // Error if not available
 		},
 		{
@@ -49,7 +49,7 @@ func TestRuntimeSelection(t *testing.T) {
 					AutoDetectEnv: false,
 				},
 			},
-			expectedType:   "namespace",
+			expectedType:    "namespace",
 			shouldHaveError: !namespace.IsMountNamespaceAvailable(), // Error if not available
 		},
 		{
@@ -60,7 +60,7 @@ func TestRuntimeSelection(t *testing.T) {
 					AutoDetectEnv: false,
 				},
 			},
-			expectedType:   "docker",
+			expectedType:    "docker",
 			shouldHaveError: false, // Docker executor always created (may fail at execution)
 		},
 	}
@@ -211,4 +211,3 @@ func TestRuntimeDetection(t *testing.T) {
 	runtimeInfo := namespace.GetRuntimeInfo(selectedRuntime, env)
 	t.Logf("Runtime info: %s", runtimeInfo)
 }
-

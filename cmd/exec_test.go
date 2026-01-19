@@ -123,9 +123,9 @@ func TestShouldRequireApproval(t *testing.T) {
 
 func TestIsLikelyAgentBypass(t *testing.T) {
 	tests := []struct {
-		name     string
-		value    string
-		isAgent  bool
+		name    string
+		value   string
+		isAgent bool
 	}{
 		// Agent-like values (should be blocked)
 		{"contains 'bypass'", "my-bypass-123", true},
@@ -139,17 +139,17 @@ func TestIsLikelyAgentBypass(t *testing.T) {
 		{"simple 'yes'", "yes", true},
 		{"simple '1'", "1", true},
 		{"too short", "short", true},
-		
+
 		// Valid user values (should be allowed)
 		// Note: contains only letters or mix of letters and common patterns
 		{"human identifier", "i-am-human-john", false},
 		{"random string", "xkcd-correct-horse-battery", false},
-		
+
 		// These could look automated, so they're blocked for safety
 		// (mostly numbers/hex-like patterns that agents might generate)
-		{"timestamp hash", "a1b2c3d4e5f6", true},      // Hex-like, could be auto-generated
-		{"user with id", "user-john-12345678", true},  // Ends with many numbers
-		{"long random", "secretpassword123", true},    // Ends with numbers
+		{"timestamp hash", "a1b2c3d4e5f6", true},     // Hex-like, could be auto-generated
+		{"user with id", "user-john-12345678", true}, // Ends with many numbers
+		{"long random", "secretpassword123", true},   // Ends with numbers
 	}
 
 	for _, tt := range tests {
@@ -164,7 +164,7 @@ func TestIsLikelyAgentBypass(t *testing.T) {
 
 func TestGuardLevelIntegration(t *testing.T) {
 	// Test that guard levels properly filter and require approval
-	
+
 	// Create findings of different severities
 	findings := []analyzer.Finding{
 		{Severity: "medium", Code: "SUDO_USAGE", Description: "Sudo usage detected"},
@@ -209,7 +209,7 @@ func TestGuardLevelIntegration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			filtered := filterFindingsByGuardLevel(findings, tt.guardLevel)
-			
+
 			if len(filtered) != tt.expectedFiltered {
 				t.Errorf("expected %d filtered findings, got %d", tt.expectedFiltered, len(filtered))
 			}
@@ -303,7 +303,7 @@ func TestBypassValueValidation(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			isAgent := isLikelyAgentBypass(tt.value)
 			isValid := len(tt.value) >= 10 && !isAgent
-			
+
 			if isValid != tt.shouldAllow {
 				t.Errorf("value %q: expected allow=%v (reason: %s), got allow=%v",
 					tt.value, tt.shouldAllow, tt.reason, isValid)
@@ -315,11 +315,11 @@ func TestBypassValueValidation(t *testing.T) {
 func TestGuardLevelScenarios(t *testing.T) {
 	// Real-world scenario tests
 	scenarios := []struct {
-		name         string
-		command      string
-		guardLevel   config.GuardLevel
-		shouldBlock  bool
-		description  string
+		name        string
+		command     string
+		guardLevel  config.GuardLevel
+		shouldBlock bool
+		description string
 	}{
 		{
 			name:        "dev: safe npm install",
@@ -407,11 +407,11 @@ func TestPreExecutionAssessment(t *testing.T) {
 		{
 			name:           "non-critical command with sandbox disabled",
 			command:        "echo test",
-			riskLevel:       "low",
-			findings:        []analyzer.Finding{},
+			riskLevel:      "low",
+			findings:       []analyzer.Finding{},
 			sandboxEnabled: false,
-			shouldBlock:     false,
-			description:     "Non-critical commands can proceed without sandbox",
+			shouldBlock:    false,
+			description:    "Non-critical commands can proceed without sandbox",
 		},
 		{
 			name:      "fork bomb with sandbox disabled",
@@ -425,12 +425,12 @@ func TestPreExecutionAssessment(t *testing.T) {
 			description:    "Fork bomb should be blocked if sandbox disabled",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// This test verifies the logic that would be in runExec
 			// We're testing that critical commands require sandbox
-			
+
 			hasCriticalCode := false
 			for _, f := range tt.findings {
 				criticalCodes := []string{
@@ -450,13 +450,13 @@ func TestPreExecutionAssessment(t *testing.T) {
 					break
 				}
 			}
-			
+
 			// Simulate pre-execution assessment logic
 			shouldBlock := false
 			if tt.riskLevel == "critical" && hasCriticalCode && !tt.sandboxEnabled {
 				shouldBlock = true
 			}
-			
+
 			if shouldBlock != tt.shouldBlock {
 				t.Errorf("expected shouldBlock=%v, got=%v (%s)",
 					tt.shouldBlock, shouldBlock, tt.description)
@@ -470,10 +470,10 @@ func TestPreExecutionAssessment(t *testing.T) {
 func TestSecurityImprovementsRegression(t *testing.T) {
 	// The incident: rm -r /* was not detected
 	incidentCommand := "rm -r /*"
-	
+
 	policy := config.PolicyConfig{}
 	findings := analyzer.AnalyzeScript("incident.sh", []byte(incidentCommand), policy)
-	
+
 	// Should detect DANGEROUS_DELETE_ROOT
 	found := false
 	for _, f := range findings {
@@ -482,11 +482,11 @@ func TestSecurityImprovementsRegression(t *testing.T) {
 			break
 		}
 	}
-	
+
 	if !found {
 		t.Fatal("REGRESSION: Incident command 'rm -r /*' is NOT detected!")
 	}
-	
+
 	// Should also detect other variations
 	variations := []string{
 		"rm -rf /*",
@@ -494,7 +494,7 @@ func TestSecurityImprovementsRegression(t *testing.T) {
 		"rm -rf /bin",
 		"rm -rf /usr",
 	}
-	
+
 	for _, variant := range variations {
 		findings := analyzer.AnalyzeScript("test.sh", []byte(variant), policy)
 		found := false

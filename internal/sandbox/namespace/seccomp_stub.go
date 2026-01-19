@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package namespace
@@ -26,4 +27,3 @@ func ApplySeccompFilter(profile SeccompProfile) error {
 func GetSeccompInfo() (string, error) {
 	return "seccomp is only available on Linux", fmt.Errorf("unsupported platform")
 }
-

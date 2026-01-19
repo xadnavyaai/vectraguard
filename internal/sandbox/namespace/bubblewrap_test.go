@@ -99,4 +99,3 @@ func TestIsBubblewrapAvailable(t *testing.T) {
 		}
 	}
 }
-

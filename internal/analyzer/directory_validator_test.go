@@ -448,4 +448,3 @@ func TestValidateProtectedDirectory_Extensive(t *testing.T) {
 		}
 	}
 }
-
