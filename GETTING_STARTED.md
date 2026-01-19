@@ -7,6 +7,7 @@
 ## 🎯 What You'll Achieve
 
 After following this guide:
+- ✅ CVE scanning for known vulnerable dependencies
 - ✅ Commands run with `vectra-guard exec` will be protected
 - ✅ Risky commands will be caught automatically
 - ✅ Full audit trail of everything executed
@@ -72,6 +73,13 @@ vectra-guard exec -- npm install
 vectra-guard audit session
 ```
 
+**A2) Scan dependencies for CVEs**
+
+```bash
+vectra-guard cve sync --path .
+vectra-guard cve scan --path .
+```
+
 **B) Review a risky script before running**
 
 ```bash
@@ -96,6 +104,13 @@ vectra-guard exec -- echo "Hello, Vectra Guard!"
 
 ```bash
 vectra-guard audit session
+```
+
+### Step 4b: CVE Scan (optional, recommended)
+
+```bash
+vectra-guard cve sync --path .
+vectra-guard cve scan --path .
 ```
 
 **That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
