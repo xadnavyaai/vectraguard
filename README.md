@@ -421,6 +421,11 @@ vectra-guard exec --interactive sudo apt update
 # Audit npm or python dependencies (auto-installs tools if missing)
 vectra-guard audit npm --path .
 vectra-guard audit python --path .
+
+# CVE awareness (local cache + manifest scan)
+vectra-guard cve sync --path .
+vectra-guard cve scan --path .
+vectra-guard cve explain express-validator@6.15.0 --ecosystem npm
 ```
 
 ### Package Audits
@@ -437,6 +442,21 @@ vectra-guard audit python --path /path/to/project
 # Disable auto-install of audit tools
 vectra-guard audit npm --path . --no-install
 vectra-guard audit python --path . --no-install
+```
+
+### CVE Awareness
+
+Use the built-in CVE cache to scan manifests and explain known vulnerabilities.
+
+```bash
+# Sync CVE cache (OSV-backed)
+vectra-guard cve sync --path .
+
+# Scan manifests/lockfiles
+vectra-guard cve scan --path .
+
+# Explain a specific package/version
+vectra-guard cve explain express-validator@6.15.0 --ecosystem npm
 ```
 
 ### Session Management

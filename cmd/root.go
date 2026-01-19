@@ -102,6 +102,43 @@ func execute(args []string) error {
 			return usageError()
 		}
 		return runExec(ctx, subFlags.Args(), *interactive, *sessionID)
+	case "cve":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		cveCmd := subArgs[0]
+		cveArgs := subArgs[1:]
+		switch cveCmd {
+		case "sync":
+			subFlags := flag.NewFlagSet("cve-sync", flag.ContinueOnError)
+			target := subFlags.String("path", ".", "Target directory for manifests")
+			force := subFlags.Bool("force", false, "Refresh cached entries even if fresh")
+			if err := subFlags.Parse(cveArgs); err != nil {
+				return err
+			}
+			return runCVESync(ctx, *target, *force)
+		case "scan":
+			subFlags := flag.NewFlagSet("cve-scan", flag.ContinueOnError)
+			target := subFlags.String("path", ".", "Target directory for manifests")
+			refresh := subFlags.Bool("refresh", false, "Refresh cached entries before scanning")
+			if err := subFlags.Parse(cveArgs); err != nil {
+				return err
+			}
+			return runCVEScan(ctx, *target, *refresh)
+		case "explain":
+			subFlags := flag.NewFlagSet("cve-explain", flag.ContinueOnError)
+			ecosystem := subFlags.String("ecosystem", "npm", "Package ecosystem (npm, Go, etc.)")
+			refresh := subFlags.Bool("refresh", false, "Refresh cache for the specified package")
+			if err := subFlags.Parse(cveArgs); err != nil {
+				return err
+			}
+			if subFlags.NArg() < 1 {
+				return usageError()
+			}
+			return runCVEExplain(ctx, subFlags.Arg(0), *ecosystem, *refresh)
+		default:
+			return usageError()
+		}
 	case "audit":
 		if len(subArgs) < 1 {
 			return usageError()
@@ -325,13 +362,13 @@ func execute(args []string) error {
 			subFlags := flag.NewFlagSet("seed-agents", flag.ContinueOnError)
 			target := subFlags.String("target", ".", "Target repository directory")
 			force := subFlags.Bool("force", false, "Overwrite existing files")
-				targets := subFlags.String("targets", "", "Comma/space-separated targets (e.g., agents,claude,cursor)")
-				list := subFlags.Bool("list", false, "List available targets and exit")
+			targets := subFlags.String("targets", "", "Comma/space-separated targets (e.g., agents,claude,cursor)")
+			list := subFlags.Bool("list", false, "List available targets and exit")
 			if err := subFlags.Parse(seedArgs); err != nil {
 				return err
 			}
-				selected := parseSeedTargets(*targets)
-				return runSeedAgents(ctx, *target, *force, selected, *list)
+			selected := parseSeedTargets(*targets)
+			return runSeedAgents(ctx, *target, *force, selected, *list)
 		default:
 			return usageError()
 		}

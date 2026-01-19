@@ -11,6 +11,7 @@ This document provides detailed configuration options and preset examples for Ve
 - [Guard Level (Auto-Detection)](#guard-level-auto-detection)
 - [Production Indicators](#production-indicators)
 - [Security Policies](#security-policies)
+- [CVE Awareness](#cve-awareness)
 - [Sandbox Configuration](#sandbox-configuration)
 - [Advanced Configuration](#advanced-configuration)
 
@@ -28,6 +29,11 @@ guard_level:
   level: auto             # Auto-detect context (low in dev, high in prod)
   allow_user_bypass: true # Allow overriding with env var
 
+cve:
+  enabled: true
+  sources: ["osv"]
+  update_interval_hours: 24
+
 sandbox:
   enabled: true
   mode: always            # Default: All commands sandboxed (maximum security)
@@ -44,6 +50,11 @@ guard_level:
   level: auto             # Auto-detect context (low in dev, high in prod)
   allow_user_bypass: true # Allow overriding with env var
 
+cve:
+  enabled: true
+  sources: ["osv"]
+  update_interval_hours: 24
+
 sandbox:
   enabled: true
   mode: auto              # Only sandbox risky commands (like npm install)
@@ -58,6 +69,11 @@ sandbox:
 guard_level:
   level: high             # Block critical/high risks without approval
 
+cve:
+  enabled: true
+  sources: ["osv"]
+  update_interval_hours: 24
+
 sandbox:
   enabled: true
   mode: always            # Run EVERYTHING in sandbox for isolation
@@ -71,6 +87,11 @@ sandbox:
 ```yaml
 guard_level:
   level: paranoid         # Require explicit approval for everything
+
+cve:
+  enabled: true
+  sources: ["osv"]
+  update_interval_hours: 24
 
 sandbox:
   enabled: true
@@ -146,6 +167,10 @@ guard_level:
 
 logging:
   format: json  # or: text
+
+cve:
+  enabled: true
+  sources: ["osv"]
 
 policies:
   monitor_git_ops: true
@@ -253,6 +278,24 @@ policies:
   # Block force push (git push --force)
   block_force_git: true
 ```
+
+---
+
+## CVE Awareness
+
+Control the local CVE cache and manifest scanning behavior.
+
+```yaml
+cve:
+  enabled: true
+  sources: ["osv"]          # Currently supported: osv
+  update_interval_hours: 24 # Cache freshness window
+  cache_dir: "~/.vectra-guard/cve"
+```
+
+Notes:
+- CVE data is fetched from OSV and cached locally.
+- Use `vg cve sync` to refresh the cache, and `vg cve scan` to scan manifests.
 
 **What gets detected:**
 - `git push --force` / `git push -f` (blocked if `block_force_git: true`)

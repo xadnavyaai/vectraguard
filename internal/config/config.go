@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -18,6 +19,7 @@ type Config struct {
 	GuardLevel           GuardLevelConfig           `yaml:"guard_level" toml:"guard_level" json:"guard_level"`
 	ProductionIndicators ProductionIndicatorsConfig `yaml:"production_indicators" toml:"production_indicators" json:"production_indicators"`
 	Sandbox              SandboxConfig              `yaml:"sandbox" toml:"sandbox" json:"sandbox"`
+	CVE                  CVEConfig                  `yaml:"cve" toml:"cve" json:"cve"`
 }
 
 // LoggingConfig controls output formatting.
@@ -154,6 +156,14 @@ type SandboxConfig struct {
 	TrustStorePath string `yaml:"trust_store_path" toml:"trust_store_path" json:"trust_store_path"`
 }
 
+// CVEConfig controls CVE awareness and caching.
+type CVEConfig struct {
+	Enabled             bool     `yaml:"enabled" toml:"enabled" json:"enabled"`
+	Sources             []string `yaml:"sources" toml:"sources" json:"sources"`
+	UpdateIntervalHours int      `yaml:"update_interval_hours" toml:"update_interval_hours" json:"update_interval_hours"`
+	CacheDir            string   `yaml:"cache_dir" toml:"cache_dir" json:"cache_dir"`
+}
+
 // BindMountConfig represents a bind mount configuration
 type BindMountConfig struct {
 	HostPath      string `yaml:"host_path" toml:"host_path" json:"host_path"`
@@ -267,6 +277,12 @@ func DefaultConfig() Config {
 			LogOutput:       false, // Don't log output by default
 			ShowRuntimeInfo: false, // Don't spam user by default
 			TrustStorePath:  "",
+		},
+		CVE: CVEConfig{
+			Enabled:             true,
+			Sources:             []string{"osv"},
+			UpdateIntervalHours: 24,
+			CacheDir:            "",
 		},
 	}
 }
@@ -466,6 +482,18 @@ func merge(dst *Config, src Config) {
 	dst.Sandbox.EnableMetrics = src.Sandbox.EnableMetrics
 	dst.Sandbox.LogOutput = src.Sandbox.LogOutput
 	dst.Sandbox.ShowRuntimeInfo = src.Sandbox.ShowRuntimeInfo
+
+	// Merge CVE configuration
+	dst.CVE.Enabled = src.CVE.Enabled
+	if len(src.CVE.Sources) > 0 {
+		dst.CVE.Sources = src.CVE.Sources
+	}
+	if src.CVE.UpdateIntervalHours > 0 {
+		dst.CVE.UpdateIntervalHours = src.CVE.UpdateIntervalHours
+	}
+	if src.CVE.CacheDir != "" {
+		dst.CVE.CacheDir = src.CVE.CacheDir
+	}
 }
 
 func exists(path string) bool {
@@ -502,6 +530,9 @@ func decodeYAML(data []byte) (Config, error) {
 			case "sandbox":
 				mode = "sandbox"
 				listTarget = nil
+			case "cve":
+				mode = "cve"
+				listTarget = nil
 			case "allowlist":
 				if mode == "policies" {
 					listTarget = &cfg.Policies.Allowlist
@@ -525,6 +556,10 @@ func decodeYAML(data []byte) (Config, error) {
 			case "keywords":
 				if mode == "production_indicators" {
 					listTarget = &cfg.ProductionIndicators.Keywords
+				}
+			case "sources":
+				if mode == "cve" {
+					listTarget = &cfg.CVE.Sources
 				}
 			}
 			continue
@@ -604,6 +639,17 @@ func decodeYAML(data []byte) (Config, error) {
 				case "seccomp_profile":
 					cfg.Sandbox.SeccompProfile = value
 				}
+			case "cve":
+				switch key {
+				case "enabled":
+					cfg.CVE.Enabled = value == "true"
+				case "cache_dir":
+					cfg.CVE.CacheDir = value
+				case "update_interval_hours":
+					if parsed, err := strconv.Atoi(value); err == nil {
+						cfg.CVE.UpdateIntervalHours = parsed
+					}
+				}
 			}
 		}
 	}
@@ -644,6 +690,19 @@ func decodeTOML(data []byte) (Config, error) {
 				cfg.Policies.Allowlist = parseStringArray(value)
 			case "denylist":
 				cfg.Policies.Denylist = parseStringArray(value)
+			}
+		case "cve":
+			switch key {
+			case "enabled":
+				cfg.CVE.Enabled = trimQuotes(value) == "true"
+			case "cache_dir":
+				cfg.CVE.CacheDir = trimQuotes(value)
+			case "update_interval_hours":
+				if parsed, err := strconv.Atoi(trimQuotes(value)); err == nil {
+					cfg.CVE.UpdateIntervalHours = parsed
+				}
+			case "sources":
+				cfg.CVE.Sources = parseStringArray(value)
 			}
 		}
 	}

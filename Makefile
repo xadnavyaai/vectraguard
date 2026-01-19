@@ -96,6 +96,10 @@ test-local-extensive:
 test:
 	go test -v ./...
 
+# CVE test suite (unit tests only)
+test-cve:
+	go test -v ./internal/cve/... ./cmd -run TestParsePackageArg\|TestResolveCVECachePath\|TestShortSummary
+
 # Run internal tests (safe - no execution, unit tests only)
 # Tests: daemon, sandbox, runtime, analyzer, config
 test-internal:
@@ -115,6 +119,9 @@ test-internal:
 	@echo ""
 	@echo "Testing config..."
 	go test -v ./internal/config/...
+	@echo ""
+	@echo "Testing CVE..."
+	@$(MAKE) test-cve
 	@echo ""
 	@echo "Testing other internal packages..."
 	go test -v ./internal/logging/... ./internal/session/...
@@ -263,6 +270,7 @@ help:
 	@echo ""
 	@echo "Basic Testing:"
 	@echo "  test          - Run Go unit tests (local)"
+	@echo "  test-cve      - Run CVE unit tests (cache + scan helpers)"
 	@echo "  test-internal - Run internal Go unit tests (safe, no execution)"
 	@echo "  test-namespace - Run namespace tests (local, safe)"
 	@echo "  test-pr8      - Test PR #8 specific changes (daemon, seccomp)"
