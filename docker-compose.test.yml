@@ -70,6 +70,8 @@ services:
       - GO_ENV=test
       - DOCKER_HOST=unix:///var/run/docker.sock
       - VECTRA_GUARD_VERSION=test
+      - CI=true
+      - VECTRAGUARD_CONTAINER=true
     privileged: true  # Required for Docker-in-Docker (sandbox testing)
     working_dir: /workspace
     entrypoint: []

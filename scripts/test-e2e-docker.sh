@@ -68,7 +68,7 @@ setup_binary() {
     }
     
     print_info "Building vectra-guard binary in temp location (safe, won't overwrite local)..."
-    if ! go build -o "$temp_binary" .; then
+    if ! go build -buildvcs=false -o "$temp_binary" .; then
         rm -f "$temp_binary"
         print_failure "Failed to build binary"
         exit 1
