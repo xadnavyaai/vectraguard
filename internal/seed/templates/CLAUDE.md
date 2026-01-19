@@ -4,6 +4,26 @@
 - Run shell commands via `vectra-guard exec -- <command>` when changes are involved.
 - Avoid destructive commands or anything targeting system paths.
 
+## CVE Scanning Workflow
+- **Before installing dependencies, scan for vulnerabilities:**
+  ```bash
+  vg cve sync --path .
+  vg cve scan --path .
+  vg cve explain <package>@<version> --ecosystem <npm|pypi|go>
+  ```
+- Enable in config: `cve: { enabled: true, sources: ["osv"] }`
+- **Example workflow:**
+  ```bash
+  # Sync CVE database
+  vg cve sync --path .
+  
+  # Scan manifest files (package.json, requirements.txt, go.mod)
+  vg cve scan --path .
+  
+  # If clean, install safely
+  vg exec -- npm install
+  ```
+
 ## Config & Sandbox
 - Config lives in `vectra-guard.yaml` (or `.vectra-guard/config.yaml` with `--local`).
 - Sandbox is enabled by default. Prefer `mode: always` for risky commands.

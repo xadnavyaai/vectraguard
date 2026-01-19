@@ -58,6 +58,60 @@ denylist = ["rm -rf /"]
 	}
 }
 
+func TestDecodeYAMLParsesCVE(t *testing.T) {
+	body := `
+cve:
+  enabled: true
+  cache_dir: /tmp/vg-cve
+  update_interval_hours: 12
+  sources:
+    - osv
+    - nvd
+`
+	cfg, err := decodeYAML([]byte(body))
+	if err != nil {
+		t.Fatalf("decode yaml: %v", err)
+	}
+	if !cfg.CVE.Enabled {
+		t.Fatalf("expected cve enabled")
+	}
+	if cfg.CVE.CacheDir != "/tmp/vg-cve" {
+		t.Fatalf("unexpected cache_dir: %s", cfg.CVE.CacheDir)
+	}
+	if cfg.CVE.UpdateIntervalHours != 12 {
+		t.Fatalf("unexpected update interval: %d", cfg.CVE.UpdateIntervalHours)
+	}
+	if len(cfg.CVE.Sources) != 2 || cfg.CVE.Sources[0] != "osv" || cfg.CVE.Sources[1] != "nvd" {
+		t.Fatalf("unexpected cve sources: %+v", cfg.CVE.Sources)
+	}
+}
+
+func TestDecodeTOMLParsesCVE(t *testing.T) {
+	body := `
+[cve]
+enabled = true
+cache_dir = "/tmp/vg-cve"
+update_interval_hours = 24
+sources = ["osv", "mitre"]
+`
+	cfg, err := decodeTOML([]byte(body))
+	if err != nil {
+		t.Fatalf("decode toml: %v", err)
+	}
+	if !cfg.CVE.Enabled {
+		t.Fatalf("expected cve enabled")
+	}
+	if cfg.CVE.CacheDir != "/tmp/vg-cve" {
+		t.Fatalf("unexpected cache_dir: %s", cfg.CVE.CacheDir)
+	}
+	if cfg.CVE.UpdateIntervalHours != 24 {
+		t.Fatalf("unexpected update interval: %d", cfg.CVE.UpdateIntervalHours)
+	}
+	if len(cfg.CVE.Sources) != 2 || cfg.CVE.Sources[0] != "osv" || cfg.CVE.Sources[1] != "mitre" {
+		t.Fatalf("unexpected cve sources: %+v", cfg.CVE.Sources)
+	}
+}
+
 func TestLoadRespectsPrecedence(t *testing.T) {
 	tmp := t.TempDir()
 	configDir := filepath.Join(tmp, ".config", "vectra-guard")
@@ -106,15 +160,15 @@ func TestContextHelpers(t *testing.T) {
 
 func TestGuardLevelDefaults(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	if cfg.GuardLevel.Level != GuardLevelAuto {
 		t.Errorf("expected default guard level to be auto, got %s", cfg.GuardLevel.Level)
 	}
-	
+
 	if !cfg.GuardLevel.AllowUserBypass {
 		t.Error("expected user bypass to be allowed by default")
 	}
-	
+
 	if cfg.GuardLevel.BypassEnvVar != "VECTRAGUARD_BYPASS" {
 		t.Errorf("expected default bypass env var to be VECTRAGUARD_BYPASS, got %s", cfg.GuardLevel.BypassEnvVar)
 	}
@@ -122,23 +176,23 @@ func TestGuardLevelDefaults(t *testing.T) {
 
 func TestPolicyDefaults(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	if !cfg.Policies.MonitorGitOps {
 		t.Error("expected MonitorGitOps to be true by default")
 	}
-	
+
 	if !cfg.Policies.BlockForceGit {
 		t.Error("expected BlockForceGit to be true by default")
 	}
-	
+
 	if !cfg.Policies.DetectProdEnv {
 		t.Error("expected DetectProdEnv to be true by default")
 	}
-	
+
 	if !cfg.Policies.OnlyDestructiveSQL {
 		t.Error("expected OnlyDestructiveSQL to be true by default")
 	}
-	
+
 	expectedPatterns := []string{"prod", "production", "prd", "live", "staging", "stg"}
 	if len(cfg.Policies.ProdEnvPatterns) != len(expectedPatterns) {
 		t.Errorf("expected %d prod env patterns, got %d", len(expectedPatterns), len(cfg.Policies.ProdEnvPatterns))
@@ -158,14 +212,14 @@ func TestGuardLevelParsing(t *testing.T) {
 		{"paranoid level", "guard_level:\n  level: paranoid\n", GuardLevelParanoid},
 		{"off level", "guard_level:\n  level: off\n", GuardLevelOff},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg, err := decodeYAML([]byte(tt.yaml))
 			if err != nil {
 				t.Fatalf("decode yaml: %v", err)
 			}
-			
+
 			if cfg.GuardLevel.Level != tt.expected {
 				t.Errorf("expected guard level %s, got %s", tt.expected, cfg.GuardLevel.Level)
 			}
@@ -181,12 +235,12 @@ func TestGuardLevelValidation(t *testing.T) {
 		GuardLevelHigh,
 		GuardLevelParanoid,
 	}
-	
+
 	for _, level := range validLevels {
 		t.Run(string(level), func(t *testing.T) {
 			cfg := DefaultConfig()
 			cfg.GuardLevel.Level = level
-			
+
 			// Should not panic or error
 			_ = cfg.GuardLevel.Level
 		})
@@ -195,7 +249,7 @@ func TestGuardLevelValidation(t *testing.T) {
 
 func TestPolicyConfigDefaults(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	tests := []struct {
 		name     string
 		value    bool
@@ -206,7 +260,7 @@ func TestPolicyConfigDefaults(t *testing.T) {
 		{"DetectProdEnv", cfg.Policies.DetectProdEnv, true},
 		{"OnlyDestructiveSQL", cfg.Policies.OnlyDestructiveSQL, true},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if tt.value != tt.expected {
@@ -242,54 +296,54 @@ policies:
   denylist:
     - "rm -rf /"
 `
-	
+
 	cfg, err := decodeYAML([]byte(yaml))
 	if err != nil {
 		t.Fatalf("decode yaml: %v", err)
 	}
-	
+
 	// Verify all fields
 	if cfg.Logging.Format != "json" {
 		t.Errorf("expected format json, got %s", cfg.Logging.Format)
 	}
-	
+
 	if cfg.GuardLevel.Level != GuardLevelHigh {
 		t.Errorf("expected guard level high, got %s", cfg.GuardLevel.Level)
 	}
-	
+
 	if cfg.GuardLevel.AllowUserBypass != false {
 		t.Error("expected allow_user_bypass to be false")
 	}
-	
+
 	if cfg.GuardLevel.BypassEnvVar != "CUSTOM_BYPASS" {
 		t.Errorf("expected bypass env var CUSTOM_BYPASS, got %s", cfg.GuardLevel.BypassEnvVar)
 	}
-	
+
 	if !cfg.Policies.MonitorGitOps {
 		t.Error("expected monitor_git_ops to be true")
 	}
-	
+
 	if !cfg.Policies.BlockForceGit {
 		t.Error("expected block_force_git to be true")
 	}
-	
+
 	if !cfg.Policies.DetectProdEnv {
 		t.Error("expected detect_prod_env to be true")
 	}
-	
+
 	if cfg.Policies.OnlyDestructiveSQL {
 		t.Error("expected only_destructive_sql to be false")
 	}
-	
+
 	expectedPatterns := []string{"prod", "production", "uat"}
 	if len(cfg.Policies.ProdEnvPatterns) != len(expectedPatterns) {
 		t.Errorf("expected %d patterns, got %d", len(expectedPatterns), len(cfg.Policies.ProdEnvPatterns))
 	}
-	
+
 	if len(cfg.Policies.Allowlist) != 2 {
 		t.Errorf("expected 2 allowlist items, got %d", len(cfg.Policies.Allowlist))
 	}
-	
+
 	if len(cfg.Policies.Denylist) != 1 {
 		t.Errorf("expected 1 denylist item, got %d", len(cfg.Policies.Denylist))
 	}
@@ -298,19 +352,19 @@ policies:
 func TestConfigMerging(t *testing.T) {
 	base := Config{
 		GuardLevel: GuardLevelConfig{
-			Level: GuardLevelLow,
+			Level:           GuardLevelLow,
 			AllowUserBypass: true,
-			BypassEnvVar: "BASE_VAR",
+			BypassEnvVar:    "BASE_VAR",
 		},
 		Policies: PolicyConfig{
 			MonitorGitOps: false,
 			BlockForceGit: false,
 		},
 	}
-	
+
 	override := Config{
 		GuardLevel: GuardLevelConfig{
-			Level: GuardLevelHigh,
+			Level:           GuardLevelHigh,
 			AllowUserBypass: false, // Explicitly set to false
 			// BypassEnvVar not set (empty string)
 		},
@@ -319,28 +373,28 @@ func TestConfigMerging(t *testing.T) {
 			BlockForceGit: false, // Explicitly set to false
 		},
 	}
-	
+
 	merge(&base, override)
-	
+
 	if base.GuardLevel.Level != GuardLevelHigh {
 		t.Error("guard level should be overridden to high")
 	}
-	
+
 	// Note: boolean values are always merged from source, even if false
 	// This is by design since we can't distinguish between "not set" and "set to false" for booleans
 	if base.GuardLevel.AllowUserBypass != false {
 		t.Error("allow_user_bypass should be overridden to false")
 	}
-	
+
 	// BypassEnvVar should keep base value since override is empty
 	if base.GuardLevel.BypassEnvVar != "BASE_VAR" {
 		t.Error("bypass_env_var should keep base value when override is empty")
 	}
-	
+
 	if !base.Policies.MonitorGitOps {
 		t.Error("monitor_git_ops should be overridden to true")
 	}
-	
+
 	// BlockForceGit is merged from override (false)
 	if base.Policies.BlockForceGit {
 		t.Error("block_force_git should be overridden to false")
@@ -352,12 +406,12 @@ func TestInvalidGuardLevel(t *testing.T) {
 guard_level:
   level: invalid_level
 `
-	
+
 	cfg, err := decodeYAML([]byte(yaml))
 	if err != nil {
 		t.Fatalf("decode yaml: %v", err)
 	}
-	
+
 	// Should parse but with the invalid value
 	if cfg.GuardLevel.Level != GuardLevel("invalid_level") {
 		t.Errorf("expected invalid_level, got %s", cfg.GuardLevel.Level)
@@ -370,16 +424,16 @@ func TestPartialConfig(t *testing.T) {
 guard_level:
   level: paranoid
 `
-	
+
 	cfg, err := decodeYAML([]byte(yaml))
 	if err != nil {
 		t.Fatalf("decode yaml: %v", err)
 	}
-	
+
 	if cfg.GuardLevel.Level != GuardLevelParanoid {
 		t.Errorf("expected paranoid, got %s", cfg.GuardLevel.Level)
 	}
-	
+
 	// Other fields should be empty/default
 	if cfg.GuardLevel.BypassEnvVar != "" {
 		t.Error("bypass env var should be empty when not specified")
@@ -403,14 +457,14 @@ func TestBooleanParsing(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg, err := decodeYAML([]byte(tt.yaml))
 			if err != nil {
 				t.Fatalf("decode yaml: %v", err)
 			}
-			
+
 			if cfg.Policies.MonitorGitOps != tt.expected {
 				t.Errorf("expected %v, got %v (yaml: %q)", tt.expected, cfg.Policies.MonitorGitOps, tt.yaml)
 			}
@@ -424,12 +478,12 @@ policies:
   detect_prod_env: true
   prod_env_patterns: []
 `
-	
+
 	cfg, err := decodeYAML([]byte(yaml))
 	if err != nil {
 		t.Fatalf("decode yaml: %v", err)
 	}
-	
+
 	if len(cfg.Policies.ProdEnvPatterns) != 0 {
 		t.Errorf("expected empty prod patterns, got %d", len(cfg.Policies.ProdEnvPatterns))
 	}
@@ -441,14 +495,14 @@ func TestConfigContextHelpers(t *testing.T) {
 			Level: GuardLevelHigh,
 		},
 	}
-	
+
 	ctx := WithConfig(context.Background(), cfg)
 	retrieved := FromContext(ctx)
-	
+
 	if retrieved.GuardLevel.Level != GuardLevelHigh {
 		t.Error("config not properly stored/retrieved from context")
 	}
-	
+
 	// Test with nil context
 	defaultCfg := FromContext(nil)
 	if defaultCfg.GuardLevel.Level != GuardLevelAuto {
@@ -467,23 +521,23 @@ production_indicators:
     - prod
     - staging
 `
-	
+
 	cfg, err := decodeYAML([]byte(yaml))
 	if err != nil {
 		t.Fatalf("decode yaml: %v", err)
 	}
-	
+
 	expectedBranches := []string{"main", "master", "production"}
 	if len(cfg.ProductionIndicators.Branches) != len(expectedBranches) {
 		t.Errorf("expected %d branches, got %d", len(expectedBranches), len(cfg.ProductionIndicators.Branches))
 	}
-	
+
 	for i, branch := range expectedBranches {
 		if cfg.ProductionIndicators.Branches[i] != branch {
 			t.Errorf("expected branch %s, got %s", branch, cfg.ProductionIndicators.Branches[i])
 		}
 	}
-	
+
 	expectedKeywords := []string{"prod", "staging"}
 	if len(cfg.ProductionIndicators.Keywords) != len(expectedKeywords) {
 		t.Errorf("expected %d keywords, got %d", len(expectedKeywords), len(cfg.ProductionIndicators.Keywords))
@@ -492,11 +546,11 @@ production_indicators:
 
 func TestDetectGuardLevelGitBranch(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	tests := []struct {
-		name       string
-		branch     string
-		expected   GuardLevel
+		name        string
+		branch      string
+		expected    GuardLevel
 		description string
 	}{
 		{
@@ -530,15 +584,15 @@ func TestDetectGuardLevelGitBranch(t *testing.T) {
 			description: "branch containing 'prod' should trigger high",
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := DetectionContext{
 				GitBranch: tt.branch,
 			}
-			
+
 			level := DetectGuardLevel(cfg, ctx)
-			
+
 			if level != tt.expected {
 				t.Errorf("%s: expected %s, got %s", tt.description, tt.expected, level)
 			}
@@ -548,7 +602,7 @@ func TestDetectGuardLevelGitBranch(t *testing.T) {
 
 func TestDetectGuardLevelCommand(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	tests := []struct {
 		name     string
 		command  string
@@ -580,15 +634,15 @@ func TestDetectGuardLevelCommand(t *testing.T) {
 			expected: GuardLevelMedium,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := DetectionContext{
 				Command: tt.command,
 			}
-			
+
 			level := DetectGuardLevel(cfg, ctx)
-			
+
 			if level != tt.expected {
 				t.Errorf("command %q: expected %s, got %s", tt.command, tt.expected, level)
 			}
@@ -599,14 +653,14 @@ func TestDetectGuardLevelCommand(t *testing.T) {
 func TestDetectGuardLevelNonAutoReturnsConfigured(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.GuardLevel.Level = GuardLevelHigh
-	
+
 	ctx := DetectionContext{
-		GitBranch: "main", // Would normally trigger paranoid
+		GitBranch: "main",           // Would normally trigger paranoid
 		Command:   "deploy to prod", // Would normally trigger high
 	}
-	
+
 	level := DetectGuardLevel(cfg, ctx)
-	
+
 	// Should return configured level, not auto-detected
 	if level != GuardLevelHigh {
 		t.Errorf("when not auto, should return configured level (high), got %s", level)
@@ -615,15 +669,15 @@ func TestDetectGuardLevelNonAutoReturnsConfigured(t *testing.T) {
 
 func TestDetectGuardLevelPriorityMostDangerous(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	// Main branch (paranoid) + production keyword (high) = paranoid wins
 	ctx := DetectionContext{
 		GitBranch: "main",
 		Command:   "deploy to prod-server",
 	}
-	
+
 	level := DetectGuardLevel(cfg, ctx)
-	
+
 	if level != GuardLevelParanoid {
 		t.Errorf("most dangerous context should win: expected paranoid, got %s", level)
 	}
@@ -685,13 +739,13 @@ func TestIsInMeaningfulContext(t *testing.T) {
 			expected: false,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			result := isInMeaningfulContext(tt.text, tt.keyword)
-			
+
 			if result != tt.expected {
-				t.Errorf("text %q with keyword %q: expected %v, got %v", 
+				t.Errorf("text %q with keyword %q: expected %v, got %v",
 					tt.text, tt.keyword, tt.expected, result)
 			}
 		})
@@ -700,7 +754,7 @@ func TestIsInMeaningfulContext(t *testing.T) {
 
 func TestDetectGuardLevelEnvironmentVars(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	tests := []struct {
 		name     string
 		env      map[string]string
@@ -728,15 +782,15 @@ func TestDetectGuardLevelEnvironmentVars(t *testing.T) {
 			expected: GuardLevelMedium,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := DetectionContext{
 				Environment: tt.env,
 			}
-			
+
 			level := DetectGuardLevel(cfg, ctx)
-			
+
 			if level != tt.expected {
 				t.Errorf("expected %s, got %s", tt.expected, level)
 			}
@@ -746,7 +800,7 @@ func TestDetectGuardLevelEnvironmentVars(t *testing.T) {
 
 func TestDetectGuardLevelWorkingDirectory(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	tests := []struct {
 		name       string
 		workingDir string
@@ -768,15 +822,15 @@ func TestDetectGuardLevelWorkingDirectory(t *testing.T) {
 			expected:   GuardLevelMedium,
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ctx := DetectionContext{
 				WorkingDir: tt.workingDir,
 			}
-			
+
 			level := DetectGuardLevel(cfg, ctx)
-			
+
 			if level != tt.expected {
 				t.Errorf("workdir %q: expected %s, got %s", tt.workingDir, tt.expected, level)
 			}
@@ -786,12 +840,12 @@ func TestDetectGuardLevelWorkingDirectory(t *testing.T) {
 
 func TestProductionIndicatorsDefaults(t *testing.T) {
 	cfg := DefaultConfig()
-	
+
 	expectedBranches := []string{"main", "master", "production", "release"}
 	if len(cfg.ProductionIndicators.Branches) != len(expectedBranches) {
 		t.Errorf("expected %d default branches, got %d", len(expectedBranches), len(cfg.ProductionIndicators.Branches))
 	}
-	
+
 	expectedKeywords := []string{"prod", "production", "prd", "live", "staging", "stg"}
 	if len(cfg.ProductionIndicators.Keywords) != len(expectedKeywords) {
 		t.Errorf("expected %d default keywords, got %d", len(expectedKeywords), len(cfg.ProductionIndicators.Keywords))
@@ -814,20 +868,20 @@ production_indicators:
 policies:
   monitor_git_ops: true
 `
-	
+
 	cfg, err := decodeYAML([]byte(yaml))
 	if err != nil {
 		t.Fatalf("decode yaml: %v", err)
 	}
-	
+
 	if cfg.GuardLevel.Level != GuardLevelAuto {
 		t.Errorf("expected auto guard level, got %s", cfg.GuardLevel.Level)
 	}
-	
+
 	if len(cfg.ProductionIndicators.Branches) != 2 {
 		t.Errorf("expected 2 branches, got %d", len(cfg.ProductionIndicators.Branches))
 	}
-	
+
 	if len(cfg.ProductionIndicators.Keywords) != 2 {
 		t.Errorf("expected 2 keywords, got %d", len(cfg.ProductionIndicators.Keywords))
 	}

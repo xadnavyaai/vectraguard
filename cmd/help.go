@@ -22,6 +22,7 @@ Topics:
   sandbox   Install sandbox dependencies
   seed      Seed agent instructions into a repo
   audit     Audit npm/pip packages for vulnerabilities
+  cve       Scan manifests using local CVE cache
 `)
 	case "context":
 		return printHelp(`Context summaries:
@@ -95,6 +96,16 @@ Use --list to see available targets.
 Uses npm audit and pip-audit to surface known vulnerabilities. If --fail is
 set, exits non-zero when findings exist. By default, missing tools are
 auto-installed; use --no-install to disable.
+`)
+	case "cve":
+		return printHelp(`CVE awareness:
+
+  vg cve sync [--path .] [--force]
+  vg cve scan [--path .] [--refresh]
+  vg cve explain <name[@version]> [--ecosystem npm] [--refresh]
+
+Sync fetches CVE data into a local cache. Scan analyzes manifests/lockfiles and
+reports known vulnerabilities. Explain shows cached advisories for a package.
 `)
 	default:
 		return printHelp(fmt.Sprintf("Unknown help topic: %s\n", topic))

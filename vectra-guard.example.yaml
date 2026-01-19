@@ -161,6 +161,16 @@ policies:
     - "DROP TABLE"
 
 # ============================================
+# CVE AWARENESS
+# ============================================
+
+cve:
+  enabled: true
+  sources: ["osv"]          # Currently supported: osv
+  update_interval_hours: 24 # Cache freshness window
+  # cache_dir: ~/.vectra-guard/cve
+
+# ============================================
 # ENVIRONMENT VARIABLE PROTECTION (Optional)
 # ============================================
 

@@ -12,6 +12,7 @@ AI agents and automation run with your full shell access. One mistaken command c
 
 **At a glance**
 - **Safety by default**: risky commands are analyzed before they run.
+- **CVE scanning**: local cache + manifest scanning for known vulnerable deps.
 - **Non-invasive install**: user-space by default with a one-line install and easy uninstall.
 - **Sandbox + cache**: isolate unknown code and reuse cached dependencies.
 - **Auditability**: review what ran, what was blocked, and why.
@@ -22,8 +23,11 @@ AI agents and automation run with your full shell access. One mistaken command c
 - Dangerous operations (`mkfs`, `dd if=`)
 - Risky git actions (force push, history rewrites)
 - Networked installs (`curl | sh`, `wget | bash`)
+- Known vulnerable dependencies via CVE scanning
 - External HTTP(S) endpoints when using `vg`/`vectra-guard` (localhost only; override with `VECTRAGUARD_ALLOW_NET=1`)
 - Sudo usage when using `vg`/`vectra-guard` (override with `VECTRAGUARD_ALLOW_SUDO=1`)
+
+> 📖 **[View Complete Feature Guide →](FEATURES.md)** — Detailed examples, workflows, and use cases
 
 ---
 
@@ -418,9 +422,29 @@ vectra-guard exec npm install
 # Execute with interactive approval
 vectra-guard exec --interactive sudo apt update
 
+# CVE awareness (local cache + manifest scan)
+vectra-guard cve sync --path .
+vectra-guard cve scan --path .
+vectra-guard cve explain express-validator@6.15.0 --ecosystem npm
+
 # Audit npm or python dependencies (auto-installs tools if missing)
 vectra-guard audit npm --path .
 vectra-guard audit python --path .
+```
+
+### CVE Awareness
+
+Use the built-in CVE cache to scan manifests and explain known vulnerabilities.
+
+```bash
+# Sync CVE cache (OSV-backed)
+vectra-guard cve sync --path .
+
+# Scan manifests/lockfiles
+vectra-guard cve scan --path .
+
+# Explain a specific package/version
+vectra-guard cve explain express-validator@6.15.0 --ecosystem npm
 ```
 
 ### Package Audits
@@ -1374,6 +1398,7 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | **List trusted commands** | `vg trust list` |
 | **Trust a command** | `vg trust add "command"` |
 | **View metrics** | `vg metrics show` |
+| **Complete feature guide** | See [FEATURES.md](FEATURES.md) |
 | **Sandbox documentation** | See [SANDBOX.md](SANDBOX.md) |
 | **Config examples** | See [CONFIGURATION.md](CONFIGURATION.md) |
 | **Security guide** | See [SECURITY.md](SECURITY.md) |
