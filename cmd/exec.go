@@ -40,7 +40,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	// regardless of guard level configuration
 	findings := analyzer.AnalyzeScript("inline-command", []byte(cmdString), cfg.Policies)
 	trackingRiskLevel, trackingFindingCodes := summarizeFindings(findings)
-	
+
 	// Check for CRITICAL commands that MUST be blocked regardless of guard level
 	// These commands can destroy the system and should NEVER execute
 	criticalCodes := []string{
@@ -51,16 +51,16 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		"SENSITIVE_ENV_ACCESS",
 		"DOTENV_FILE_READ",
 	}
-	
+
 	hasCriticalCode := false
 	for _, f := range findings {
 		for _, code := range criticalCodes {
 			if f.Code == code {
 				hasCriticalCode = true
 				logger.Error("CRITICAL command blocked - cannot be bypassed", map[string]any{
-					"command":    cmdString,
-					"code":       code,
-					"severity":   f.Severity,
+					"command":     cmdString,
+					"code":        code,
+					"severity":    f.Severity,
 					"description": f.Description,
 				})
 				recordCommandAttempt(tracker, session.Command{
@@ -93,20 +93,20 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 
 	riskLevel := "low"
 	var findingCodes []string
-	
+
 	// Filter findings based on guard level
 	filteredFindings := filterFindingsByGuardLevel(findings, cfg.GuardLevel.Level)
-	
+
 	// Debug: Log if findings were filtered out
 	if len(findings) > 0 && len(filteredFindings) == 0 {
 		logger.Warn("findings filtered out by guard level", map[string]any{
-			"total_findings": len(findings),
+			"total_findings":    len(findings),
 			"filtered_findings": len(filteredFindings),
-			"guard_level": cfg.GuardLevel.Level,
-			"findings": findings,
+			"guard_level":       cfg.GuardLevel.Level,
+			"findings":          findings,
 		})
 	}
-	
+
 	if len(filteredFindings) > 0 {
 		// Determine highest risk level
 		for _, f := range filteredFindings {
@@ -142,10 +142,10 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			// Auto mode: treat as medium for blocking (conservative)
 			effectiveGuardLevel = config.GuardLevelMedium
 		}
-		
+
 		// Determine if approval is required based on guard level
 		requiresApproval := shouldRequireApproval(riskLevel, effectiveGuardLevel)
-		
+
 		// Handle interactive approval or blocking
 		if requiresApproval {
 			if interactive {
@@ -171,7 +171,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					})
 					return &exitError{message: "execution denied", code: 3}
 				}
-				
+
 				// Handle "remember" functionality
 				if approval.remember && cfg.Sandbox.Enabled {
 					trustStore, err := sandbox.NewTrustStore(cfg.Sandbox.TrustStorePath)
@@ -190,8 +190,8 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				}
 			} else {
 				logger.Error("risky command blocked", map[string]any{
-					"command":    cmdString,
-					"risk_level": riskLevel,
+					"command":     cmdString,
+					"risk_level":  riskLevel,
 					"guard_level": cfg.GuardLevel.Level,
 				})
 				recordCommandAttempt(tracker, session.Command{
@@ -210,7 +210,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					},
 				})
 				return &exitError{
-					message: fmt.Sprintf("%s risk command blocked by guard level %s (use --interactive to approve, or set bypass)", 
+					message: fmt.Sprintf("%s risk command blocked by guard level %s (use --interactive to approve, or set bypass)",
 						riskLevel, cfg.GuardLevel.Level),
 					code: 3,
 				}
@@ -223,10 +223,10 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		repeatDecision := evaluateRepeatProtection(tracker.sess, cmdName, args, trackingRiskLevel, trackingFindingCodes)
 		if repeatDecision.block {
 			logger.Error("repeated high-risk action blocked", map[string]any{
-				"command":     cmdString,
-				"risk_level":  trackingRiskLevel,
-				"repeat_key":  repeatDecision.key,
-				"repeat_count": repeatDecision.count,
+				"command":               cmdString,
+				"risk_level":            trackingRiskLevel,
+				"repeat_key":            repeatDecision.key,
+				"repeat_count":          repeatDecision.count,
 				"repeat_window_seconds": int(repeatDecision.window.Seconds()),
 			})
 			recordCommandAttempt(tracker, session.Command{
@@ -253,10 +253,10 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 		}
 		if repeatDecision.warn {
 			logger.Warn("repeated action warning", map[string]any{
-				"command":     cmdString,
-				"risk_level":  trackingRiskLevel,
-				"repeat_key":  repeatDecision.key,
-				"repeat_count": repeatDecision.count,
+				"command":               cmdString,
+				"risk_level":            trackingRiskLevel,
+				"repeat_key":            repeatDecision.key,
+				"repeat_count":          repeatDecision.count,
 				"repeat_window_seconds": int(repeatDecision.window.Seconds()),
 			})
 			fmt.Fprintf(os.Stderr, "Warning: repeated action detected (%d/%d in %s). Slow down to avoid a block.\n",
@@ -356,7 +356,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			"SENSITIVE_ENV_ACCESS",
 			"DOTENV_FILE_READ",
 		}
-		
+
 		hasCriticalCode := false
 		for _, f := range filteredFindings {
 			for _, code := range criticalCodes {
@@ -369,7 +369,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				break
 			}
 		}
-		
+
 		if hasCriticalCode {
 			// CRITICAL: These commands MUST be sandboxed - no bypass allowed
 			// This check happens BEFORE bypass checks to prevent critical commands from bypassing
@@ -378,10 +378,10 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				"risk_level": riskLevel,
 				"findings":   findingCodes,
 			})
-			
+
 			// CRITICAL commands CANNOT be bypassed - even with user bypass
 			// This is a hard security requirement
-			
+
 			// Even if sandbox is disabled, we MUST enforce it for critical commands
 			// This is a safety override that cannot be bypassed
 			if !cfg.Sandbox.Enabled {
@@ -414,7 +414,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 	if bypassEnvVar == "" {
 		bypassEnvVar = "VECTRAGUARD_BYPASS"
 	}
-	
+
 	if cfg.GuardLevel.AllowUserBypass && os.Getenv(bypassEnvVar) != "" {
 		// CRITICAL: Do not allow bypass for critical commands
 		if riskLevel == "critical" {
@@ -426,7 +426,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				"SENSITIVE_ENV_ACCESS",
 				"DOTENV_FILE_READ",
 			}
-			
+
 			hasCriticalCode := false
 			for _, f := range filteredFindings {
 				for _, code := range criticalCodes {
@@ -439,7 +439,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 					break
 				}
 			}
-			
+
 			if hasCriticalCode {
 				logger.Error("CRITICAL command cannot be bypassed", map[string]any{
 					"command":    cmdString,
@@ -452,7 +452,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				}
 			}
 		}
-		
+
 		bypassValue := os.Getenv(bypassEnvVar)
 		// Require a specific non-trivial value that agents are unlikely to guess
 		// Users can set: export VECTRAGUARD_BYPASS="$(date +%s | sha256sum | head -c 16)"
@@ -476,22 +476,22 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				Approved:  true,
 				Findings:  trackingFindingCodes,
 				Metadata: map[string]interface{}{
-					"bypass":     true,
-					"execution":  "direct",
+					"bypass":      true,
+					"execution":   "direct",
 					"guard_level": cfg.GuardLevel.Level,
 				},
 			})
 			return err
 		}
 	}
-	
+
 	// Create sandbox executor
 	executor, err := sandbox.NewExecutor(cfg, logger)
 	if err != nil {
 		logger.Error("failed to initialize sandbox executor", map[string]any{
 			"error": err.Error(),
 		})
-		
+
 		// For critical commands, we cannot fallback to direct execution
 		if riskLevel == "critical" {
 			recordCommandAttempt(tracker, session.Command{
@@ -514,7 +514,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				code:    3,
 			}
 		}
-		
+
 		// Fallback to direct execution only for non-critical commands
 		start := time.Now()
 		exitCode, execErr := executeCommandDirectly(cmdArgs)
@@ -529,20 +529,20 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			Approved:  true,
 			Findings:  trackingFindingCodes,
 			Metadata: map[string]interface{}{
-				"execution":          "direct",
+				"execution":           "direct",
 				"sandbox_init_failed": true,
 			},
 		})
 		return execErr
 	}
-	
+
 	// Decide execution mode (host vs sandbox)
 	// Pass findings so sandbox can make informed decisions
 	decision := executor.DecideExecutionMode(ctx, cmdArgs, riskLevel, filteredFindings)
-	
+
 	// Show user-friendly notice
 	displayExecutionNotice(decision, riskLevel)
-	
+
 	// Execute command in chosen mode
 	start := time.Now()
 	err = executor.Execute(ctx, cmdArgs, decision)
@@ -598,11 +598,11 @@ type approvalResult struct {
 
 func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding) approvalResult {
 	result := approvalResult{approved: false, remember: false, duration: 0}
-	
+
 	fmt.Fprintf(os.Stderr, "\n⚠️  Command requires approval\n")
 	fmt.Fprintf(os.Stderr, "Command: %s\n", cmdString)
 	fmt.Fprintf(os.Stderr, "Risk Level: %s\n\n", strings.ToUpper(riskLevel))
-	
+
 	if len(findings) > 0 {
 		fmt.Fprintf(os.Stderr, "Security concerns:\n")
 		for i, f := range findings {
@@ -617,12 +617,12 @@ func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding)
 	fmt.Fprintf(os.Stderr, "  r  - Yes, and remember (trust permanently)\n")
 	fmt.Fprintf(os.Stderr, "  n  - No, cancel\n")
 	fmt.Fprintf(os.Stderr, "\nChoose [y/r/N]: ")
-	
+
 	var response string
 	fmt.Scanln(&response)
-	
+
 	response = strings.ToLower(strings.TrimSpace(response))
-	
+
 	switch response {
 	case "y", "yes":
 		result.approved = true
@@ -632,7 +632,7 @@ func promptForApproval(riskLevel, cmdString string, findings []analyzer.Finding)
 	default:
 		result.approved = false
 	}
-	
+
 	return result
 }
 
@@ -641,11 +641,11 @@ func filterFindingsByGuardLevel(findings []analyzer.Finding, level config.GuardL
 	if level == config.GuardLevelOff {
 		return nil
 	}
-	
+
 	if level == config.GuardLevelParanoid {
 		return findings // Return all findings
 	}
-	
+
 	var filtered []analyzer.Finding
 	for _, f := range findings {
 		switch level {
@@ -675,7 +675,7 @@ func filterFindingsByGuardLevel(findings []analyzer.Finding, level config.GuardL
 			filtered = append(filtered, f)
 		}
 	}
-	
+
 	return filtered
 }
 
@@ -684,7 +684,7 @@ func shouldRequireApproval(riskLevel string, guardLevel config.GuardLevel) bool 
 	if guardLevel == config.GuardLevelParanoid {
 		return true // Everything requires approval
 	}
-	
+
 	switch guardLevel {
 	case config.GuardLevelLow:
 		return riskLevel == "critical"
@@ -708,19 +708,19 @@ func isLikelyAgentBypass(value string) bool {
 		"cursor", "copilot", "gpt", "claude",
 		"true", "yes", "1", "enabled",
 	}
-	
+
 	lowerValue := strings.ToLower(value)
 	for _, pattern := range agentPatterns {
 		if strings.Contains(lowerValue, pattern) {
 			return true
 		}
 	}
-	
+
 	// If it's too simple (less than 10 chars), likely not a proper bypass
 	if len(value) < 10 {
 		return true
 	}
-	
+
 	return false
 }
 
@@ -733,16 +733,16 @@ func displayExecutionNotice(decision sandbox.ExecutionDecision, riskLevel string
 		}
 		return
 	}
-	
+
 	// Sandbox execution - always inform user
 	notice := "📦 Running in sandbox"
-	
+
 	if decision.ShouldCache {
 		notice += " (cached)"
 	}
-	
+
 	notice += "."
-	
+
 	// Explain the "why"
 	if decision.Reason != "" {
 		reasonParts := strings.Split(decision.Reason, "+")
@@ -756,7 +756,7 @@ func displayExecutionNotice(decision sandbox.ExecutionDecision, riskLevel string
 			notice += fmt.Sprintf("\n   Why: %s", decision.Reason)
 		}
 	}
-	
+
 	fmt.Fprintln(os.Stderr, notice)
 }
 
@@ -919,13 +919,13 @@ func isRepeatSensitiveCommand(cmdName string) bool {
 
 func hasSensitiveFinding(codes []string) bool {
 	sensitiveCodes := map[string]struct{}{
-		"DANGEROUS_DELETE_ROOT":     {},
-		"DANGEROUS_DELETE_HOME":     {},
+		"DANGEROUS_DELETE_ROOT":      {},
+		"DANGEROUS_DELETE_HOME":      {},
 		"PROTECTED_DIRECTORY_ACCESS": {},
-		"FORK_BOMB":                 {},
-		"SENSITIVE_ENV_ACCESS":      {},
-		"DOTENV_FILE_READ":          {},
-		"PRIVATE_KEY_ACCESS":        {},
+		"FORK_BOMB":                  {},
+		"SENSITIVE_ENV_ACCESS":       {},
+		"DOTENV_FILE_READ":           {},
+		"PRIVATE_KEY_ACCESS":         {},
 	}
 	for _, code := range codes {
 		if _, ok := sensitiveCodes[code]; ok {
@@ -973,15 +973,15 @@ func executeCommandDirectly(cmdArgs []string) (int, error) {
 	if len(cmdArgs) == 0 {
 		return 1, fmt.Errorf("no command specified")
 	}
-	
+
 	cmdName := cmdArgs[0]
 	args := cmdArgs[1:]
-	
+
 	cmd := exec.Command(cmdName, args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Stdin = os.Stdin
-	
+
 	err := cmd.Run()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {
@@ -992,7 +992,6 @@ func executeCommandDirectly(cmdArgs []string) (int, error) {
 		}
 		return 1, fmt.Errorf("execute command: %w", err)
 	}
-	
+
 	return 0, nil
 }
-

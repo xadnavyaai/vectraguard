@@ -13,7 +13,7 @@ import (
 func TestSessionLifecycle(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
-	
+
 	mgr, err := NewManager(tmpDir, logger)
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
@@ -68,7 +68,7 @@ func TestSessionLifecycle(t *testing.T) {
 func TestRiskScoring(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
-	
+
 	mgr, err := NewManager(tmpDir, logger)
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
@@ -116,7 +116,7 @@ func TestRiskScoring(t *testing.T) {
 func TestFileOperations(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
-	
+
 	mgr, err := NewManager(tmpDir, logger)
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
@@ -163,7 +163,7 @@ func TestFileOperations(t *testing.T) {
 func TestListSessions(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
-	
+
 	mgr, err := NewManager(tmpDir, logger)
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
@@ -206,7 +206,7 @@ func TestListSessions(t *testing.T) {
 func TestSessionPersistence(t *testing.T) {
 	tmpDir := t.TempDir()
 	logger := logging.NewLogger("text", io.Discard)
-	
+
 	mgr, err := NewManager(tmpDir, logger)
 	if err != nil {
 		t.Fatalf("NewManager failed: %v", err)
@@ -220,7 +220,7 @@ func TestSessionPersistence(t *testing.T) {
 	// Note: Session files are stored in home directory, not tmpDir
 	// The sessionDir is set in NewManager to ~/.vectra-guard/sessions
 	// We just verify that we can load the session back
-	
+
 	// Create new manager and load session
 	mgr2, err := NewManager(tmpDir, logger)
 	if err != nil {
@@ -236,7 +236,6 @@ func TestSessionPersistence(t *testing.T) {
 		t.Errorf("Loaded session ID mismatch: expected %s, got %s", session.ID, loaded.ID)
 	}
 }
-
 
 func TestWorkspaceSessionIndex(t *testing.T) {
 	tempHome := t.TempDir()
@@ -274,8 +273,6 @@ func TestWorkspaceSessionIndex(t *testing.T) {
 		t.Fatalf("expected workspace2 session %s, got %s", sess2.ID, got)
 	}
 }
-
-
 
 func TestWorkspaceSessionIndexHonorsEnvMismatch(t *testing.T) {
 	tempHome := t.TempDir()

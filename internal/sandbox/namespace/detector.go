@@ -30,13 +30,13 @@ const (
 
 // Capabilities represents the available sandboxing capabilities
 type Capabilities struct {
-	Bubblewrap       bool
-	Namespaces       bool
-	Docker           bool
-	Seccomp          bool
-	OverlayFS        bool
-	UserNamespaces   bool
-	MountNamespaces  bool
+	Bubblewrap        bool
+	Namespaces        bool
+	Docker            bool
+	Seccomp           bool
+	OverlayFS         bool
+	UserNamespaces    bool
+	MountNamespaces   bool
 	NetworkNamespaces bool
 }
 
@@ -56,17 +56,17 @@ func DetectEnvironment() Environment {
 
 	// Check for CI environment variables
 	ciVars := []string{
-		"CI",                    // Generic CI
-		"CONTINUOUS_INTEGRATION",// Generic CI
-		"GITHUB_ACTIONS",        // GitHub Actions
-		"GITLAB_CI",             // GitLab CI
-		"CIRCLECI",              // CircleCI
-		"TRAVIS",                // Travis CI
-		"JENKINS_URL",           // Jenkins
-		"BUILDKITE",             // Buildkite
-		"DRONE",                 // Drone CI
-		"BITBUCKET_PIPELINE",    // Bitbucket Pipelines
-		"TF_BUILD",              // Azure Pipelines
+		"CI",                     // Generic CI
+		"CONTINUOUS_INTEGRATION", // Generic CI
+		"GITHUB_ACTIONS",         // GitHub Actions
+		"GITLAB_CI",              // GitLab CI
+		"CIRCLECI",               // CircleCI
+		"TRAVIS",                 // Travis CI
+		"JENKINS_URL",            // Jenkins
+		"BUILDKITE",              // Buildkite
+		"DRONE",                  // Drone CI
+		"BITBUCKET_PIPELINE",     // Bitbucket Pipelines
+		"TF_BUILD",               // Azure Pipelines
 	}
 
 	for _, varName := range ciVars {
@@ -103,7 +103,7 @@ func DetectCapabilities() Capabilities {
 		// Verify Docker daemon is running with timeout (prevents hanging on Windows)
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		
+
 		cmd := exec.CommandContext(ctx, "docker", "info")
 		cmd.Stdout = nil
 		cmd.Stderr = nil
@@ -225,4 +225,3 @@ func GetRuntimeInfo(runtime RuntimeType, env Environment) string {
 		return "Unknown runtime"
 	}
 }
-

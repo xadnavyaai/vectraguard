@@ -168,7 +168,7 @@ check_prerequisites() {
         
         if [ "$needs_rebuild" = true ]; then
             print_info "Building vectra-guard..."
-            (cd "$PROJECT_ROOT" && go build -o vectra-guard .) || {
+            (cd "$PROJECT_ROOT" && go build -buildvcs=false -o vectra-guard .) || {
                 echo -e "${RED}Error: Failed to build vectra-guard${NC}"
                 exit 1
             }
@@ -176,9 +176,9 @@ check_prerequisites() {
         fi
     elif ! command -v vectra-guard &> /dev/null; then
         echo -e "${YELLOW}Warning: vectra-guard binary not found, building...${NC}"
-        (cd "$PROJECT_ROOT" && go build -o vectra-guard .) || {
+        (cd "$PROJECT_ROOT" && go build -buildvcs=false -o vectra-guard .) || {
             echo -e "${RED}Error: Failed to build vectra-guard${NC}"
-            echo "Please build it manually: go build -o vectra-guard ."
+            echo "Please build it manually: go build -buildvcs=false -o vectra-guard ."
             exit 1
         }
     fi

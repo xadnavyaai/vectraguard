@@ -112,6 +112,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Run Docker-based PR tests
+        env:
+          CI: true
         run: make test-docker-pr
         continue-on-error: false
 

@@ -7,10 +7,10 @@ import (
 
 func TestIsSensitive(t *testing.T) {
 	ep := NewEnvProtector(MaskFull)
-	
+
 	tests := []struct {
-		name      string
-		want      bool
+		name string
+		want bool
 	}{
 		{"AWS_SECRET_ACCESS_KEY", true},
 		{"DATABASE_PASSWORD", true},
@@ -22,7 +22,7 @@ func TestIsSensitive(t *testing.T) {
 		{"MY_SECRET_VALUE", true},
 		{"NORMAL_CONFIG", false},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := ep.IsSensitive(tt.name); got != tt.want {
@@ -51,8 +51,8 @@ func TestMaskValue(t *testing.T) {
 			value: "super_secret_key_123",
 			check: func(masked string) bool {
 				return strings.Contains(masked, "***") &&
-				       strings.HasPrefix(masked, "supe") &&
-				       strings.HasSuffix(masked, "_123")
+					strings.HasPrefix(masked, "supe") &&
+					strings.HasSuffix(masked, "_123")
 			},
 		},
 		{
@@ -72,7 +72,7 @@ func TestMaskValue(t *testing.T) {
 			},
 		},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ep := NewEnvProtector(tt.mode)
@@ -97,7 +97,7 @@ func TestGenerateFakeValue(t *testing.T) {
 		{"password", "DB_PASSWORD", "SuperSecret123!", "Fake"},
 		{"key", "SECRET_KEY", "sk_live_1234567890abcdef", "fake_key"},
 	}
-	
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			fake := generateFakeValue(tt.varName, tt.original)
@@ -113,15 +113,15 @@ func TestGenerateFakeValue(t *testing.T) {
 
 func TestSanitizeEnvOutput(t *testing.T) {
 	ep := NewEnvProtector(MaskPartial)
-	
+
 	input := `HOME=/Users/test
 PATH=/usr/bin:/bin
 AWS_SECRET_ACCESS_KEY=AKIAIOSFODNN7EXAMPLE
 DATABASE_PASSWORD=super_secret_password
 USER=testuser`
-	
+
 	output := ep.SanitizeEnvOutput(input)
-	
+
 	// Should mask sensitive vars
 	if strings.Contains(output, "AKIAIOSFODNN7EXAMPLE") {
 		t.Error("AWS key not masked in output")
@@ -132,7 +132,7 @@ USER=testuser`
 	if !strings.Contains(output, "[MASKED]") {
 		t.Error("Missing [MASKED] marker")
 	}
-	
+
 	// Should preserve non-sensitive vars
 	if !strings.Contains(output, "/Users/test") {
 		t.Error("HOME value incorrectly masked")
@@ -144,15 +144,15 @@ USER=testuser`
 
 func TestAddProtectedVar(t *testing.T) {
 	ep := NewEnvProtector(MaskFull)
-	
+
 	// Should not be sensitive by default
 	if ep.IsSensitive("CUSTOM_VAR") {
 		t.Error("CUSTOM_VAR should not be sensitive by default")
 	}
-	
+
 	// Add to protected list
 	ep.AddProtectedVar("CUSTOM_VAR")
-	
+
 	// Should now be sensitive
 	if !ep.IsSensitive("CUSTOM_VAR") {
 		t.Error("CUSTOM_VAR should be sensitive after adding")
@@ -161,13 +161,12 @@ func TestAddProtectedVar(t *testing.T) {
 
 func TestAddFakeValue(t *testing.T) {
 	ep := NewEnvProtector(MaskFake)
-	
+
 	customFake := "my_custom_fake_value"
 	ep.AddFakeValue("MY_SECRET", customFake)
-	
+
 	masked := ep.MaskValue("MY_SECRET", "real_secret_value")
 	if masked != customFake {
 		t.Errorf("Expected custom fake value %q, got %q", customFake, masked)
 	}
 }
-

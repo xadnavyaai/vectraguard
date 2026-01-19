@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package namespace
@@ -282,4 +283,3 @@ func IsMountNamespaceAvailable() bool {
 	_, err := os.Stat("/proc/self/ns/mnt")
 	return err == nil
 }
-

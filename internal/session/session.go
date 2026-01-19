@@ -27,18 +27,18 @@ type Session struct {
 
 // Command represents a single command execution in a session.
 type Command struct {
-	Timestamp   time.Time              `json:"timestamp"`
-	Command     string                 `json:"command"`
-	Args        []string               `json:"args"`
-	ExitCode    int                    `json:"exit_code"`
-	Output      string                 `json:"output,omitempty"`
-	Error       string                 `json:"error,omitempty"`
-	Duration    time.Duration          `json:"duration"`
-	RiskLevel   string                 `json:"risk_level"`
-	Approved    bool                   `json:"approved"`
-	ApprovedBy  string                 `json:"approved_by,omitempty"`
-	Findings    []string               `json:"findings,omitempty"`
-	Metadata    map[string]interface{} `json:"metadata,omitempty"`
+	Timestamp  time.Time              `json:"timestamp"`
+	Command    string                 `json:"command"`
+	Args       []string               `json:"args"`
+	ExitCode   int                    `json:"exit_code"`
+	Output     string                 `json:"output,omitempty"`
+	Error      string                 `json:"error,omitempty"`
+	Duration   time.Duration          `json:"duration"`
+	RiskLevel  string                 `json:"risk_level"`
+	Approved   bool                   `json:"approved"`
+	ApprovedBy string                 `json:"approved_by,omitempty"`
+	Findings   []string               `json:"findings,omitempty"`
+	Metadata   map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // FileOperation represents a file system operation.
@@ -96,9 +96,9 @@ func (m *Manager) Start(agentName, workspace string) (*Session, error) {
 	}
 
 	m.logger.Info("session started", map[string]any{
-		"session_id":  session.ID,
-		"agent":       agentName,
-		"workspace":   workspace,
+		"session_id": session.ID,
+		"agent":      agentName,
+		"workspace":  workspace,
 	})
 
 	return session, nil
@@ -144,7 +144,7 @@ func (m *Manager) End(session *Session) error {
 // AddCommand appends a command to the session and updates risk score.
 func (m *Manager) AddCommand(session *Session, cmd Command) error {
 	session.Commands = append(session.Commands, cmd)
-	
+
 	// Update risk score based on command risk level
 	switch cmd.RiskLevel {
 	case "critical":
@@ -163,7 +163,7 @@ func (m *Manager) AddCommand(session *Session, cmd Command) error {
 // AddFileOperation appends a file operation to the session.
 func (m *Manager) AddFileOperation(session *Session, op FileOperation) error {
 	session.FileOps = append(session.FileOps, op)
-	
+
 	if !op.Allowed {
 		session.Violations++
 		session.RiskScore += 25

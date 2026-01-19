@@ -3,13 +3,24 @@
 # Default version for development
 VERSION ?= dev
 
+# Build flags: disable VCS in CI/Docker environments where git may not be available
+# GitHub Actions sets CI=true automatically
+# In Docker containers, git may not be accessible
+ifeq ($(CI),true)
+  BUILD_FLAGS := -buildvcs=false
+else ifeq ($(VECTRAGUARD_CONTAINER),true)
+  BUILD_FLAGS := -buildvcs=false
+else
+  BUILD_FLAGS :=
+endif
+
 # ============================================================================
 # BUILD
 # ============================================================================
 
 # Build without version (shows "dev")
 build:
-	go build -o vectra-guard .
+	go build $(BUILD_FLAGS) -o vectra-guard .
 
 # Build with version
 build-version:
@@ -17,7 +28,7 @@ build-version:
 		echo "Usage: make build-version VERSION=v0.0.2"; \
 		exit 1; \
 	fi
-	go build -ldflags "-X github.com/vectra-guard/vectra-guard/cmd.Version=$(VERSION)" -o vectra-guard .
+	go build $(BUILD_FLAGS) -ldflags "-X github.com/vectra-guard/vectra-guard/cmd.Version=$(VERSION)" -o vectra-guard .
 
 # ============================================================================
 # TESTING - DOCKER (Recommended - All Extended Tests)

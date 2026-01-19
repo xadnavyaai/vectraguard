@@ -627,8 +627,8 @@ func TestRunContextSummarize_IgnoresHiddenFiles(t *testing.T) {
 
 	// Create visible and hidden files
 	files := map[string]string{
-		"main.go":    `package main\nfunc main() {}\n`,
-		".hidden.go": `package main\nfunc hidden() {}\n`,
+		"main.go":     `package main\nfunc main() {}\n`,
+		".hidden.go":  `package main\nfunc hidden() {}\n`,
 		".git/config": `[core]\n`,
 	}
 

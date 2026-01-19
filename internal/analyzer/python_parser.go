@@ -9,22 +9,22 @@ import (
 // Handles os.system(), subprocess.*, os.popen(), etc.
 func extractPythonCommands(pythonCode string) []string {
 	var commands []string
-	
+
 	// Normalize the code (handle escaped quotes, etc.)
 	normalized := normalizePythonCode(pythonCode)
-	
+
 	// Extract from os.system("command")
 	commands = append(commands, extractOsSystemCommands(normalized)...)
-	
+
 	// Extract from subprocess.call/run/Popen(["cmd", "args"])
 	commands = append(commands, extractSubprocessCommands(normalized)...)
-	
+
 	// Extract from os.popen("command")
 	commands = append(commands, extractOsPopenCommands(normalized)...)
-	
+
 	// Extract from eval() or exec() with string literals
 	commands = append(commands, extractEvalExecCommands(normalized)...)
-	
+
 	return deduplicateCommands(commands)
 }
 
@@ -39,14 +39,14 @@ func normalizePythonCode(code string) string {
 // extractOsSystemCommands extracts commands from os.system() calls
 func extractOsSystemCommands(code string) []string {
 	var commands []string
-	
+
 	// Pattern: os.system("command") or os.system('command')
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`os\.system\s*\(\s*["']([^"']+)["']`),
 		regexp.MustCompile(`os\.system\s*\(\s*"""([^"]+)"""`),
 		regexp.MustCompile(`os\.system\s*\(\s*'''([^']+)'''`),
 	}
-	
+
 	for _, pattern := range patterns {
 		matches := pattern.FindAllStringSubmatch(code, -1)
 		for _, match := range matches {
@@ -56,14 +56,14 @@ func extractOsSystemCommands(code string) []string {
 			}
 		}
 	}
-	
+
 	return commands
 }
 
 // extractSubprocessCommands extracts commands from subprocess.* calls
 func extractSubprocessCommands(code string) []string {
 	var commands []string
-	
+
 	// Pattern: subprocess.call/run/Popen(["cmd", "arg1", "arg2"])
 	// Also handles: subprocess.call(["cmd", "arg"], shell=True)
 	// Use non-greedy matching for nested structures
@@ -75,7 +75,7 @@ func extractSubprocessCommands(code string) []string {
 		// String format with shell=True: "cmd arg1 arg2"
 		regexp.MustCompile(`subprocess\.(call|run|Popen|check_call|check_output)\s*\(\s*["']([^"']+)["'].*shell\s*=\s*True`),
 	}
-	
+
 	for _, pattern := range patterns {
 		matches := pattern.FindAllStringSubmatch(code, -1)
 		for _, match := range matches {
@@ -91,14 +91,14 @@ func extractSubprocessCommands(code string) []string {
 			}
 		}
 	}
-	
+
 	return commands
 }
 
 // extractOsPopenCommands extracts commands from os.popen() calls
 func extractOsPopenCommands(code string) []string {
 	var commands []string
-	
+
 	// Pattern: os.popen("command")
 	pattern := regexp.MustCompile(`os\.popen\s*\(\s*["']([^"']+)["']`)
 	matches := pattern.FindAllStringSubmatch(code, -1)
@@ -108,21 +108,21 @@ func extractOsPopenCommands(code string) []string {
 			commands = append(commands, cmd)
 		}
 	}
-	
+
 	return commands
 }
 
 // extractEvalExecCommands extracts commands from eval() or exec() calls with string literals
 func extractEvalExecCommands(code string) []string {
 	var commands []string
-	
+
 	// Pattern: eval("command") or exec("command")
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`(?:eval|exec)\s*\(\s*["']([^"']+)["']`),
 		regexp.MustCompile(`(?:eval|exec)\s*\(\s*"""([^"]+)"""`),
 		regexp.MustCompile(`(?:eval|exec)\s*\(\s*'''([^']+)'''`),
 	}
-	
+
 	for _, pattern := range patterns {
 		matches := pattern.FindAllStringSubmatch(code, -1)
 		for _, match := range matches {
@@ -137,7 +137,7 @@ func extractEvalExecCommands(code string) []string {
 			}
 		}
 	}
-	
+
 	return commands
 }
 
@@ -145,7 +145,7 @@ func extractEvalExecCommands(code string) []string {
 // Handles: ["cmd", "arg1", "arg2"] or ("cmd", "arg1", "arg2")
 func parsePythonArray(arrayStr string) []string {
 	var args []string
-	
+
 	// Remove brackets/parentheses if present
 	arrayStr = strings.TrimSpace(arrayStr)
 	arrayStr = strings.TrimPrefix(arrayStr, "[")
@@ -153,16 +153,16 @@ func parsePythonArray(arrayStr string) []string {
 	arrayStr = strings.TrimPrefix(arrayStr, "(")
 	arrayStr = strings.TrimSuffix(arrayStr, ")")
 	arrayStr = strings.TrimSpace(arrayStr)
-	
+
 	if arrayStr == "" {
 		return args
 	}
-	
+
 	// Parse quoted strings properly - handle both single and double quotes
 	// Use regex to extract quoted strings (more reliable than splitting)
 	quotedPattern := regexp.MustCompile(`["']([^"']*)["']`)
 	matches := quotedPattern.FindAllStringSubmatch(arrayStr, -1)
-	
+
 	if len(matches) > 0 {
 		// Extract all quoted strings
 		for _, match := range matches {
@@ -184,7 +184,7 @@ func parsePythonArray(arrayStr string) []string {
 			}
 		}
 	}
-	
+
 	return args
 }
 
@@ -199,7 +199,7 @@ func restoreEscapedQuotes(cmd string) string {
 func deduplicateCommands(commands []string) []string {
 	seen := make(map[string]bool)
 	var unique []string
-	
+
 	for _, cmd := range commands {
 		normalized := strings.TrimSpace(cmd)
 		if normalized != "" && !seen[normalized] {
@@ -207,14 +207,14 @@ func deduplicateCommands(commands []string) []string {
 			unique = append(unique, normalized)
 		}
 	}
-	
+
 	return unique
 }
 
 // isPythonCommand checks if a line contains a Python command invocation
 func isPythonCommand(line string) bool {
 	lower := strings.ToLower(line)
-	return strings.Contains(lower, "python") && 
+	return strings.Contains(lower, "python") &&
 		(strings.Contains(lower, "-c") || strings.Contains(lower, "python -c"))
 }
 
@@ -229,10 +229,10 @@ func extractPythonCodeFromCommand(cmd string) string {
 	if len(match) < 2 {
 		return ""
 	}
-	
+
 	quote := match[1] // The quote character (' or ")
 	startIdx := strings.Index(cmd, match[0]) + len(match[0])
-	
+
 	// Find the matching closing quote, handling escaped quotes
 	var code strings.Builder
 	escaped := false
@@ -254,7 +254,7 @@ func extractPythonCodeFromCommand(cmd string) string {
 		}
 		code.WriteByte(char)
 	}
-	
+
 	extracted := code.String()
 	if extracted != "" {
 		// Unescape quotes
@@ -262,20 +262,19 @@ func extractPythonCodeFromCommand(cmd string) string {
 		extracted = strings.ReplaceAll(extracted, "\\\"", "\"")
 		return extracted
 	}
-	
+
 	// Fallback to regex for triple quotes
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`python\s+-c\s+'''([^']+)'''`),
 		regexp.MustCompile(`python\s+-c\s+"""([^"]+)"""`),
 	}
-	
+
 	for _, pattern := range patterns {
 		matches := pattern.FindStringSubmatch(cmd)
 		if len(matches) > 1 {
 			return matches[1]
 		}
 	}
-	
+
 	return ""
 }
-

@@ -80,7 +80,7 @@ func ValidateProtectedDirectory(command string, protectedDirs []string) (bool, s
 		}
 		// Remove any double slashes but keep the leading one
 		argPath = "/" + strings.TrimLeft(strings.ReplaceAll(argPath, "//", "/"), "/")
-		
+
 		argPathLower := strings.ToLower(argPath)
 
 		for _, protectedDir := range protectedDirs {
@@ -154,15 +154,15 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 	if len(protectedDirs) == 0 || path == "" {
 		return false
 	}
-	
+
 	pathTrimmed := strings.TrimSpace(path)
-	
+
 	// Skip relative paths and home paths - they're not protected
-	if strings.HasPrefix(pathTrimmed, "./") || strings.HasPrefix(pathTrimmed, "../") || 
+	if strings.HasPrefix(pathTrimmed, "./") || strings.HasPrefix(pathTrimmed, "../") ||
 		strings.HasPrefix(pathTrimmed, "~/") || pathTrimmed == "~" {
 		return false
 	}
-	
+
 	// Normalize path - handle Unix-style paths cross-platform
 	pathLower := strings.ToLower(pathTrimmed)
 	var pathNormalized string
@@ -178,12 +178,12 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 		// Not an absolute Unix path - not protected
 		return false
 	}
-	
+
 	for _, protectedDir := range protectedDirs {
 		if protectedDir == "" {
 			continue
 		}
-		
+
 		protectedDirLower := strings.ToLower(strings.TrimSpace(protectedDir))
 		var protectedDirNormalized string
 		if strings.HasPrefix(protectedDirLower, "/") {
@@ -198,17 +198,17 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 			// Relative path - make it absolute
 			protectedDirNormalized = "/" + strings.TrimLeft(protectedDirLower, "/")
 		}
-		
+
 		// Exact match
 		if pathNormalized == protectedDirNormalized {
 			return true
 		}
-		
+
 		// Prefix match (path is inside protected directory)
 		if strings.HasPrefix(pathNormalized, protectedDirNormalized+"/") {
 			return true
 		}
-		
+
 		// Special case: root directory
 		if protectedDirNormalized == "/" {
 			// Any absolute path is under root (except root itself which is exact match)
@@ -217,7 +217,6 @@ func IsProtectedDirectory(path string, protectedDirs []string) bool {
 			}
 		}
 	}
-	
+
 	return false
 }
-

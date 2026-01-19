@@ -200,4 +200,3 @@ func TestIsInContainer(t *testing.T) {
 	result := isInContainer()
 	t.Logf("isInContainer() = %v", result)
 }
-

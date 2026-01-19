@@ -10,12 +10,12 @@ import (
 
 // BubblewrapConfig holds configuration for bubblewrap sandbox
 type BubblewrapConfig struct {
-	Workspace   string
-	CacheDir    string
-	AllowNetwork bool
+	Workspace     string
+	CacheDir      string
+	AllowNetwork  bool
 	ReadOnlyPaths []string
-	BindMounts   []BindMount
-	Environment  map[string]string
+	BindMounts    []BindMount
+	Environment   map[string]string
 }
 
 // BindMount represents a bind mount configuration
@@ -39,37 +39,37 @@ func NewBubblewrapExecutor(config BubblewrapConfig) *BubblewrapExecutor {
 func (e *BubblewrapExecutor) Execute(cmdArgs []string) error {
 	// Build bubblewrap command
 	bwrapArgs := e.buildBubblewrapArgs(cmdArgs)
-	
+
 	cmd := exec.Command("bwrap", bwrapArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	// Set environment variables
 	cmd.Env = os.Environ()
 	for key, value := range e.config.Environment {
 		cmd.Env = append(cmd.Env, fmt.Sprintf("%s=%s", key, value))
 	}
-	
+
 	return cmd.Run()
 }
 
 // buildBubblewrapArgs constructs the bubblewrap command arguments
 func (e *BubblewrapExecutor) buildBubblewrapArgs(cmdArgs []string) []string {
 	args := []string{}
-	
+
 	// 1. Bind root filesystem as read-only
 	args = append(args, "--ro-bind", "/", "/")
-	
+
 	// 2. Create new /dev with essential devices
 	args = append(args, "--dev", "/dev")
-	
+
 	// 3. Create new /proc
 	args = append(args, "--proc", "/proc")
-	
+
 	// 4. Create writable /tmp (isolated)
 	args = append(args, "--tmpfs", "/tmp")
-	
+
 	// 5. Bind workspace as writable
 	if e.config.Workspace != "" {
 		absWorkspace, err := filepath.Abs(e.config.Workspace)
@@ -79,7 +79,7 @@ func (e *BubblewrapExecutor) buildBubblewrapArgs(cmdArgs []string) []string {
 			args = append(args, "--bind", absWorkspace, "/workspace")
 		}
 	}
-	
+
 	// 6. Bind cache directories (preserve between runs)
 	cacheBinds := e.getDefaultCacheBinds()
 	for _, bind := range append(cacheBinds, e.config.BindMounts...) {
@@ -91,33 +91,33 @@ func (e *BubblewrapExecutor) buildBubblewrapArgs(cmdArgs []string) []string {
 			}
 		}
 	}
-	
+
 	// 7. Unshare all namespaces
 	args = append(args, "--unshare-all")
-	
+
 	// 8. Network sharing (optional)
 	if e.config.AllowNetwork {
 		args = append(args, "--share-net")
 	}
-	
+
 	// 9. Die with parent (cleanup on exit)
 	args = append(args, "--die-with-parent")
-	
+
 	// 10. New session
 	args = append(args, "--new-session")
-	
+
 	// 11. Security hardening
 	args = append(args, "--cap-drop", "ALL") // Drop all capabilities
-	
+
 	// 12. Set working directory
 	if e.config.Workspace != "" {
 		args = append(args, "--chdir", e.config.Workspace)
 	}
-	
+
 	// 13. Add the command to execute
 	args = append(args, "--")
 	args = append(args, cmdArgs...)
-	
+
 	return args
 }
 
@@ -127,9 +127,9 @@ func (e *BubblewrapExecutor) getDefaultCacheBinds() []BindMount {
 	if home == "" {
 		return []BindMount{}
 	}
-	
+
 	binds := []BindMount{}
-	
+
 	// Common cache directories
 	cacheDirs := []struct {
 		path   string
@@ -145,7 +145,7 @@ func (e *BubblewrapExecutor) getDefaultCacheBinds() []BindMount {
 		{filepath.Join(home, ".pip"), filepath.Join(home, ".pip")},
 		{filepath.Join(home, ".local", "share", "virtualenvs"), filepath.Join(home, ".local", "share", "virtualenvs")},
 	}
-	
+
 	for _, dir := range cacheDirs {
 		if _, err := os.Stat(dir.path); err == nil {
 			binds = append(binds, BindMount{
@@ -155,7 +155,7 @@ func (e *BubblewrapExecutor) getDefaultCacheBinds() []BindMount {
 			})
 		}
 	}
-	
+
 	return binds
 }
 
@@ -172,9 +172,8 @@ func GetVersion() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	
+
 	// Parse version from output (e.g., "bubblewrap 0.8.0")
 	version := strings.TrimSpace(string(output))
 	return version, nil
 }
-

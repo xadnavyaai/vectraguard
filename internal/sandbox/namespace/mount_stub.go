@@ -1,3 +1,4 @@
+//go:build !linux
 // +build !linux
 
 package namespace
@@ -37,4 +38,3 @@ func (e *MountNamespaceExecutor) Execute(cmdArgs []string) error {
 func IsMountNamespaceAvailable() bool {
 	return false
 }
-
