@@ -5,6 +5,7 @@
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 [![Go Version](https://img.shields.io/badge/go-1.21+-00ADD8.svg)](https://golang.org/)
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Debian%20Linux%20(x86%2FARM)-lightgrey.svg)]()
+[![CI Status](https://github.com/xadnavyaai/vectra-guard/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/xadnavyaai/vectra-guard/actions)
 
 ## 🎯 Why Vectra Guard?
 

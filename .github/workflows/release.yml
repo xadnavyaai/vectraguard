@@ -1,0 +1,197 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  GO_VERSION: '1.25.1'
+
+jobs:
+  # Run tests before building release
+  pre-release-tests:
+    name: Pre-release Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Run unit tests
+        run: make test
+
+      - name: Run internal tests
+        run: make test-internal
+
+  # Build binaries for multiple platforms
+  build-release:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    needs: pre-release-tests
+    
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            output: vectra-guard-linux-amd64
+          - goos: linux
+            goarch: arm64
+            output: vectra-guard-linux-arm64
+          - goos: darwin
+            goarch: amd64
+            output: vectra-guard-darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            output: vectra-guard-darwin-arm64
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Build binary for ${{ matrix.goos }}-${{ matrix.goarch }}
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          go build -ldflags "-X github.com/vectra-guard/vectra-guard/cmd.Version=${{ steps.get_version.outputs.VERSION }}" -o dist/${{ matrix.output }} .
+          chmod +x dist/${{ matrix.output }}
+
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum ${{ matrix.output }} > ${{ matrix.output }}.sha256
+
+      - name: Upload binary artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.output }}
+          path: |
+            dist/${{ matrix.output }}
+            dist/${{ matrix.output }}.sha256
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: build-release
+    permissions:
+      contents: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist-artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release-assets
+          find dist-artifacts -type f -exec cp {} release-assets/ \;
+          cd release-assets
+          sha256sum vectra-guard-* > checksums.txt
+          ls -lah
+
+      - name: Create Release Notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## Vectra Guard ${{ steps.get_version.outputs.VERSION }}
+
+          ### Installation
+
+          #### Linux (amd64)
+          ```bash
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/vectra-guard-linux-amd64 -o vectra-guard
+          chmod +x vectra-guard
+          sudo mv vectra-guard /usr/local/bin/
+          ```
+
+          #### Linux (arm64)
+          ```bash
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/vectra-guard-linux-arm64 -o vectra-guard
+          chmod +x vectra-guard
+          sudo mv vectra-guard /usr/local/bin/
+          ```
+
+          #### macOS (Intel)
+          ```bash
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/vectra-guard-darwin-amd64 -o vectra-guard
+          chmod +x vectra-guard
+          sudo mv vectra-guard /usr/local/bin/
+          ```
+
+          #### macOS (Apple Silicon)
+          ```bash
+          curl -L https://github.com/${{ github.repository }}/releases/download/${{ steps.get_version.outputs.VERSION }}/vectra-guard-darwin-arm64 -o vectra-guard
+          chmod +x vectra-guard
+          sudo mv vectra-guard /usr/local/bin/
+          ```
+
+          ### Verify Installation
+          ```bash
+          vectra-guard version
+          ```
+
+          ### Checksums
+          All binaries have been signed with SHA256 checksums. See `checksums.txt` for verification.
+
+          ---
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.get_version.outputs.VERSION }}
+          EOF
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          name: Release ${{ steps.get_version.outputs.VERSION }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Optional: Update Homebrew formula (if you use Homebrew)
+  update-homebrew:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    needs: create-release
+    if: success()
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: get_version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      - name: Update Homebrew formula
+        run: |
+          echo "ℹ️  Homebrew formula update would go here"
+          echo "Version: ${{ steps.get_version.outputs.VERSION }}"
+          echo "Formula file: homebrew/vectra-guard.rb"
+          # Add actual Homebrew update logic here if needed

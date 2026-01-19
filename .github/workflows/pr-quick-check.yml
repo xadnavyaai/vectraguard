@@ -1,0 +1,62 @@
+name: PR Quick Check
+
+# This workflow runs quick checks on PRs for fast feedback
+# The main CI pipeline (ci.yml) runs more comprehensive tests
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+env:
+  GO_VERSION: '1.25.1'
+
+jobs:
+  # Fast feedback: formatting and basic syntax
+  quick-checks:
+    name: Quick Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Check Go formatting
+        run: |
+          if [ -n "$(gofmt -s -l .)" ]; then
+            echo "❌ Go code is not formatted. Please run 'go fmt ./...'"
+            echo "Files that need formatting:"
+            gofmt -s -l .
+            exit 1
+          fi
+          echo "✅ Go code is properly formatted"
+
+      - name: Run go vet
+        run: go vet ./...
+
+      - name: Build check
+        run: go build -v ./...
+
+      - name: Fast unit tests
+        run: go test -short -v ./...
+        timeout-minutes: 5
+
+  # Summary
+  quick-check-summary:
+    name: Quick Check Summary
+    runs-on: ubuntu-latest
+    needs: [quick-checks]
+    if: always()
+    
+    steps:
+      - name: Check status
+        run: |
+          if [ "${{ needs.quick-checks.result }}" == "success" ]; then
+            echo "✅ Quick checks passed! Full CI pipeline will run next."
+          else
+            echo "❌ Quick checks failed. Please fix the issues above."
+            exit 1
+          fi
