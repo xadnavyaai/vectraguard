@@ -7,6 +7,28 @@ Use these guidelines for agentic coding tools and IDE assistants.
 - Avoid destructive commands (e.g., `rm -rf /`, `rm -rf /bin`, `mkfs`, `dd if=`). These are blocked by design.
 - If you need a sandboxed environment, use `vectra-guard sandbox deps install` and keep sandbox enabled.
 
+## CVE Scanning (Before Installing Dependencies)
+- **Always scan dependencies before installing:**
+  1. Sync vulnerability database: `vectra-guard cve sync --path .`
+  2. Scan project: `vectra-guard cve scan --path .`
+  3. If vulnerabilities found, check: `vectra-guard cve explain <package>@<version> --ecosystem <npm|pypi|go>`
+- Enable CVE scanning in config:
+  ```yaml
+  cve:
+    enabled: true
+    sources: ["osv"]
+    update_interval_hours: 24
+  ```
+- **Workflow example:**
+  ```bash
+  # Before npm install, pip install, go get, etc.
+  vg cve sync --path .
+  vg cve scan --path .
+  
+  # If clean, proceed
+  vg exec -- npm install
+  ```
+
 ## Recommended Setup
 - Install locally (no sudo):
   - `INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`

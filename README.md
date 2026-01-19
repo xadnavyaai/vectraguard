@@ -27,6 +27,8 @@ AI agents and automation run with your full shell access. One mistaken command c
 - External HTTP(S) endpoints when using `vg`/`vectra-guard` (localhost only; override with `VECTRAGUARD_ALLOW_NET=1`)
 - Sudo usage when using `vg`/`vectra-guard` (override with `VECTRAGUARD_ALLOW_SUDO=1`)
 
+> 📖 **[View Complete Feature Guide →](FEATURES.md)** — Detailed examples, workflows, and use cases
+
 ---
 
 ## ⚡ Quick Start
@@ -1396,6 +1398,7 @@ Vectra Guard is part of the **VectraHub** ecosystem for secure AI agent developm
 | **List trusted commands** | `vg trust list` |
 | **Trust a command** | `vg trust add "command"` |
 | **View metrics** | `vg metrics show` |
+| **Complete feature guide** | See [FEATURES.md](FEATURES.md) |
 | **Sandbox documentation** | See [SANDBOX.md](SANDBOX.md) |
 | **Config examples** | See [CONFIGURATION.md](CONFIGURATION.md) |
 | **Security guide** | See [SECURITY.md](SECURITY.md) |
