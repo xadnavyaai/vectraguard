@@ -20,6 +20,7 @@ type Config struct {
 	ProductionIndicators ProductionIndicatorsConfig `yaml:"production_indicators" toml:"production_indicators" json:"production_indicators"`
 	Sandbox              SandboxConfig              `yaml:"sandbox" toml:"sandbox" json:"sandbox"`
 	CVE                  CVEConfig                  `yaml:"cve" toml:"cve" json:"cve"`
+	SoftDelete           SoftDeleteConfig            `yaml:"soft_delete" toml:"soft_delete" json:"soft_delete"`
 }
 
 // LoggingConfig controls output formatting.
@@ -164,6 +165,21 @@ type CVEConfig struct {
 	CacheDir            string   `yaml:"cache_dir" toml:"cache_dir" json:"cache_dir"`
 }
 
+// SoftDeleteConfig controls soft delete (backup) behavior.
+type SoftDeleteConfig struct {
+	Enabled          bool   `yaml:"enabled" toml:"enabled" json:"enabled"`
+	BackupDir        string `yaml:"backup_dir" toml:"backup_dir" json:"backup_dir"`
+	MaxAgeDays       int    `yaml:"max_age_days" toml:"max_age_days" json:"max_age_days"`
+	MaxBackups       int    `yaml:"max_backups" toml:"max_backups" json:"max_backups"`
+	MaxSizeMB        int    `yaml:"max_size_mb" toml:"max_size_mb" json:"max_size_mb"`
+	AutoCleanup      bool   `yaml:"auto_cleanup" toml:"auto_cleanup" json:"auto_cleanup"`
+	AutoDelete       bool   `yaml:"auto_delete" toml:"auto_delete" json:"auto_delete"`             // Auto-delete old backups (permanent deletion)
+	AutoDeleteAfterDays int `yaml:"auto_delete_after_days" toml:"auto_delete_after_days" json:"auto_delete_after_days"` // Auto-delete backups older than N days
+	ProtectGit       bool   `yaml:"protect_git" toml:"protect_git" json:"protect_git"`
+	GitBackupCopies  int    `yaml:"git_backup_copies" toml:"git_backup_copies" json:"git_backup_copies"`
+	RotationPolicy   string `yaml:"rotation_policy" toml:"rotation_policy" json:"rotation_policy"` // age, count, size, age_and_count
+}
+
 // BindMountConfig represents a bind mount configuration
 type BindMountConfig struct {
 	HostPath      string `yaml:"host_path" toml:"host_path" json:"host_path"`
@@ -283,6 +299,19 @@ func DefaultConfig() Config {
 			Sources:             []string{"osv"},
 			UpdateIntervalHours: 24,
 			CacheDir:            "",
+		},
+		SoftDelete: SoftDeleteConfig{
+			Enabled:           true,  // Enabled by default for safety
+			BackupDir:         "",    // Will use ~/.vectra-guard/backups by default
+			MaxAgeDays:        30,    // Keep backups for 30 days
+			MaxBackups:        100,   // Maximum 100 backups
+			MaxSizeMB:         1024,  // Maximum 1GB total
+			AutoCleanup:       true,  // Auto-cleanup old backups (move to archive)
+			AutoDelete:        false, // Auto-delete old backups (permanent deletion) - disabled by default
+			AutoDeleteAfterDays: 90,  // Auto-delete backups older than 90 days (if auto_delete enabled)
+			ProtectGit:        true,  // Protect git files
+			GitBackupCopies:   3,     // Keep 3 copies of git files
+			RotationPolicy:    "age_and_count", // Use both age and count limits
 		},
 	}
 }

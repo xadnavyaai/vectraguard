@@ -139,6 +139,8 @@ func execute(args []string) error {
 		default:
 			return usageError()
 		}
+	case "restore":
+		return runRestore(ctx, subArgs)
 	case "audit":
 		if len(subArgs) < 1 {
 			return usageError()
