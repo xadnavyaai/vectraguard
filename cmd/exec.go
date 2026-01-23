@@ -15,6 +15,7 @@ import (
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 	"github.com/vectra-guard/vectra-guard/internal/sandbox"
 	"github.com/vectra-guard/vectra-guard/internal/session"
+	"github.com/vectra-guard/vectra-guard/internal/softdelete"
 )
 
 func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID string) error {
@@ -534,6 +535,75 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 			},
 		})
 		return execErr
+	}
+
+	// Intercept rm commands for soft delete (if enabled)
+	if cmdName == "rm" && cfg.SoftDelete.Enabled {
+		// Check if this is a critical deletion that should be blocked
+		shouldBlock := false
+		for _, f := range filteredFindings {
+			if f.Code == "DANGEROUS_DELETE_ROOT" || f.Code == "DANGEROUS_DELETE_HOME" || f.Code == "PROTECTED_DIRECTORY_ACCESS" {
+				shouldBlock = true
+				break
+			}
+		}
+
+		if !shouldBlock {
+			// Perform soft delete instead of actual deletion
+			softDeleteMgr, err := softdelete.NewManager(ctx, cfg.SoftDelete)
+			if err != nil {
+				logger.Warn("failed to initialize soft delete manager, falling back to normal execution", map[string]any{
+					"error": err.Error(),
+				})
+			} else {
+				// Get agent name from session if available
+				agent := ""
+				if tracker != nil && tracker.sess != nil {
+					agent = tracker.sess.AgentName
+				}
+
+				backup, err := softDeleteMgr.SoftDelete(ctx, cmdArgs, sessionID, agent)
+				if err != nil {
+					logger.Warn("soft delete failed, falling back to normal execution", map[string]any{
+						"error": err.Error(),
+					})
+				} else {
+					// Soft delete succeeded - log and return success
+					logger.Info("soft delete completed", map[string]any{
+						"backup_id":   backup.ID,
+						"files_count": len(backup.Files),
+						"total_size":  backup.TotalSize,
+						"is_git":      backup.IsGitBackup,
+					})
+
+					fmt.Fprintf(os.Stderr, "♻️  Files moved to backup (ID: %s)\n", backup.ID)
+					fmt.Fprintf(os.Stderr, "   Restore with: vg restore %s\n", backup.ID)
+					if backup.IsGitBackup {
+						fmt.Fprintf(os.Stderr, "   ⚠️  Git files detected - extra protection applied\n")
+					}
+
+					// Record command as successful soft delete
+					recordCommandAttempt(tracker, session.Command{
+						Timestamp: time.Now(),
+						Command:   cmdName,
+						Args:      args,
+						ExitCode:  0,
+						Duration:  0,
+						RiskLevel: trackingRiskLevel,
+						Approved:  true,
+						Findings:  trackingFindingCodes,
+						Metadata: map[string]interface{}{
+							"soft_delete": true,
+							"backup_id":   backup.ID,
+							"files_count": len(backup.Files),
+							"is_git":      backup.IsGitBackup,
+						},
+					})
+
+					return nil
+				}
+			}
+		}
 	}
 
 	// Decide execution mode (host vs sandbox)

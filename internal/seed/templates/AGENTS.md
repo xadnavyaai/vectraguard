@@ -29,6 +29,43 @@ Use these guidelines for agentic coding tools and IDE assistants.
   vg exec -- npm install
   ```
 
+## Soft Delete (Safe File Deletion)
+- **Files deleted via `rm` are automatically backed up** when soft delete is enabled
+- **Safe deletion workflow:**
+  ```bash
+  # Delete files - they're automatically backed up
+  vg exec -- rm -rf old-files/
+  
+  # List all backups
+  vg restore list
+  
+  # Restore a deleted file/directory
+  vg restore <backup-id>
+  
+  # Show backup details
+  vg restore show <backup-id>
+  
+  # Clean old backups (rotation)
+  vg restore clean
+  
+  # Manually trigger auto-delete (if enabled)
+  vg restore auto-delete
+  ```
+- **Git Protection**: `.git` directory and git config files get extra protection
+- **Auto-Delete**: Optionally automatically delete old backups permanently
+- **Enable soft delete in config:**
+  ```yaml
+  soft_delete:
+    enabled: true
+    max_age_days: 30
+    max_backups: 100
+    auto_cleanup: true      # Auto-rotate old backups
+    auto_delete: false      # Auto-delete backups older than N days (disabled by default)
+    auto_delete_after_days: 90  # Delete backups older than 90 days (if auto_delete enabled)
+    protect_git: true
+  ```
+- **Important**: Critical deletions (like `rm -rf /`) are still blocked. Soft delete only applies to safe deletions.
+
 ## Recommended Setup
 - Install locally (no sudo):
   - `INSTALL_DIR="$HOME/.local/bin" curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash`
