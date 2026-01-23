@@ -547,7 +547,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				break
 			}
 		}
-		
+
 		if !shouldBlock {
 			// Perform soft delete instead of actual deletion
 			softDeleteMgr, err := softdelete.NewManager(ctx, cfg.SoftDelete)
@@ -561,7 +561,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 				if tracker != nil && tracker.sess != nil {
 					agent = tracker.sess.AgentName
 				}
-				
+
 				backup, err := softDeleteMgr.SoftDelete(ctx, cmdArgs, sessionID, agent)
 				if err != nil {
 					logger.Warn("soft delete failed, falling back to normal execution", map[string]any{
@@ -575,13 +575,13 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 						"total_size":  backup.TotalSize,
 						"is_git":      backup.IsGitBackup,
 					})
-					
+
 					fmt.Fprintf(os.Stderr, "♻️  Files moved to backup (ID: %s)\n", backup.ID)
 					fmt.Fprintf(os.Stderr, "   Restore with: vg restore %s\n", backup.ID)
 					if backup.IsGitBackup {
 						fmt.Fprintf(os.Stderr, "   ⚠️  Git files detected - extra protection applied\n")
 					}
-					
+
 					// Record command as successful soft delete
 					recordCommandAttempt(tracker, session.Command{
 						Timestamp: time.Now(),
@@ -599,7 +599,7 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 							"is_git":      backup.IsGitBackup,
 						},
 					})
-					
+
 					return nil
 				}
 			}

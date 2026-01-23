@@ -461,13 +461,13 @@ func TestAutoDelete_GitProtection(t *testing.T) {
 			{
 				ID:          gitBackupID,
 				Timestamp:   time.Now().Add(-36 * time.Hour), // 1.5 days ago (within 2x threshold)
-				TotalSize:    100,
+				TotalSize:   100,
 				IsGitBackup: true, // Git backup
 			},
 			{
 				ID:          normalBackupID,
 				Timestamp:   time.Now().Add(-2 * 24 * time.Hour), // 2 days ago
-				TotalSize:    100,
+				TotalSize:   100,
 				IsGitBackup: false,
 			},
 		},

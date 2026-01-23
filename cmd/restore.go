@@ -107,12 +107,12 @@ func runRestoreList(ctx context.Context) error {
 		}
 		filesCount := len(backup.Files)
 		size := formatSize(backup.TotalSize)
-		
+
 		gitMark := ""
 		if backup.IsGitBackup {
 			gitMark = " ⚠️ GIT"
 		}
-		
+
 		fmt.Printf("%-8s  %-19s  %-30s  %-6d  %-10s%s\n",
 			backup.ID[:8], timestamp, command, filesCount, size, gitMark)
 	}
@@ -147,7 +147,7 @@ func runRestoreShow(ctx context.Context, backupID string) error {
 	if backup.IsGitBackup {
 		fmt.Printf("⚠️  Git Backup: Yes\n")
 	}
-	
+
 	fmt.Println("\nFiles:")
 	for i, file := range backup.Files {
 		if i >= 20 {
@@ -182,7 +182,7 @@ func runRestoreBackup(ctx context.Context, backupID string, targetPath string) e
 	}
 
 	fmt.Printf("Restoring backup %s...\n", backupID)
-	
+
 	if err := mgr.Restore(ctx, backupID, targetPath); err != nil {
 		return fmt.Errorf("failed to restore: %w", err)
 	}
@@ -215,7 +215,7 @@ func runRestoreClean(ctx context.Context, olderThanDays int) error {
 	}
 
 	fmt.Println("Cleaning old backups...")
-	
+
 	if err := mgr.Cleanup(ctx); err != nil {
 		return fmt.Errorf("failed to cleanup: %w", err)
 	}
@@ -251,7 +251,7 @@ func runRestoreStats(ctx context.Context) error {
 		if backup.IsGitBackup {
 			gitBackups++
 		}
-		
+
 		// Count backups that would be auto-deleted
 		if cfg.SoftDelete.AutoDelete && cfg.SoftDelete.AutoDeleteAfterDays > 0 {
 			age := now.Sub(backup.Timestamp)
@@ -295,7 +295,7 @@ func runRestoreDelete(ctx context.Context, backupID string) error {
 	}
 
 	fmt.Printf("Deleting backup %s...\n", backupID)
-	
+
 	if err := mgr.DeleteBackup(ctx, backupID); err != nil {
 		return fmt.Errorf("failed to delete backup: %w", err)
 	}
@@ -318,7 +318,7 @@ func runRestoreAutoDelete(ctx context.Context) error {
 	}
 
 	fmt.Println("Running auto-delete for old backups...")
-	
+
 	if err := mgr.AutoDeleteOldBackups(ctx); err != nil {
 		return fmt.Errorf("failed to auto-delete: %w", err)
 	}
