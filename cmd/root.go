@@ -67,6 +67,14 @@ func execute(args []string) error {
 			return err
 		}
 		return runScanSecrets(ctx, *target, *allowlist)
+	case "scan-security":
+		subFlags := flag.NewFlagSet("scan-security", flag.ContinueOnError)
+		target := subFlags.String("path", ".", "Target directory or file to scan for security issues")
+		languages := subFlags.String("languages", "", "Comma-separated languages to scan (go,python,c). Default: all supported")
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		return runScanSecurity(ctx, *target, *languages)
 	case "help":
 		topic := ""
 		if len(subArgs) > 0 {
@@ -460,6 +468,7 @@ func usageError() error {
 
 Commands:
   scan-secrets                 Scan files for exposed secrets (regex + entropy)
+  scan-security                Scan source code (Go/Python/C) for risky patterns
   init                         Initialize configuration file
   validate <script>            Validate a shell script for security issues
   validate-agent <path>        Validate agent scripts (file or directory)
