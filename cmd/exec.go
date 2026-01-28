@@ -12,6 +12,7 @@ import (
 
 	"github.com/vectra-guard/vectra-guard/internal/analyzer"
 	"github.com/vectra-guard/vectra-guard/internal/config"
+	"github.com/vectra-guard/vectra-guard/internal/lockdown"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
 	"github.com/vectra-guard/vectra-guard/internal/sandbox"
 	"github.com/vectra-guard/vectra-guard/internal/session"
@@ -24,6 +25,18 @@ func runExec(ctx context.Context, cmdArgs []string, interactive bool, sessionID 
 
 	if len(cmdArgs) == 0 {
 		return fmt.Errorf("no command specified")
+	}
+
+	// Global lockdown check: if enabled, block all guarded executions early.
+	if st, err := lockdown.GetState(); err == nil && st.Enabled {
+		logger.Error("execution blocked by global lockdown", map[string]any{
+			"reason":    st.Reason,
+			"updatedBy": st.UpdatedBy,
+		})
+		return &exitError{
+			message: "lockdown: guarded executions are currently disabled. Use `vg lockdown status` or `vg lockdown disable` to resume.",
+			code:    3,
+		}
 	}
 
 	cmdName := cmdArgs[0]

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/vectra-guard/vectra-guard/internal/config"
 	"github.com/vectra-guard/vectra-guard/internal/logging"
@@ -58,6 +59,14 @@ func execute(args []string) error {
 	subArgs := root.Args()[1:]
 
 	switch subcommand {
+	case "scan-secrets":
+		subFlags := flag.NewFlagSet("scan-secrets", flag.ContinueOnError)
+		target := subFlags.String("path", ".", "Target directory or file to scan for secrets")
+		allowlist := subFlags.String("allowlist", "", "Path to allowlist file of known-safe secrets")
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		return runScanSecrets(ctx, *target, *allowlist)
 	case "help":
 		topic := ""
 		if len(subArgs) > 0 {
@@ -82,6 +91,22 @@ func execute(args []string) error {
 			return usageError()
 		}
 		return runValidate(ctx, subFlags.Arg(0))
+	case "validate-agent":
+		subFlags := flag.NewFlagSet("validate-agent", flag.ContinueOnError)
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		if subFlags.NArg() != 1 {
+			return usageError()
+		}
+		return runValidateAgent(ctx, subFlags.Arg(0))
+	case "prompt-firewall":
+		subFlags := flag.NewFlagSet("prompt-firewall", flag.ContinueOnError)
+		file := subFlags.String("file", "", "Read prompt text from file instead of stdin")
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		return runPromptFirewall(ctx, *file)
 	case "explain":
 		subFlags := flag.NewFlagSet("explain", flag.ContinueOnError)
 		if err := subFlags.Parse(subArgs); err != nil {
@@ -141,6 +166,26 @@ func execute(args []string) error {
 		}
 	case "restore":
 		return runRestore(ctx, subArgs)
+	case "lockdown":
+		if len(subArgs) < 1 {
+			return usageError()
+		}
+		lockCmd := subArgs[0]
+		lockArgs := subArgs[1:]
+		switch lockCmd {
+		case "enable":
+			reason := ""
+			if len(lockArgs) > 0 {
+				reason = strings.Join(lockArgs, " ")
+			}
+			return runLockdownEnable(ctx, reason)
+		case "disable":
+			return runLockdownDisable(ctx)
+		case "status":
+			return runLockdownStatus(ctx)
+		default:
+			return usageError()
+		}
 	case "audit":
 		if len(subArgs) < 1 {
 			return usageError()
@@ -228,6 +273,24 @@ func execute(args []string) error {
 		default:
 			return usageError()
 		}
+	case "session-diff":
+		subFlags := flag.NewFlagSet("session-diff", flag.ContinueOnError)
+		rootPath := subFlags.String("path", "", "Limit diff to a specific root path")
+		jsonOutput := subFlags.Bool("json", false, "Output diff in JSON format")
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		if subFlags.NArg() < 1 {
+			return usageError()
+		}
+		return runSessionDiff(ctx, subFlags.Arg(0), *rootPath, *jsonOutput)
+	case "serve":
+		subFlags := flag.NewFlagSet("serve", flag.ContinueOnError)
+		port := subFlags.Int("port", 8000, "Port to bind the local dashboard to")
+		if err := subFlags.Parse(subArgs); err != nil {
+			return err
+		}
+		return runServe(ctx, *port)
 	case "trust":
 		if len(subArgs) < 1 {
 			return usageError()
@@ -396,8 +459,12 @@ func usageError() error {
 	usage := fmt.Sprintf(`usage: %s [--config FILE] [--output text|json] <command> [args]
 
 Commands:
+  scan-secrets                 Scan files for exposed secrets (regex + entropy)
   init                         Initialize configuration file
   validate <script>            Validate a shell script for security issues
+  validate-agent <path>        Validate agent scripts (file or directory)
+  prompt-firewall [--file]     Analyze prompts for injection and jailbreak attempts
+  lockdown <enable|disable|status>  Control global lockdown mode
   explain <script>             Explain security risks in a script
   exec [--interactive] <cmd>   Execute command with security validation
   audit <npm|python>           Audit package vulnerabilities (npm/pip-audit)
@@ -406,6 +473,8 @@ Commands:
   session end <id>             End an agent session
   session list                 List all sessions
   session show <id>            Show session details
+  session-diff <id>            Show added/modified/deleted files for a session
+  serve [--port]               Serve local dashboard on http://127.0.0.1:PORT
   trust list                   List trusted commands
   trust add <cmd>              Add command to trust store
   trust remove <cmd>           Remove command from trust store
