@@ -738,6 +738,7 @@ After setup, you should have:
 3. **Customize policies** - Edit `vectra-guard.yaml`
 4. **Share with team** - Commit config to git
 5. **Enable container mode** - For maximum security
+6. **Scan for secrets and risky code** - Run `vectra-guard scan-secrets --path .` and `vectra-guard scan-security --path . --languages go,python,c,config` in CI or before deploy. See [Control panel & deployment security](docs/control-panel-security.md) (checklist, rule reference, and [detection behavior](docs/control-panel-security.md#detection-behavior-scan-secrets-and-scan-security)).
 
 ---
 

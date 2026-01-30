@@ -273,6 +273,21 @@ vg scan-security --path . --languages go,python,c,config
 # Flags: BIND_ALL_INTERFACES, LOCALHOST_TRUST_PROXY, UNAUTHENTICATED_ACCESS in configs
 ```
 
+**Detection behavior (fewer false positives)**
+
+- **scan-secrets:** Known patterns (AWS, api_key/token/secret, private keys) are always reported. High-entropy strings (ENTROPY_CANDIDATE) are only reported when the line has secret context (token=, api_key:, etc.); paths, slugs, UUIDs, and code identifiers are filtered out. Lockfiles are skipped. See [Secret findings examples](docs/blog/secret-findings-examples.md).
+- **scan-security:** Comment-only lines (Python `#`, Go `//`, config `#`) are skipped so URLs or bind examples in comments are not flagged.
+
+**Verify and test**
+
+```bash
+# Sample findings per repo, verify match on line, classify TRUE_ISSUE vs FP (requires test-workspaces/)
+go run scripts/verify-secret-findings.go
+
+# E2E tests for the binary (scan-secrets, scan-security, audit, validate)
+go build -o vectra-guard . && ./scripts/test-binary-e2e.sh ./vectra-guard
+```
+
 **Validate agent workflows**
 ```bash
 vg validate-agent .agent
