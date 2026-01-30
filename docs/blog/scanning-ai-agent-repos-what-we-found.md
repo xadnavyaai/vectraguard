@@ -32,14 +32,16 @@ All are open source and run or trigger code locally—exactly the kind of surfac
 
 | Repo | Code findings | Severity mix | Secrets (candidates) | Package issues |
 |------|----------------|-------------|----------------------|----------------|
-| AutoGPT | 1,333 | Medium | 174,012 | 14 (python) |
-| Open Interpreter | 259 | 5 high, 254 medium | 1,093 | 14 (python) |
-| Aider | 473 | Medium | 10,354 | — |
-| LocalAGI | 71 | 2 high, 69 medium | 1,549 | 14 (python) |
-| Moltbot | 11 | Medium | 55,095 | npm 0, python 14 |
-| Huginn | 3 (scan) / 0 (audit) | — | 4,036 | 14 (python) |
+| AutoGPT | 1,298 | Medium | 5,651 | 14 (python) |
+| Open Interpreter | 247 | 5 high, 242 medium | 10 | 14 (python) |
+| Aider | 435 | Medium | 170 | — |
+| LocalAGI | 68 | 2 high, 66 medium | 13 | 14 (python) |
+| Moltbot | 11 | Medium | 1,546 | npm 0, python 14 |
+| Huginn | 3 (scan) / 0 (audit) | — | 104 | 14 (python) |
 
-*Code findings* = static patterns (e.g. env access, external HTTP, bind 0.0.0.0, subprocess). *Secrets* = high-entropy and key-like strings in source/config (lockfiles are skipped by default so counts reflect app code, not dependency hashes; see [Findings analysis](../reports/findings-analysis.md)). *Package issues* = pip-audit / npm audit where we ran it.
+*Code findings* = static patterns (e.g. env access, external HTTP, bind 0.0.0.0, subprocess); comment-only lines are skipped. *Secrets* = key-like strings in source/config with secret context (token/api_key/secret etc.) and high-entropy values; lockfiles are skipped and paths/slugs/identifiers are filtered to reduce false positives (~7.5K total across six repos). See [Secret findings examples](secret-findings-examples.md) and [Findings analysis](../reports/findings-analysis.md). *Package issues* = pip-audit / npm audit where we ran it.
+
+The table above reflects a run with **improved detection** (context-based secret flagging and comment-line skip for security rules); earlier runs showed higher secret counts before these FP reductions.
 
 ## What Showed Up Most
 

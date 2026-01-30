@@ -133,6 +133,33 @@ requests.get(url)
 	}
 }
 
+func TestScanPathSkipsCommentOnlyLines(t *testing.T) {
+	dir := t.TempDir()
+	pyFile := filepath.Join(dir, "example.py")
+	// Comment-only lines should not produce findings (reduce FPs from doc URLs, etc.).
+	content := []byte(`# See https://api.example.com/docs
+# host = "0.0.0.0"
+url = "https://real-call.com"  # inline comment
+`)
+	if err := os.WriteFile(pyFile, content, 0o644); err != nil {
+		t.Fatalf("write py file: %v", err)
+	}
+	findings, err := ScanPath(dir, Options{})
+	if err != nil {
+		t.Fatalf("ScanPath error: %v", err)
+	}
+	// Should have exactly one PY_EXTERNAL_HTTP (the real-call.com line), not from comment lines.
+	var externalCount int
+	for _, f := range findings {
+		if f.Code == "PY_EXTERNAL_HTTP" {
+			externalCount++
+		}
+	}
+	if externalCount != 1 {
+		t.Errorf("expected 1 PY_EXTERNAL_HTTP (non-comment line only), got %d: %#v", externalCount, findings)
+	}
+}
+
 func TestScanPathDetectsBindAllInterfaces(t *testing.T) {
 	dir := t.TempDir()
 
