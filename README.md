@@ -25,10 +25,12 @@ AI agents and automation run with your full shell access. One mistaken command c
 - Risky git actions (force push, history rewrites)
 - Networked installs (`curl | sh`, `wget | bash`)
 - Known vulnerable dependencies via CVE scanning
+- Exposed secrets and risky code patterns (`vg scan-secrets`, `vg scan-security`), including deployment configs (bind 0.0.0.0, trust-proxy, auth off)
 - External HTTP(S) endpoints when using `vg`/`vectra-guard` (localhost only; override with `VECTRAGUARD_ALLOW_NET=1`)
 - Sudo usage when using `vg`/`vectra-guard` (override with `VECTRAGUARD_ALLOW_SUDO=1`)
 
-> 📖 **[View Complete Feature Guide →](FEATURES.md)** — Detailed examples, workflows, and use cases
+> 📖 **[View Complete Feature Guide →](FEATURES.md)** — Detailed examples, workflows, and use cases  
+> 📖 **[Control panel & deployment security →](docs/control-panel-security.md)** — Checklist, CI examples, scan-security rule reference
 
 ---
 

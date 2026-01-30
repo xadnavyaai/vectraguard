@@ -1,0 +1,31 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../vectraguard-frontend"
+		}
+	],
+	"settings": {
+		"terminal.integrated.env.osx": {
+			"VECTRAGUARD_SESSION_ID": "${env:VECTRAGUARD_SESSION_ID}"
+		},
+		"terminal.integrated.env.linux": {
+			"VECTRAGUARD_SESSION_ID": "${env:VECTRAGUARD_SESSION_ID}"
+		},
+		"terminal.integrated.env.windows": {
+			"VECTRAGUARD_SESSION_ID": "${env:VECTRAGUARD_SESSION_ID}"
+		},
+		"terminal.integrated.defaultProfile.osx": "bash",
+		"terminal.integrated.profiles.osx": {
+			"bash": {
+				"path": "/bin/bash",
+				"args": [
+					"-l"
+				],
+				"icon": "terminal-bash"
+			}
+		}
+	}
+}
