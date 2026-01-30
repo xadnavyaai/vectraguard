@@ -148,3 +148,27 @@ func TestScanPathRespectsIgnorePaths(t *testing.T) {
 		t.Fatalf("expected at least one finding from %s, got %d findings from: %v", appFile, len(findings), files)
 	}
 }
+
+func TestScanPathSkipsLockfiles(t *testing.T) {
+	dir := t.TempDir()
+
+	// Lockfiles are full of high-entropy hashes; we skip them by default so
+	// secret counts reflect app/config, not dependency integrity blobs.
+	lockFiles := []string{"package-lock.json", "yarn.lock", "poetry.lock", "cargo.lock", "other.lock"}
+	for _, name := range lockFiles {
+		path := filepath.Join(dir, name)
+		// Content that would trigger ENTROPY_CANDIDATE in a normal file.
+		content := []byte(`{"integrity":"sha512-abcdEFGHijklMNOPqrstUVWX1234567890ABCDEFGHijklMNOPqrstUVWX12345678=="}`)
+		if err := os.WriteFile(path, content, 0o644); err != nil {
+			t.Fatalf("write %s: %v", name, err)
+		}
+	}
+
+	findings, err := ScanPath(dir, Options{})
+	if err != nil {
+		t.Fatalf("ScanPath error: %v", err)
+	}
+	if len(findings) != 0 {
+		t.Fatalf("expected 0 findings when only lockfiles present (skip lockfiles by default), got %d: %#v", len(findings), findings)
+	}
+}

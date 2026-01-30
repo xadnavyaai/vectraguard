@@ -23,6 +23,18 @@ Stored findings use this schema so tools and scripts can consume them the same w
 | **findings-summary.json** | Placeholder/schema for combined tool-format output; use **similar-agent-findings.json** when generated. |
 | **findings-analysis.md** | Pattern-by-pattern discussion; examples use tool format (text and JSON keys). |
 
+## Cross-validation (rule-code counts)
+
+Canonical counts for the six-repo scan come from **similar-agent-scan-raw.txt** (grep by `code=...`). Validated totals:
+
+| Rule | Count | Source |
+|------|-------|--------|
+| PY_EXTERNAL_HTTP | 1,245 | similar-agent-scan-raw.txt |
+| PY_REMOTE_HTTP | 175 | similar-agent-scan-raw.txt |
+| BIND_ALL_INTERFACES | 22 | similar-agent-scan-raw.txt |
+
+Secrets totals in the blog table are from `vg audit repo`; lockfiles are skipped by default so secret counts reflect app/config, not dependency hashes.
+
 ## How to refer to them
 
 - **From docs or blog:** Link to `findings-analysis.md` for narrative; link to `similar-agent-findings.json` for machine-readable findings in tool format.

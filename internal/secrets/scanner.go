@@ -261,6 +261,17 @@ func shouldSkipFile(path string) bool {
 		strings.HasSuffix(lower, ".dll") {
 		return true
 	}
+	// Skip lockfiles: full of integrity hashes and resolved URLs that match
+	// ENTROPY_CANDIDATE; they inflate secret counts and are not app secrets.
+	switch lower {
+	case "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb",
+		"poetry.lock", "pipfile.lock", "pdm.lock", "uv.lock",
+		"cargo.lock", "go.sum", "composer.lock":
+		return true
+	}
+	if strings.HasSuffix(lower, ".lock") {
+		return true
+	}
 	return false
 }
 
