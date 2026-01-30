@@ -27,6 +27,11 @@ type Options struct {
 	// Allowlist contains exact values that should be ignored even if they match
 	// a detector (e.g., known test keys).
 	Allowlist map[string]struct{}
+	// IgnorePaths is a list of path globs or directory prefixes (relative to the
+	// scan root). If any pattern matches a file's path, that file is skipped.
+	// Patterns ending with "/" match any file under that directory prefix.
+	// Otherwise filepath.Match is used (e.g. "*.min.js", "vendor/*").
+	IgnorePaths []string
 }
 
 var (
@@ -75,6 +80,9 @@ func ScanPath(root string, opts Options) ([]Finding, error) {
 	var findings []Finding
 
 	if !info.IsDir() {
+		if shouldIgnorePath(filepath.Base(root), opts.IgnorePaths) {
+			return nil, nil
+		}
 		fs, err := scanFile(root, opts)
 		if err != nil {
 			return nil, err
@@ -94,6 +102,10 @@ func ScanPath(root string, opts Options) ([]Finding, error) {
 			return nil
 		}
 		if shouldSkipFile(path) {
+			return nil
+		}
+		rel, errRel := filepath.Rel(root, path)
+		if errRel == nil && shouldIgnorePath(filepath.ToSlash(rel), opts.IgnorePaths) {
 			return nil
 		}
 		fs, err := scanFile(path, opts)
@@ -188,6 +200,39 @@ func scanFile(path string, opts Options) ([]Finding, error) {
 	}
 
 	return findings, nil
+}
+
+// shouldIgnorePath returns true if relPath (slash-separated, relative to scan root)
+// matches any of the given patterns. Patterns ending with "/" are directory prefixes;
+// others are matched with filepath.Match against relPath and the base name.
+func shouldIgnorePath(relPath string, patterns []string) bool {
+	if len(patterns) == 0 {
+		return false
+	}
+	relPath = filepath.ToSlash(relPath)
+	base := filepath.Base(relPath)
+	for _, p := range patterns {
+		p = strings.TrimSpace(filepath.ToSlash(p))
+		if p == "" {
+			continue
+		}
+		if strings.HasSuffix(p, "/") {
+			prefix := strings.TrimSuffix(p, "/")
+			if prefix == "" || relPath == prefix || strings.HasPrefix(relPath, prefix+"/") {
+				return true
+			}
+			continue
+		}
+		matched, _ := filepath.Match(p, relPath)
+		if matched {
+			return true
+		}
+		matched, _ = filepath.Match(p, base)
+		if matched {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldSkipDir(name string) bool {

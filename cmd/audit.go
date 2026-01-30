@@ -12,6 +12,8 @@ import (
 	"strings"
 
 	"github.com/vectra-guard/vectra-guard/internal/logging"
+	"github.com/vectra-guard/vectra-guard/internal/secscan"
+	"github.com/vectra-guard/vectra-guard/internal/secrets"
 	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
@@ -36,13 +38,81 @@ type sessionAuditSummary struct {
 	Blocked         int
 }
 
-func runAudit(ctx context.Context, tool string, targetPath string, failOnFindings bool, autoInstall bool, sessionID string, allSessions bool) error {
+// repoAuditSummary is a higher-level, repo-wide summary that aggregates
+// static security scan findings, secret detections, and package audits.
+type repoAuditSummary struct {
+	Path string
+
+	// Code-level static analysis (scan-security)
+	CodeFindings      []secscan.Finding
+	CodeFindingsTotal int
+	CodeBySeverity    map[string]int
+	CodeByLanguage    map[string]int
+
+	// Secret scanning (scan-secrets)
+	SecretsTotal int
+
+	// Package / dependency audits (npm, python, cve)
+	PackageAudits []auditSummary
+}
+
+// repoAuditOptions holds options for repo audit only (output format, allowlist, ignore paths).
+type repoAuditOptions struct {
+	OutputFormat string // text, markdown, json
+	AllowlistPath string
+	IgnoreGlobs  string // comma-separated
+}
+
+// codeRemediation maps secscan finding codes to short remediation guidance.
+var codeRemediation = map[string]string{
+	"PY_ENV_ACCESS":       "Use env vars; avoid logging or exposing in responses.",
+	"PY_SUBPROCESS":       "Prefer subprocess with shell=False and validate arguments.",
+	"PY_EVAL":             "Avoid eval(); use ast.literal_eval or structured parsing for untrusted input.",
+	"PY_EXEC":             "Avoid exec(); validate and sandbox any dynamic code.",
+	"PY_REMOTE_HTTP":     "Validate URLs and responses; guard against SSRF.",
+	"GO_EXEC_COMMAND":     "Validate and sanitize command arguments; avoid shell invocation.",
+	"GO_DANGEROUS_SHELL":  "Remove or restrict dangerous shell patterns.",
+	"GO_NET_HTTP":         "Authenticate and sanitize remote calls.",
+	"GO_ENV_READ":         "Avoid leaking credentials via env; use secret managers where possible.",
+	"GO_SYSTEM_WRITE":     "Avoid writing to system dirs from app code; use config management.",
+	"C_SHELL_EXEC":        "Validate inputs to system/popen/exec*; avoid shell injection.",
+	"C_GETS":              "Replace gets() with fgets() or safe alternatives.",
+	"C_UNSAFE_STRING":     "Use bounded APIs (strncpy, strlcpy) or safe string libraries.",
+	"C_MEMCPY":            "Validate bounds before memcpy to prevent buffer overflows.",
+	"C_RAW_SOCKET":        "Review socket use for abuse or exfiltration.",
+	"PY_EXTERNAL_HTTP":    "Ensure non-localhost URLs are not used with untrusted input (SSRF risk).",
+	"GO_EXTERNAL_HTTP":    "Ensure non-localhost URLs are not used with untrusted input (SSRF risk).",
+	"BIND_ALL_INTERFACES": "Binding to 0.0.0.0 exposes the service on all interfaces; ensure auth and TLS.",
+}
+
+func runAudit(ctx context.Context, tool string, targetPath string, failOnFindings bool, autoInstall bool, sessionID string, allSessions bool, repoOpts *repoAuditOptions) error {
 	logger := logging.FromContext(ctx)
 	if targetPath == "" {
 		targetPath = "."
 	}
 
 	switch strings.ToLower(tool) {
+	case "repo":
+		summary, err := runRepoAudit(ctx, targetPath, autoInstall, repoOpts)
+		if err != nil {
+			return err
+		}
+		outputFormat := "text"
+		if repoOpts != nil && repoOpts.OutputFormat != "" {
+			outputFormat = strings.ToLower(strings.TrimSpace(repoOpts.OutputFormat))
+		}
+		switch outputFormat {
+		case "markdown":
+			emitRepoAuditMarkdown(summary)
+		case "json":
+			emitRepoAuditJSON(summary)
+		default:
+			logRepoAuditSummary(logger, summary)
+			printRepoAuditFindingsText(summary, 50)
+		}
+		if failOnFindings && (summary.CodeFindingsTotal > 0 || summary.SecretsTotal > 0 || hasPackageFindings(summary.PackageAudits)) {
+			return &exitError{message: "repo audit found issues", code: 2}
+		}
 	case "session":
 		summary, err := runSessionAudit(ctx, sessionID, allSessions)
 		if err != nil {
@@ -82,6 +152,127 @@ func runAudit(ctx context.Context, tool string, targetPath string, failOnFinding
 	}
 
 	return nil
+}
+
+// runRepoAudit orchestrates a basic, repo-wide security audit by:
+//   - running scan-security (static security patterns)
+//   - running scan-secrets (secret detection)
+//   - running package audits (npm, python) in project mode
+func runRepoAudit(ctx context.Context, targetPath string, autoInstall bool, opts *repoAuditOptions) (repoAuditSummary, error) {
+	logger := logging.FromContext(ctx)
+	summary := repoAuditSummary{
+		Path:           targetPath,
+		CodeFindings:   nil,
+		CodeBySeverity: map[string]int{},
+		CodeByLanguage: map[string]int{},
+	}
+
+	// 1) Static security scan (code-level findings)
+	secFindings, err := secscan.ScanPath(targetPath, secscan.Options{})
+	if err != nil {
+		return repoAuditSummary{}, fmt.Errorf("scan-security: %w", err)
+	}
+	summary.CodeFindings = secFindings
+	for _, f := range secFindings {
+		summary.CodeFindingsTotal++
+		sev := strings.TrimSpace(strings.ToLower(f.Severity))
+		if sev == "" {
+			sev = "unknown"
+		}
+		summary.CodeBySeverity[sev] = summary.CodeBySeverity[sev] + 1
+
+		lang := strings.TrimSpace(strings.ToLower(f.Language))
+		if lang == "" {
+			lang = "unknown"
+		}
+		summary.CodeByLanguage[lang] = summary.CodeByLanguage[lang] + 1
+	}
+
+	// 2) Secret scan with optional allowlist and path ignore
+	secretsOpts := secrets.Options{}
+	if opts != nil {
+		if opts.AllowlistPath != "" {
+			allowlist, errLoad := loadAllowlist(opts.AllowlistPath)
+			if errLoad != nil {
+				logger.Warn("load allowlist failed, continuing without", map[string]any{
+					"path": opts.AllowlistPath, "error": errLoad.Error(),
+				})
+			} else {
+				secretsOpts.Allowlist = allowlist
+			}
+		}
+		for _, p := range strings.Split(opts.IgnoreGlobs, ",") {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				secretsOpts.IgnorePaths = append(secretsOpts.IgnorePaths, trimmed)
+			}
+		}
+	}
+	secretCount, err := countSecrets(ctx, targetPath, secretsOpts)
+	if err != nil {
+		logger.Warn("secret scan failed during repo audit", map[string]any{
+			"path":  targetPath,
+			"error": err.Error(),
+		})
+	} else {
+		summary.SecretsTotal = secretCount
+	}
+
+	// 3) Package audits (npm, python) – best-effort; ignore unsupported cases.
+	if autoInstall {
+		if err := ensureNpm(ctx); err != nil {
+			logger.Info("npm auto-install failed for repo audit (continuing without npm audit)", map[string]any{
+				"error": err.Error(),
+			})
+		}
+		if err := ensurePipAudit(ctx); err != nil {
+			logger.Info("pip-audit auto-install failed for repo audit (continuing without python audit)", map[string]any{
+				"error": err.Error(),
+			})
+		}
+	}
+
+	if s, err := runNpmAudit(targetPath); err == nil {
+		summary.PackageAudits = append(summary.PackageAudits, s)
+	} else {
+		logger.Info("npm audit skipped during repo audit", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	if s, err := runPythonAudit(targetPath); err == nil {
+		summary.PackageAudits = append(summary.PackageAudits, s)
+	} else {
+		logger.Info("python audit skipped during repo audit", map[string]any{
+			"error": err.Error(),
+		})
+	}
+
+	return summary, nil
+}
+
+// countSecrets returns the number of secret findings for the given path.
+func countSecrets(ctx context.Context, targetPath string, opts secrets.Options) (int, error) {
+	logger := logging.FromContext(ctx)
+
+	findings, err := secrets.ScanPath(targetPath, opts)
+	if err != nil {
+		logger.Warn("scan-secrets failed", map[string]any{
+			"path":  targetPath,
+			"error": err.Error(),
+		})
+		return 0, err
+	}
+	return len(findings), nil
+}
+
+func hasPackageFindings(audits []auditSummary) bool {
+	for _, a := range audits {
+		if a.Total > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func runSessionAudit(ctx context.Context, sessionID string, allSessions bool) (sessionAuditSummary, error) {
@@ -375,6 +566,158 @@ func logSessionAuditSummary(logger *logging.Logger, summary sessionAuditSummary)
 	}
 
 	logger.Info("session audit summary", fields)
+}
+
+// logRepoAuditSummary prints a concise, high-level summary of the repo audit.
+func logRepoAuditSummary(logger *logging.Logger, summary repoAuditSummary) {
+	fields := map[string]any{
+		"path":                 summary.Path,
+		"code_findings_total":  summary.CodeFindingsTotal,
+		"secrets_total":        summary.SecretsTotal,
+		"code_by_severity":     summary.CodeBySeverity,
+		"code_by_language":     summary.CodeByLanguage,
+		"package_audits_total": len(summary.PackageAudits),
+	}
+
+	// Optionally embed per-tool package audit counts for quick inspection.
+	if len(summary.PackageAudits) > 0 {
+		pkgs := make(map[string]map[string]any)
+		for _, a := range summary.PackageAudits {
+			pkgs[a.Tool] = map[string]any{
+				"total":  a.Total,
+				"counts": a.Counts,
+				"mode":   a.Mode,
+			}
+		}
+		fields["package_audits"] = pkgs
+	}
+
+	logger.Info("repo audit summary", fields)
+}
+
+func getRemediation(code string) string {
+	if s, ok := codeRemediation[code]; ok {
+		return s
+	}
+	return ""
+}
+
+const (
+	repoAuditTextCap   = 50
+	repoAuditJSONCap   = 200
+)
+
+func printRepoAuditFindingsText(summary repoAuditSummary, cap int) {
+	if cap <= 0 {
+		cap = repoAuditTextCap
+	}
+	for i, f := range summary.CodeFindings {
+		if i >= cap {
+			fmt.Fprintf(os.Stdout, "... and %d more code findings\n", len(summary.CodeFindings)-cap)
+			return
+		}
+		rem := getRemediation(f.Code)
+		if rem != "" {
+			fmt.Fprintf(os.Stdout, "%s:%d  %s  %s  → %s\n", f.File, f.Line, f.Code, f.Description, rem)
+		} else {
+			fmt.Fprintf(os.Stdout, "%s:%d  %s  %s\n", f.File, f.Line, f.Code, f.Description)
+		}
+	}
+}
+
+func emitRepoAuditMarkdown(summary repoAuditSummary) {
+	fmt.Fprintln(os.Stdout, "# Repo Audit Report")
+	fmt.Fprintf(os.Stdout, "\n**Path:** %s\n\n", summary.Path)
+	fmt.Fprintln(os.Stdout, "## Code findings")
+	fmt.Fprintln(os.Stdout, "| File | Line | Severity | Code | Description | Remediation |")
+	fmt.Fprintln(os.Stdout, "|------|------|----------|------|-------------|-------------|")
+	cap := repoAuditTextCap
+	for i, f := range summary.CodeFindings {
+		if i >= cap {
+			fmt.Fprintf(os.Stdout, "| ... | ... | ... | ... | *… and %d more* | ... |\n", len(summary.CodeFindings)-cap)
+			break
+		}
+		rem := getRemediation(f.Code)
+		desc := strings.ReplaceAll(f.Description, "|", "\\|")
+		remEsc := strings.ReplaceAll(rem, "|", "\\|")
+		fmt.Fprintf(os.Stdout, "| %s | %d | %s | %s | %s | %s |\n",
+			f.File, f.Line, f.Severity, f.Code, desc, remEsc)
+	}
+	fmt.Fprintf(os.Stdout, "\n## Secrets\n\n**Total:** %d\n\n", summary.SecretsTotal)
+	fmt.Fprintln(os.Stdout, "## Dependencies")
+	for _, a := range summary.PackageAudits {
+		fmt.Fprintf(os.Stdout, "\n### %s\n\n**Total:** %d  \n**Mode:** %s\n\n", a.Tool, a.Total, a.Mode)
+		if len(a.Counts) > 0 {
+			fmt.Fprintln(os.Stdout, "| Severity | Count |")
+			fmt.Fprintln(os.Stdout, "|----------|-------|")
+			for sev, n := range a.Counts {
+				fmt.Fprintf(os.Stdout, "| %s | %d |\n", sev, n)
+			}
+		}
+	}
+}
+
+type repoAuditJSONOut struct {
+	Path           string                   `json:"path"`
+	CodeFindings   []codeFindingJSON        `json:"code_findings"`
+	CodeBySeverity map[string]int          `json:"code_by_severity"`
+	SecretsTotal   int                      `json:"secrets_total"`
+	PackageAudits  []auditSummaryJSON       `json:"package_audits"`
+}
+
+type codeFindingJSON struct {
+	File         string `json:"file"`
+	Line         int    `json:"line"`
+	Severity     string `json:"severity"`
+	Code         string `json:"code"`
+	Description  string `json:"description"`
+	Remediation  string `json:"remediation"`
+}
+
+type auditSummaryJSON struct {
+	Tool   string         `json:"tool"`
+	Path   string         `json:"path"`
+	Total  int            `json:"total"`
+	Counts map[string]int `json:"counts"`
+	Mode   string         `json:"mode"`
+}
+
+func emitRepoAuditJSON(summary repoAuditSummary) {
+	findings := summary.CodeFindings
+	if len(findings) > repoAuditJSONCap {
+		findings = findings[:repoAuditJSONCap]
+	}
+	codeList := make([]codeFindingJSON, 0, len(findings))
+	for _, f := range findings {
+		codeList = append(codeList, codeFindingJSON{
+			File:        f.File,
+			Line:        f.Line,
+			Severity:    f.Severity,
+			Code:        f.Code,
+			Description: f.Description,
+			Remediation: getRemediation(f.Code),
+		})
+	}
+	pkgList := make([]auditSummaryJSON, 0, len(summary.PackageAudits))
+	for _, a := range summary.PackageAudits {
+		pkgList = append(pkgList, auditSummaryJSON{
+			Tool:   a.Tool,
+			Path:   a.Path,
+			Total:  a.Total,
+			Counts: a.Counts,
+			Mode:   a.Mode,
+		})
+	}
+	out := repoAuditJSONOut{
+		Path:           summary.Path,
+		CodeFindings:   codeList,
+		CodeBySeverity: summary.CodeBySeverity,
+		SecretsTotal:   summary.SecretsTotal,
+		PackageAudits:  pkgList,
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(out)
 }
 
 func ensureNpm(ctx context.Context) error {

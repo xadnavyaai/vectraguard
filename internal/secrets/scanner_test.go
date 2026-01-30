@@ -101,3 +101,51 @@ aws_access_key_id: ` + secret + `
 	}
 }
 
+func TestScanPathRespectsIgnorePaths(t *testing.T) {
+	dir := t.TempDir()
+
+	// File under a path we will ignore (not in shouldSkipDir so Walk visits it).
+	ignoredDir := filepath.Join(dir, "external", "foo")
+	if err := os.MkdirAll(ignoredDir, 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	ignoredFile := filepath.Join(ignoredDir, "bar.txt")
+	secretContent := []byte("aws_access_key_id: AKIAIOSFODNN7EXAMPLE\n")
+	if err := os.WriteFile(ignoredFile, secretContent, 0o644); err != nil {
+		t.Fatalf("write ignored file: %v", err)
+	}
+
+	// File at root that should be scanned.
+	appFile := filepath.Join(dir, "app.py")
+	if err := os.WriteFile(appFile, []byte("token: abcdEFGHijklMNOPqrstUVWX12345678\n"), 0o644); err != nil {
+		t.Fatalf("write app file: %v", err)
+	}
+
+	opts := Options{IgnorePaths: []string{"external/", "external/*"}}
+	findings, err := ScanPath(dir, opts)
+	if err != nil {
+		t.Fatalf("ScanPath error: %v", err)
+	}
+
+	for _, f := range findings {
+		if f.File == ignoredFile {
+			t.Fatalf("expected no findings from ignored path %s, got finding: %#v", ignoredFile, f)
+		}
+	}
+	// We expect at least one finding from app.py (entropy candidate).
+	foundApp := false
+	for _, f := range findings {
+		if f.File == appFile {
+			foundApp = true
+			break
+		}
+	}
+	if !foundApp {
+		var files []string
+		for _, f := range findings {
+			files = append(files, f.File)
+		}
+		t.Fatalf("expected at least one finding from %s, got %d findings from: %v", appFile, len(findings), files)
+	}
+}
+

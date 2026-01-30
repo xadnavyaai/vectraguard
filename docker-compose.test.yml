@@ -122,28 +122,6 @@ services:
     networks:
       - test-network
 
-  # Release testing service - tests the built release binaries
-  # Uses the actual release artifacts from dist/ folder
-  # Tests Linux binaries inside Docker container
-  test-release:
-    build:
-      context: .
-      dockerfile: Dockerfile.test
-    image: vectra-guard-test:latest
-    container_name: vectra-guard-test-release
-    volumes:
-      - ${PWD}:/workspace:rw,cached
-      - go-mod-cache:/go/pkg/mod
-    environment:
-      - GO_ENV=test
-      - VECTRA_GUARD_VERSION=test
-      - VECTRAGUARD_CONTAINER=true
-    working_dir: /workspace
-    entrypoint: []
-    command: ["./scripts/test-release.sh", "v0.0.1"]
-    networks:
-      - test-network
-
   # Namespace testing service - tests the new namespace-based sandboxing
   # SAFE: Only tests detection and configuration logic
   # Tests bubblewrap, mount namespaces, seccomp, and runtime selection

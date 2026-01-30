@@ -93,6 +93,8 @@ func languageForExt(ext string) string {
 		return "python"
 	case ".c", ".h":
 		return "c"
+	case ".yaml", ".yml", ".json":
+		return "config"
 	default:
 		return ""
 	}
@@ -118,6 +120,8 @@ func scanFile(path, lang string) ([]Finding, error) {
 			findings = append(findings, scanPythonLine(path, line, lineNum)...)
 		case "c":
 			findings = append(findings, scanCLine(path, line, lineNum)...)
+		case "config":
+			findings = append(findings, scanConfigLine(path, line, lineNum)...)
 		}
 	}
 	if err := scanner.Err(); err != nil {
@@ -146,7 +150,15 @@ var (
 	cStrcpyRe        = regexp.MustCompile(`\bstrcpy\(`)
 	cStrcatRe        = regexp.MustCompile(`\bstrcat\(`)
 	cMemUnsafeRe     = regexp.MustCompile(`\bmemcpy\(`)
-	cSocketRe        = regexp.MustCompile(`\bsocket\(`)
+	cSocketRe           = regexp.MustCompile(`\bsocket\(`)
+	// External HTTP(S) URL: match URL then check host is not localhost/127.0.0.1/::1
+	externalHTTPRe      = regexp.MustCompile(`https?://([^\s/]+)`)
+	bindAllInterfacesRe = regexp.MustCompile(`0\.0\.0\.0|"0\.0\.0\.0"`)
+
+	// Config/deployment: control-panel and reverse-proxy misconfig
+	configBindRe           = regexp.MustCompile(`(?i)(host|listen|bind|address).*0\.0\.0\.0|0\.0\.0\.0.*(:|,)`)
+	configTrustProxyRe     = regexp.MustCompile(`(?i)(trust[_\s]?proxy|X-Forwarded-For|forwarded.*trust)`)
+	configUnauthAccessRe   = regexp.MustCompile(`(?i)(auth|authentication|secure).*:\s*(false|0|off|no|disabled)`)
 )
 
 func scanGoLine(path, line string, lineNum int) []Finding {
@@ -203,7 +215,56 @@ func scanGoLine(path, line string, lineNum int) []Finding {
 			Description: "Writing to system directory (/etc, /var, /usr); review for safety.",
 		})
 	}
+	for _, submatch := range externalHTTPRe.FindAllStringSubmatch(line, -1) {
+		if len(submatch) > 1 && !isLocalhostHost(submatch[1]) {
+			out = append(out, Finding{
+				File:        path,
+				Line:        lineNum,
+				Language:    "go",
+				Severity:    "medium",
+				Code:        "GO_EXTERNAL_HTTP",
+				Description: "Non-localhost HTTP(S) URL; ensure not used with untrusted input (SSRF risk).",
+			})
+			break
+		}
+	}
+	if bindAllInterfacesRe.MatchString(line) {
+		out = append(out, Finding{
+			File:        path,
+			Line:        lineNum,
+			Language:    "go",
+			Severity:    "medium",
+			Code:        "BIND_ALL_INTERFACES",
+			Description: "Binding to 0.0.0.0 exposes the service on all interfaces; ensure auth and TLS are enabled.",
+		})
+	}
 	return out
+}
+
+func isLocalhostHost(host string) bool {
+	host = strings.TrimSpace(host)
+
+	// Handle IPv6 addresses in URL host, which are typically wrapped in brackets,
+	// e.g. http://[::1]:3000. In that case, extract the inner address first.
+	if strings.HasPrefix(host, "[") {
+		if end := strings.Index(host, "]"); end > 0 {
+			host = host[1:end]
+		}
+	} else {
+		// Strip optional port for non-bracketed hosts like 127.0.0.1:8080.
+		if i := strings.Index(host, ":"); i >= 0 {
+			host = host[:i]
+		}
+	}
+
+	switch strings.ToLower(host) {
+	case "localhost", "127.0.0.1", "::1":
+		return true
+	}
+	if strings.HasPrefix(host, "127.") {
+		return true
+	}
+	return false
 }
 
 func scanPythonLine(path, line string, lineNum int) []Finding {
@@ -260,6 +321,29 @@ func scanPythonLine(path, line string, lineNum int) []Finding {
 			Description: "Environment or .env access; avoid exposing secrets in logs or responses.",
 		})
 	}
+	for _, submatch := range externalHTTPRe.FindAllStringSubmatch(line, -1) {
+		if len(submatch) > 1 && !isLocalhostHost(submatch[1]) {
+			out = append(out, Finding{
+				File:        path,
+				Line:        lineNum,
+				Language:    "python",
+				Severity:    "medium",
+				Code:        "PY_EXTERNAL_HTTP",
+				Description: "Non-localhost HTTP(S) URL; ensure not used with untrusted input (SSRF risk).",
+			})
+			break
+		}
+	}
+	if bindAllInterfacesRe.MatchString(line) {
+		out = append(out, Finding{
+			File:        path,
+			Line:        lineNum,
+			Language:    "python",
+			Severity:    "medium",
+			Code:        "BIND_ALL_INTERFACES",
+			Description: "Binding to 0.0.0.0 exposes the service on all interfaces; ensure auth and TLS are enabled.",
+		})
+	}
 	return out
 }
 
@@ -314,6 +398,53 @@ func scanCLine(path, line string, lineNum int) []Finding {
 			Severity:    "medium",
 			Code:        "C_RAW_SOCKET",
 			Description: "Raw socket use; review for network abuse or exfiltration.",
+		})
+	}
+	if bindAllInterfacesRe.MatchString(line) {
+		out = append(out, Finding{
+			File:        path,
+			Line:        lineNum,
+			Language:    "c",
+			Severity:    "medium",
+			Code:        "BIND_ALL_INTERFACES",
+			Description: "Binding to 0.0.0.0 exposes the service on all interfaces; ensure auth and TLS are enabled.",
+		})
+	}
+	return out
+}
+
+func scanConfigLine(path, line string, lineNum int) []Finding {
+	var out []Finding
+	lower := strings.ToLower(line)
+
+	if configBindRe.MatchString(line) {
+		out = append(out, Finding{
+			File:        path,
+			Line:        lineNum,
+			Language:    "config",
+			Severity:    "medium",
+			Code:        "BIND_ALL_INTERFACES",
+			Description: "Config binds to 0.0.0.0; control panels must use auth and TLS when exposed.",
+		})
+	}
+	if configTrustProxyRe.MatchString(lower) {
+		out = append(out, Finding{
+			File:        path,
+			Line:        lineNum,
+			Language:    "config",
+			Severity:    "medium",
+			Code:        "LOCALHOST_TRUST_PROXY",
+			Description: "Trust proxy / X-Forwarded-For can treat remote clients as local; ensure auth is not bypassed.",
+		})
+	}
+	if configUnauthAccessRe.MatchString(lower) {
+		out = append(out, Finding{
+			File:        path,
+			Line:        lineNum,
+			Language:    "config",
+			Severity:    "high",
+			Code:        "UNAUTHENTICATED_ACCESS",
+			Description: "Config disables auth or secure access; control panels must require authentication.",
 		})
 	}
 	return out

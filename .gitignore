@@ -58,3 +58,5 @@ roadmap.md
 .tmp-home/*
 
 .vscode/*
+
+.tmp/*

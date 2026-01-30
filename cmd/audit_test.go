@@ -1,8 +1,11 @@
 package cmd
 
 import (
+	"bytes"
+	"encoding/json"
 	"testing"
 
+	"github.com/vectra-guard/vectra-guard/internal/secscan"
 	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
@@ -152,5 +155,105 @@ func TestBuildSessionAuditSummaryFromSessions(t *testing.T) {
 	}
 	if summary.Blocked != 1 {
 		t.Fatalf("expected blocked 1, got %d", summary.Blocked)
+	}
+}
+
+func TestHasPackageFindings(t *testing.T) {
+	tests := []struct {
+		name   string
+		input  []auditSummary
+		expect bool
+	}{
+		{
+			name:   "no audits",
+			input:  nil,
+			expect: false,
+		},
+		{
+			name: "audits with zero findings",
+			input: []auditSummary{
+				{Tool: "npm", Total: 0},
+				{Tool: "python", Total: 0},
+			},
+			expect: false,
+		},
+		{
+			name: "audits with findings",
+			input: []auditSummary{
+				{Tool: "npm", Total: 1},
+				{Tool: "python", Total: 0},
+			},
+			expect: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := hasPackageFindings(tt.input)
+			if got != tt.expect {
+				t.Fatalf("expected %v, got %v", tt.expect, got)
+			}
+		})
+	}
+}
+
+func TestGetRemediationForKnownCodes(t *testing.T) {
+	for _, code := range []string{"PY_ENV_ACCESS", "PY_SUBPROCESS", "GO_EXEC_COMMAND", "BIND_ALL_INTERFACES"} {
+		rem := getRemediation(code)
+		if rem == "" {
+			t.Errorf("getRemediation(%q) expected non-empty, got %q", code, rem)
+		}
+	}
+	// Unknown code returns empty
+	if getRemediation("UNKNOWN_CODE") != "" {
+		t.Errorf("getRemediation(UNKNOWN_CODE) expected empty, got non-empty")
+	}
+}
+
+func TestRepoAuditSummaryJSONRoundTrip(t *testing.T) {
+	summary := repoAuditSummary{
+		Path: "/tmp/repo",
+		CodeFindings: []secscan.Finding{
+			{File: "a.py", Line: 1, Language: "python", Severity: "medium", Code: "PY_ENV_ACCESS", Description: "env access"},
+			{File: "b.go", Line: 2, Language: "go", Severity: "high", Code: "GO_EXEC_COMMAND", Description: "exec"},
+		},
+		CodeFindingsTotal: 2,
+		CodeBySeverity:    map[string]int{"medium": 1, "high": 1},
+		CodeByLanguage:    map[string]int{"python": 1, "go": 1},
+		SecretsTotal:      0,
+		PackageAudits:     nil,
+	}
+	var buf bytes.Buffer
+	// Encode the same struct we emit so we can decode and assert remediation is present.
+	out := repoAuditJSONOut{
+		Path: summary.Path,
+		CodeFindings: []codeFindingJSON{
+			{File: "a.py", Line: 1, Severity: "medium", Code: "PY_ENV_ACCESS", Description: "env access", Remediation: getRemediation("PY_ENV_ACCESS")},
+			{File: "b.go", Line: 2, Severity: "high", Code: "GO_EXEC_COMMAND", Description: "exec", Remediation: getRemediation("GO_EXEC_COMMAND")},
+		},
+		CodeBySeverity: summary.CodeBySeverity,
+		SecretsTotal:   summary.SecretsTotal,
+		PackageAudits:  nil,
+	}
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(out); err != nil {
+		t.Fatalf("encode: %v", err)
+	}
+	var decoded repoAuditJSONOut
+	if err := json.NewDecoder(&buf).Decode(&decoded); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if decoded.Path != summary.Path {
+		t.Errorf("path: got %q", decoded.Path)
+	}
+	if len(decoded.CodeFindings) != 2 {
+		t.Fatalf("code_findings: expected 2, got %d", len(decoded.CodeFindings))
+	}
+	if decoded.CodeFindings[0].Remediation == "" {
+		t.Errorf("code_findings[0].remediation expected non-empty for PY_ENV_ACCESS")
+	}
+	if decoded.CodeFindings[1].Remediation == "" {
+		t.Errorf("code_findings[1].remediation expected non-empty for GO_EXEC_COMMAND")
 	}
 }

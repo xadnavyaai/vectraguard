@@ -70,7 +70,7 @@ func execute(args []string) error {
 	case "scan-security":
 		subFlags := flag.NewFlagSet("scan-security", flag.ContinueOnError)
 		target := subFlags.String("path", ".", "Target directory or file to scan for security issues")
-		languages := subFlags.String("languages", "", "Comma-separated languages to scan (go,python,c). Default: all supported")
+		languages := subFlags.String("languages", "", "Comma-separated languages to scan (go,python,c,config). Default: go,python,c. Use config for YAML/JSON deployment checks.")
 		if err := subFlags.Parse(subArgs); err != nil {
 			return err
 		}
@@ -205,10 +205,21 @@ func execute(args []string) error {
 		noInstall := subFlags.Bool("no-install", false, "Disable auto-install of audit dependencies")
 		sessionID := subFlags.String("session", "", "Session ID for session audit")
 		allSessions := subFlags.Bool("all", false, "Audit across all sessions (session tool only)")
+		outputFormat := subFlags.String("output", "text", "Report format: text, markdown, or json (repo only)")
+		allowlistPath := subFlags.String("allowlist", "", "Path to allowlist file for secrets (repo only)")
+		ignoreGlobs := subFlags.String("ignore", "", "Comma-separated path globs to ignore in secret scan (repo only)")
 		if err := subFlags.Parse(subArgs[1:]); err != nil {
 			return err
 		}
-		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall, *sessionID, *allSessions)
+		var repoOpts *repoAuditOptions
+		if strings.ToLower(auditTool) == "repo" {
+			repoOpts = &repoAuditOptions{
+				OutputFormat:  *outputFormat,
+				AllowlistPath: *allowlistPath,
+				IgnoreGlobs:  *ignoreGlobs,
+			}
+		}
+		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall, *sessionID, *allSessions, repoOpts)
 	case "sandbox":
 		if len(subArgs) < 1 {
 			return usageError()
