@@ -9,6 +9,7 @@ This document maps real-world incidents (e.g. exposed AI control panels like Mol
 - [Securing AI Agent Platforms: Checklist](#securing-ai-agent-platforms-checklist)
 - [CI Example: Security and Config Scans](#ci-example-security-and-config-scans)
 - [Scan Security Rule Reference](#scan-security-rule-reference)
+- [Testing: Release vs Local & Similar Tools](#testing-release-vs-local--similar-tools)
 - [Extensions and Future Work](#extensions-and-future-work)
 
 ---
@@ -135,6 +136,56 @@ Scans `.yaml`, `.yml`, `.json` when `config` is included in `--languages`.
 | `BIND_ALL_INTERFACES` | medium | Config binds to 0.0.0.0; control panels need auth and TLS. |
 | `LOCALHOST_TRUST_PROXY` | medium | trustProxy / X-Forwarded-For; ensure auth is not bypassed. |
 | `UNAUTHENTICATED_ACCESS` | high | auth/secure set to false or disabled; require authentication. |
+
+---
+
+## Testing: Release vs Local & Similar Tools
+
+### Was the release binary used?
+
+The Moltbot scan in this repo was run with **local source** (`go run . scan-security` and `go run . audit repo`), not with the published release binary. To validate the **release**:
+
+1. **Build locally:** `./scripts/build-release.sh v0.4.0` then run `dist/vectra-guard-<os>-<arch> scan-security --path <repo>` and `audit repo --path <repo>`.
+2. **Use the release script:** `./scripts/test-release.sh v0.4.0` runs the built binary from `dist/` (version, help, and other checks).
+3. **Install from GitHub:** Download the binary for your platform from [Releases](https://github.com/xadnavyaai/vectra-guard/releases), put `vg` on PATH, then run `vg scan-security --path <repo>` and `vg audit repo --path <repo>`.
+
+Using the release binary ensures you are testing the same code that users install.
+
+### Testing on similar AI agent tools
+
+You can run the same scans on other open-source AI agents that run locally and execute code (similar to Moltbot/Clawdbot):
+
+| Project | Repo | Notes |
+|--------|------|--------|
+| **Moltbot** | [moltbot/moltbot](https://github.com/moltbot/moltbot) | Python/TS; control-panel–style risks. |
+| **Open Interpreter** | [openinterpreter/open-interpreter](https://github.com/openinterpreter/open-interpreter) | Python; runs code locally; good for PY_* and bind/subprocess checks. |
+| **AutoGPT** | [Significant-Gravitas/Auto-GPT](https://github.com/Significant-Gravitas/Auto-GPT) | Agent platform; Python/JS; useful for env, HTTP, exec patterns. |
+| **Huginn** | [huginn/huginn](https://github.com/huginn/huginn) | Agent framework; local execution; MIT. |
+| **LocalAGI** | [mudler/LocalAGI](https://github.com/mudler/LocalAGI) | Local agent platform; mix of languages. |
+| **Aider** | [Aider-AI/aider](https://github.com/Aider-AI/aider) | AI pair programming; terminal, local code execution; Python. |
+
+**Clone all and scan:** `scripts/test-similar-agent-repos.sh` clones the full list above into `test-workspaces/` and runs scan-security + audit repo on each.
+
+```bash
+# One-time: clone all similar-agent repos into test-workspaces/
+./scripts/test-similar-agent-repos.sh clone-all
+
+# Scan all repos (use release binary or local build)
+VG_CMD="./dist/vectra-guard-darwin-arm64" ./scripts/test-similar-agent-repos.sh
+# Or: vg on PATH, or VG_CMD="go run ." from repo root
+./scripts/test-similar-agent-repos.sh
+```
+
+**One-off commands** (use release `vg` or `go run .`):
+
+```bash
+# From repo root; VG=vg or VG="go run ."
+VG="${VG:-vg}"
+$VG scan-security --path test-workspaces/moltbot --languages go,python,c,config
+$VG audit repo --path test-workspaces/moltbot --no-install
+```
+
+**Single-repo clone:** `REPO_URL=https://github.com/openinterpreter/open-interpreter REPO_NAME=open-interpreter ./scripts/test-similar-agent-repos.sh clone`
 
 ---
 
