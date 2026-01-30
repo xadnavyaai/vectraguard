@@ -112,4 +112,3 @@ func DefaultWorkspace() (string, error) {
 	}
 	return "", fmt.Errorf("unable to determine workspace")
 }
-

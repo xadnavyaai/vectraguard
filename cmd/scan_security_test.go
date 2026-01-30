@@ -53,5 +53,3 @@ func main() { println("ok") }
 		t.Fatalf("expected no error for safe code, got %v", err)
 	}
 }
-
-

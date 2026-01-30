@@ -69,4 +69,3 @@ func runLockdownStatus(ctx context.Context) error {
 	}
 	return nil
 }
-

@@ -42,4 +42,3 @@ func runValidateAgent(ctx context.Context, targetPath string) error {
 		code:    2,
 	}
 }
-

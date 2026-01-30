@@ -148,4 +148,3 @@ func TestScanPathRespectsIgnorePaths(t *testing.T) {
 		t.Fatalf("expected at least one finding from %s, got %d findings from: %v", appFile, len(findings), files)
 	}
 }
-

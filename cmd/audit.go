@@ -12,8 +12,8 @@ import (
 	"strings"
 
 	"github.com/vectra-guard/vectra-guard/internal/logging"
-	"github.com/vectra-guard/vectra-guard/internal/secscan"
 	"github.com/vectra-guard/vectra-guard/internal/secrets"
+	"github.com/vectra-guard/vectra-guard/internal/secscan"
 	"github.com/vectra-guard/vectra-guard/internal/session"
 )
 
@@ -58,9 +58,9 @@ type repoAuditSummary struct {
 
 // repoAuditOptions holds options for repo audit only (output format, allowlist, ignore paths).
 type repoAuditOptions struct {
-	OutputFormat string // text, markdown, json
+	OutputFormat  string // text, markdown, json
 	AllowlistPath string
-	IgnoreGlobs  string // comma-separated
+	IgnoreGlobs   string // comma-separated
 }
 
 // codeRemediation maps secscan finding codes to short remediation guidance.
@@ -69,7 +69,7 @@ var codeRemediation = map[string]string{
 	"PY_SUBPROCESS":       "Prefer subprocess with shell=False and validate arguments.",
 	"PY_EVAL":             "Avoid eval(); use ast.literal_eval or structured parsing for untrusted input.",
 	"PY_EXEC":             "Avoid exec(); validate and sandbox any dynamic code.",
-	"PY_REMOTE_HTTP":     "Validate URLs and responses; guard against SSRF.",
+	"PY_REMOTE_HTTP":      "Validate URLs and responses; guard against SSRF.",
 	"GO_EXEC_COMMAND":     "Validate and sanitize command arguments; avoid shell invocation.",
 	"GO_DANGEROUS_SHELL":  "Remove or restrict dangerous shell patterns.",
 	"GO_NET_HTTP":         "Authenticate and sanitize remote calls.",
@@ -603,8 +603,8 @@ func getRemediation(code string) string {
 }
 
 const (
-	repoAuditTextCap   = 50
-	repoAuditJSONCap   = 200
+	repoAuditTextCap = 50
+	repoAuditJSONCap = 200
 )
 
 func printRepoAuditFindingsText(summary repoAuditSummary, cap int) {
@@ -658,20 +658,20 @@ func emitRepoAuditMarkdown(summary repoAuditSummary) {
 }
 
 type repoAuditJSONOut struct {
-	Path           string                   `json:"path"`
-	CodeFindings   []codeFindingJSON        `json:"code_findings"`
-	CodeBySeverity map[string]int          `json:"code_by_severity"`
-	SecretsTotal   int                      `json:"secrets_total"`
-	PackageAudits  []auditSummaryJSON       `json:"package_audits"`
+	Path           string             `json:"path"`
+	CodeFindings   []codeFindingJSON  `json:"code_findings"`
+	CodeBySeverity map[string]int     `json:"code_by_severity"`
+	SecretsTotal   int                `json:"secrets_total"`
+	PackageAudits  []auditSummaryJSON `json:"package_audits"`
 }
 
 type codeFindingJSON struct {
-	File         string `json:"file"`
-	Line         int    `json:"line"`
-	Severity     string `json:"severity"`
-	Code         string `json:"code"`
-	Description  string `json:"description"`
-	Remediation  string `json:"remediation"`
+	File        string `json:"file"`
+	Line        int    `json:"line"`
+	Severity    string `json:"severity"`
+	Code        string `json:"code"`
+	Description string `json:"description"`
+	Remediation string `json:"remediation"`
 }
 
 type auditSummaryJSON struct {

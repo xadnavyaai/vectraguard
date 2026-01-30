@@ -70,4 +70,3 @@ func SetState(st State) error {
 	}
 	return nil
 }
-

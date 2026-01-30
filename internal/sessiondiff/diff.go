@@ -87,4 +87,3 @@ func Compute(ops []session.FileOperation, root string) Summary {
 		Deleted:  deleted,
 	}
 }
-

@@ -151,4 +151,3 @@ func trigramAnomaly(text string) float64 {
 	}
 	return float64(unknown) / float64(total)
 }
-

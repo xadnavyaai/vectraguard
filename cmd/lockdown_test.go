@@ -62,4 +62,3 @@ func TestRunLockdownEnableDisableStatus(t *testing.T) {
 		t.Fatalf("expected lockdown disabled after disable")
 	}
 }
-

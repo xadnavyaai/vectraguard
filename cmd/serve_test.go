@@ -38,4 +38,3 @@ func TestRunServeBindsLocalhost(t *testing.T) {
 		// We only care that starting didn't panic; we don't keep it running for long in tests.
 	}
 }
-

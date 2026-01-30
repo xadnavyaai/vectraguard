@@ -77,4 +77,3 @@ aws_access_key_id: ` + secret + `
 		t.Fatalf("expected no error when all matches are allowlisted, got %v", err)
 	}
 }
-

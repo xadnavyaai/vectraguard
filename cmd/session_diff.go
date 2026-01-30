@@ -33,10 +33,10 @@ func runSessionDiff(ctx context.Context, sessionID, rootPath string, jsonOutput 
 
 	if jsonOutput {
 		out := struct {
-			SessionID string               `json:"session_id"`
-			Workspace string               `json:"workspace"`
-			Root      string               `json:"root,omitempty"`
-			Diff      sessiondiff.Summary  `json:"diff"`
+			SessionID string              `json:"session_id"`
+			Workspace string              `json:"workspace"`
+			Root      string              `json:"root,omitempty"`
+			Diff      sessiondiff.Summary `json:"diff"`
 		}{
 			SessionID: sess.ID,
 			Workspace: sess.Workspace,
@@ -79,4 +79,3 @@ func runSessionDiff(ctx context.Context, sessionID, rootPath string, jsonOutput 
 	}
 	return nil
 }
-

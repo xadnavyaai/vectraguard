@@ -54,4 +54,3 @@ func runScanSecurity(ctx context.Context, targetPath string, languagesCSV string
 		code:    2,
 	}
 }
-

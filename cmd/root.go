@@ -216,7 +216,7 @@ func execute(args []string) error {
 			repoOpts = &repoAuditOptions{
 				OutputFormat:  *outputFormat,
 				AllowlistPath: *allowlistPath,
-				IgnoreGlobs:  *ignoreGlobs,
+				IgnoreGlobs:   *ignoreGlobs,
 			}
 		}
 		return runAudit(ctx, auditTool, *target, *failOn, !*noInstall, *sessionID, *allSessions, repoOpts)

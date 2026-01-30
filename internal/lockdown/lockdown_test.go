@@ -71,4 +71,3 @@ func TestStateFilePathUsesHome(t *testing.T) {
 		t.Fatalf("stateFilePath has no directory: %s", path)
 	}
 }
-

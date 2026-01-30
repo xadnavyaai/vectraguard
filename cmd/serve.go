@@ -39,4 +39,3 @@ func parsePortEnv(envVal string, defaultPort int) int {
 	}
 	return defaultPort
 }
-

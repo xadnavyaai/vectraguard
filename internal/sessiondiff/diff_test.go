@@ -43,4 +43,3 @@ func TestComputeWithRootFilter(t *testing.T) {
 		t.Fatalf("expected only /workspace/a.txt, got %#v", sum.Added)
 	}
 }
-

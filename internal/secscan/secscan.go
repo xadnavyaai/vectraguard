@@ -131,34 +131,34 @@ func scanFile(path, lang string) ([]Finding, error) {
 }
 
 var (
-	goExecCommandRe  = regexp.MustCompile(`exec\.Command\(`)
-	goShellDangerRe  = regexp.MustCompile(`(?i)(rm\s+-rf\s+/|curl\s+.+\|\s*sh)`)
-	goNetHTTPRe      = regexp.MustCompile(`"net/http"`)
-	goEnvReadRe      = regexp.MustCompile(`os\.Getenv\(`)
-	goWriteSystemRe  = regexp.MustCompile(`WriteFile\("(/etc|/var|/usr)/`)
-	pyEvalRe         = regexp.MustCompile(`\beval\(`)
-	pyExecRe         = regexp.MustCompile(`\bexec\(`)
-	pySubprocessRe   = regexp.MustCompile(`\bsubprocess\.`)
-	pyOSSystemRe     = regexp.MustCompile(`\bos\.system\(`)
-	pyRequestsRe     = regexp.MustCompile(`\brequests\.`)
-	pyEnvRe          = regexp.MustCompile(`os\.environ|\bENV\b|os\.getenv\(`)
-	pyDotEnvRe       = regexp.MustCompile(`\.env("|'| )`)
-	cSystemRe        = regexp.MustCompile(`\bsystem\(`)
-	cPopenRe         = regexp.MustCompile(`\bpopen\(`)
-	cExecFamilyRe    = regexp.MustCompile(`\b(execv|execve|execl|execvp)\b`)
-	cGetsRe          = regexp.MustCompile(`\bgets\(`)
-	cStrcpyRe        = regexp.MustCompile(`\bstrcpy\(`)
-	cStrcatRe        = regexp.MustCompile(`\bstrcat\(`)
-	cMemUnsafeRe     = regexp.MustCompile(`\bmemcpy\(`)
-	cSocketRe           = regexp.MustCompile(`\bsocket\(`)
+	goExecCommandRe = regexp.MustCompile(`exec\.Command\(`)
+	goShellDangerRe = regexp.MustCompile(`(?i)(rm\s+-rf\s+/|curl\s+.+\|\s*sh)`)
+	goNetHTTPRe     = regexp.MustCompile(`"net/http"`)
+	goEnvReadRe     = regexp.MustCompile(`os\.Getenv\(`)
+	goWriteSystemRe = regexp.MustCompile(`WriteFile\("(/etc|/var|/usr)/`)
+	pyEvalRe        = regexp.MustCompile(`\beval\(`)
+	pyExecRe        = regexp.MustCompile(`\bexec\(`)
+	pySubprocessRe  = regexp.MustCompile(`\bsubprocess\.`)
+	pyOSSystemRe    = regexp.MustCompile(`\bos\.system\(`)
+	pyRequestsRe    = regexp.MustCompile(`\brequests\.`)
+	pyEnvRe         = regexp.MustCompile(`os\.environ|\bENV\b|os\.getenv\(`)
+	pyDotEnvRe      = regexp.MustCompile(`\.env("|'| )`)
+	cSystemRe       = regexp.MustCompile(`\bsystem\(`)
+	cPopenRe        = regexp.MustCompile(`\bpopen\(`)
+	cExecFamilyRe   = regexp.MustCompile(`\b(execv|execve|execl|execvp)\b`)
+	cGetsRe         = regexp.MustCompile(`\bgets\(`)
+	cStrcpyRe       = regexp.MustCompile(`\bstrcpy\(`)
+	cStrcatRe       = regexp.MustCompile(`\bstrcat\(`)
+	cMemUnsafeRe    = regexp.MustCompile(`\bmemcpy\(`)
+	cSocketRe       = regexp.MustCompile(`\bsocket\(`)
 	// External HTTP(S) URL: match URL then check host is not localhost/127.0.0.1/::1
 	externalHTTPRe      = regexp.MustCompile(`https?://([^\s/]+)`)
 	bindAllInterfacesRe = regexp.MustCompile(`0\.0\.0\.0|"0\.0\.0\.0"`)
 
 	// Config/deployment: control-panel and reverse-proxy misconfig
-	configBindRe           = regexp.MustCompile(`(?i)(host|listen|bind|address).*0\.0\.0\.0|0\.0\.0\.0.*(:|,)`)
-	configTrustProxyRe     = regexp.MustCompile(`(?i)(trust[_\s]?proxy|X-Forwarded-For|forwarded.*trust)`)
-	configUnauthAccessRe   = regexp.MustCompile(`(?i)(auth|authentication|secure).*:\s*(false|0|off|no|disabled)`)
+	configBindRe         = regexp.MustCompile(`(?i)(host|listen|bind|address).*0\.0\.0\.0|0\.0\.0\.0.*(:|,)`)
+	configTrustProxyRe   = regexp.MustCompile(`(?i)(trust[_\s]?proxy|X-Forwarded-For|forwarded.*trust)`)
+	configUnauthAccessRe = regexp.MustCompile(`(?i)(auth|authentication|secure).*:\s*(false|0|off|no|disabled)`)
 )
 
 func scanGoLine(path, line string, lineNum int) []Finding {
@@ -449,4 +449,3 @@ func scanConfigLine(path, line string, lineNum int) []Finding {
 	}
 	return out
 }
-

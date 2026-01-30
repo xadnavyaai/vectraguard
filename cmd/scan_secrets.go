@@ -74,4 +74,3 @@ func loadAllowlist(path string) (map[string]struct{}, error) {
 	}
 	return allow, nil
 }
-

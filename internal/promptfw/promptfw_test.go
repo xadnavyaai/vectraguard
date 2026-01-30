@@ -26,4 +26,3 @@ func TestAnalyzeEntropySegmentRaisesRisk(t *testing.T) {
 		t.Fatalf("expected at least medium risk for high-entropy prompt, got %s (score=%.2f)", res.RiskLevel, res.Score)
 	}
 }
-

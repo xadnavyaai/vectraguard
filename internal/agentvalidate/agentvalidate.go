@@ -81,4 +81,3 @@ func isSupportedScript(path string) bool {
 		return false
 	}
 }
-

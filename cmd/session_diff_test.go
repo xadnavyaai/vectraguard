@@ -108,4 +108,3 @@ func TestRunSessionDiffJSONOutput(t *testing.T) {
 		t.Fatalf("expected JSON output, got empty")
 	}
 }
-

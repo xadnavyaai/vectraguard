@@ -463,5 +463,3 @@ func TestScanPathDetectsConfigRuleCodes(t *testing.T) {
 		})
 	}
 }
-
-

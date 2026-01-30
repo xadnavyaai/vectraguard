@@ -75,4 +75,3 @@ func readPromptInput(fromFile string) (string, error) {
 	}
 	return b.String(), nil
 }
-

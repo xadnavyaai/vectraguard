@@ -333,4 +333,3 @@ func isAllowlisted(value string, allow map[string]struct{}) bool {
 	}
 	return false
 }
-

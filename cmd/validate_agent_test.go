@@ -46,4 +46,3 @@ func TestRunValidateAgentCleanDirectory(t *testing.T) {
 		t.Fatalf("expected no validation issues, got %v", err)
 	}
 }
-

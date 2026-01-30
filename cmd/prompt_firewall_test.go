@@ -50,4 +50,3 @@ func TestRunPromptFirewallLowRiskFromFile(t *testing.T) {
 		t.Fatalf("expected low-risk prompt to be allowed, got %v", err)
 	}
 }
-

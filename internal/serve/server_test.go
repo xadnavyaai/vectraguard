@@ -46,4 +46,3 @@ func TestServeHandlers(t *testing.T) {
 		t.Fatalf("metrics status: got %d", rr.Code)
 	}
 }
-

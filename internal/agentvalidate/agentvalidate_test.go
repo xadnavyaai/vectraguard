@@ -53,4 +53,3 @@ func TestValidatePathDirectoryFiltersScripts(t *testing.T) {
 		t.Errorf("expected result for %s, got %s", script, results[0].Path)
 	}
 }
-
