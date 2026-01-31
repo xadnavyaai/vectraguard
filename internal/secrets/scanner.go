@@ -66,6 +66,12 @@ var (
 
 	// Entropy candidate: long, mostly random-looking token.
 	entropyCandidateRe = regexp.MustCompile(`([A-Za-z0-9+/=_-]{20,})`)
+
+	// FP filters for ENTROPY_CANDIDATE (detect-secrets / GitGuardian style).
+	uuidRe = regexp.MustCompile(`(?i)^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$`)
+	slugRe = regexp.MustCompile(`^\d+-[a-z0-9-]{10,}$`) // e.g. 1-eliminating-waterfalls
+	// Snake_case (all lower) or CamelCase with no digits (code identifiers, not tokens).
+	identifierRe = regexp.MustCompile(`^([a-z][a-z0-9_]{10,}|[a-z]+[A-Z][a-zA-Z]*)$`)
 )
 
 // ScanPath walks the given path (file or directory) and returns all detected
@@ -173,14 +179,20 @@ func scanFile(path string, opts Options) ([]Finding, error) {
 			}
 		}
 
-		// Entropy-based fallback: look for long random-looking tokens.
+		// Entropy-based fallback: only when line has secret context (GitGuardian-style).
+		// Reduces FPs from paths, docs, slugs that have high entropy but are not credentials.
+		if !lineHasSecretContext(line) {
+			continue
+		}
 		candidates := entropyCandidateRe.FindAllString(line, -1)
 		for _, cand := range candidates {
 			if isAllowlisted(cand, opts.Allowlist) {
 				continue
 			}
+			if isEntropyFalsePositive(cand) {
+				continue
+			}
 			entropy := shannonEntropy(cand)
-			// Threshold chosen based on typical secret scanners; tuneable.
 			if entropy < 3.5 {
 				continue
 			}
@@ -200,6 +212,52 @@ func scanFile(path string, opts Options) ([]Finding, error) {
 	}
 
 	return findings, nil
+}
+
+// lineHasSecretContext returns true if the line contains assignment-style context
+// that suggests a secret (e.g. token=, api_key:, secret:). Reduces FPs from
+// entropy-only matches in docs/paths (GitGuardian-style context requirement).
+func lineHasSecretContext(line string) bool {
+	lower := strings.ToLower(line)
+	// Assignment or key-style: secret=, token:, api_key:, password=, credential:, auth=
+	if strings.Contains(lower, "secret") || strings.Contains(lower, "token") ||
+		strings.Contains(lower, "api_key") || strings.Contains(lower, "apikey") ||
+		strings.Contains(lower, "password") || strings.Contains(lower, "credential") ||
+		strings.Contains(lower, "auth") && (strings.Contains(lower, "=") || strings.Contains(lower, ":")) {
+		return true
+	}
+	return false
+}
+
+// isEntropyFalsePositive returns true if the match is a known non-secret pattern
+// (UUID, path, slug, URL fragment) to avoid flagging them as ENTROPY_CANDIDATE.
+func isEntropyFalsePositive(match string) bool {
+	if len(match) < 20 {
+		return false
+	}
+	// UUID (detect-secrets style)
+	if uuidRe.MatchString(match) {
+		return true
+	}
+	// Path-like: contains / (URL path, import path, file path)
+	if strings.Contains(match, "/") {
+		return true
+	}
+	// Slug: numbered list or doc slug (e.g. 1-eliminating-waterfalls, 33-parallel-data-fetching)
+	if slugRe.MatchString(match) {
+		return true
+	}
+	// URL/domain fragment: com/, org/, http, github.
+	lower := strings.ToLower(match)
+	if strings.HasPrefix(lower, "com/") || strings.HasPrefix(lower, "org/") ||
+		strings.HasPrefix(lower, "http") || strings.Contains(lower, "github.") {
+		return true
+	}
+	// CamelCase or snake_case identifier only (no digits, typical config/code names)
+	if identifierRe.MatchString(match) {
+		return true
+	}
+	return false
 }
 
 // shouldIgnorePath returns true if relPath (slash-separated, relative to scan root)
@@ -269,10 +327,7 @@ func shouldSkipFile(path string) bool {
 		"cargo.lock", "go.sum", "composer.lock":
 		return true
 	}
-	if strings.HasSuffix(lower, ".lock") {
-		return true
-	}
-	return false
+	return strings.HasSuffix(lower, ".lock")
 }
 
 // isProbablyBinary does a quick sniff of the first chunk of a file to see if it

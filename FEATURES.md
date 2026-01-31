@@ -2,6 +2,8 @@
 
 **Security guard for AI coding agents & development workflows — zero friction, massive peace of mind.**
 
+Features are ordered by **impact**: high-impact first, then more features. See [README](README.md#-features-by-impact) and [GETTING_STARTED](GETTING_STARTED.md) for the high-impact path.
+
 ---
 
 ## 👇 What It Does (TL;DR)
@@ -44,6 +46,8 @@ Works seamlessly with Cursor, VS Code, Replit, Copilot workflows — protects de
 | **Session Auditing**    | Track all agent/dev actions with JSON logs         |
 | **Trust Store**         | Trust common commands to skip sandbox              |
 | **IDE + Shell Support** | Works with Cursor, VS Code, any shell              |
+
+**By impact:** **High impact** — install, exec, validate, session/audit, CVE scanning, scan-secrets/scan-security. **More features** — seed agents, explain, trust store, context summaries, roadmap, metrics, shell tracker, lockdown, prompt firewall, validate-agent, container mode, git hook, IDE integration.
 
 ---
 
@@ -271,6 +275,21 @@ vg scan-security --path .
 ```bash
 vg scan-security --path . --languages go,python,c,config
 # Flags: BIND_ALL_INTERFACES, LOCALHOST_TRUST_PROXY, UNAUTHENTICATED_ACCESS in configs
+```
+
+**Detection behavior (fewer false positives)**
+
+- **scan-secrets:** Known patterns (AWS, api_key/token/secret, private keys) are always reported. High-entropy strings (ENTROPY_CANDIDATE) are only reported when the line has secret context (token=, api_key:, etc.); paths, slugs, UUIDs, and code identifiers are filtered out. Lockfiles are skipped. See [Secret findings examples](docs/blog/secret-findings-examples.md).
+- **scan-security:** Comment-only lines (Python `#`, Go `//`, config `#`) are skipped so URLs or bind examples in comments are not flagged.
+
+**Verify and test**
+
+```bash
+# Sample findings per repo, verify match on line, classify TRUE_ISSUE vs FP (requires test-workspaces/)
+go run scripts/verify-secret-findings.go
+
+# E2E tests for the binary (scan-secrets, scan-security, audit, validate)
+go build -o vectra-guard . && ./scripts/test-binary-e2e.sh ./vectra-guard
 ```
 
 **Validate agent workflows**

@@ -3,6 +3,7 @@ package secrets
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -146,6 +147,50 @@ func TestScanPathRespectsIgnorePaths(t *testing.T) {
 			files = append(files, f.File)
 		}
 		t.Fatalf("expected at least one finding from %s, got %d findings from: %v", appFile, len(findings), files)
+	}
+}
+
+func TestScanPathEntropyRequiresSecretContext(t *testing.T) {
+	// ENTROPY_CANDIDATE only when line has secret context (token=, api_key:, etc.).
+	// Paths/slugs without context should not be flagged.
+	dir := t.TempDir()
+	path := filepath.Join(dir, "readme.md")
+	content := []byte(`See https://github.com/SomeOrg/some-repo/issues/123 and 1-eliminating-waterfalls.`)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	findings, err := ScanPath(dir, Options{})
+	if err != nil {
+		t.Fatalf("ScanPath error: %v", err)
+	}
+	for _, f := range findings {
+		if f.PatternID == "ENTROPY_CANDIDATE" {
+			t.Errorf("expected no ENTROPY_CANDIDATE when line has no secret context (path/slug only), got %q in %s", f.Match, f.File)
+		}
+	}
+}
+
+func TestScanPathEntropyFlagsWithSecretContext(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.env")
+	// Use "credential" so line has secret context but no GENERIC_API_KEY match (that regex is api_key|token|secret).
+	content := []byte(`credential: abcdEFGHijklMNOPqrstUVWX12345678`)
+	if err := os.WriteFile(path, content, 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+	findings, err := ScanPath(dir, Options{})
+	if err != nil {
+		t.Fatalf("ScanPath error: %v", err)
+	}
+	var found bool
+	for _, f := range findings {
+		if f.PatternID == "ENTROPY_CANDIDATE" && strings.Contains(f.Match, "abcdEFGH") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected ENTROPY_CANDIDATE when line has api_key= and high-entropy value, got %d findings: %#v", len(findings), findings)
 	}
 }
 

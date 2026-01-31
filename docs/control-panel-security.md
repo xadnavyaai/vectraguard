@@ -9,6 +9,7 @@ This document maps real-world incidents (e.g. exposed AI control panels like Mol
 - [Securing AI Agent Platforms: Checklist](#securing-ai-agent-platforms-checklist)
 - [CI Example: Security and Config Scans](#ci-example-security-and-config-scans)
 - [Scan Security Rule Reference](#scan-security-rule-reference)
+- [Detection behavior (scan-secrets and scan-security)](#detection-behavior-scan-secrets-and-scan-security)
 - [Testing: Release vs Local & Similar Tools](#testing-release-vs-local--similar-tools)
 - [Extensions and Future Work](#extensions-and-future-work)
 
@@ -136,6 +137,30 @@ Scans `.yaml`, `.yml`, `.json` when `config` is included in `--languages`.
 | `BIND_ALL_INTERFACES` | medium | Config binds to 0.0.0.0; control panels need auth and TLS. |
 | `LOCALHOST_TRUST_PROXY` | medium | trustProxy / X-Forwarded-For; ensure auth is not bypassed. |
 | `UNAUTHENTICATED_ACCESS` | high | auth/secure set to false or disabled; require authentication. |
+
+---
+
+## Detection behavior (scan-secrets and scan-security)
+
+How the scanners reduce false positives while keeping true issues:
+
+### scan-secrets
+
+- **Known patterns (always reported):** AWS key shapes, `api_key`/`token`/`secret` assignments, `-----BEGIN PRIVATE KEY-----`. These are treated as true issues until allowlisted.
+- **ENTROPY_CANDIDATE (context-based):** High-entropy strings (20+ chars, Shannon entropy ≥ 3.5) are only reported when the **line** contains secret-like context (e.g. `token`, `api_key`, `secret`, `password`, `credential`, `auth`). This avoids flagging paths, doc slugs, and config keys that look random but are not credentials.
+- **False-positive filters:** Even with context, we skip matches that are clearly non-secrets: UUIDs (standard format), path-like strings (contain `/`), doc slugs (e.g. `1-eliminating-waterfalls`), URL fragments (`com/`, `org/`, `http`), and code identifiers (snake_case/CamelCase with no digits).
+- **Lockfiles skipped:** `package-lock.json`, `yarn.lock`, `poetry.lock`, `*.lock`, `go.sum`, etc. are not scanned so dependency hashes do not inflate counts.
+
+See **[Secret findings examples](blog/secret-findings-examples.md)** for representative findings and the rationale.
+
+### scan-security
+
+- **Comment-only lines skipped:** Lines that are only comments do not produce findings. Python (`#`), Go (`//`, `/*`), C (`//`, `/*`), and config (`#`) are handled so that URLs or bind examples in comments (e.g. `# https://api.example.com`, `# host: 0.0.0.0`) are not reported as PY_EXTERNAL_HTTP or BIND_ALL_INTERFACES.
+
+### Verification and E2E scripts
+
+- **Verify secret findings:** `go run scripts/verify-secret-findings.go` samples findings per repo, checks that the reported match appears on the line, and classifies TRUE_ISSUE (known-pattern) vs FP. Requires `test-workspaces/` with cloned repos (see [Testing on similar AI agent tools](#testing-on-similar-ai-agent-tools)).
+- **Binary E2E:** `./scripts/test-binary-e2e.sh ./vectra-guard` runs the built binary through scan-secrets (known patterns, context, lockfile skip), scan-security (fixture, comment skip), audit repo, validate, and init. Run after `go build -o vectra-guard .`.
 
 ---
 

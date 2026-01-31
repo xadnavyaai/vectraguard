@@ -34,7 +34,7 @@ func ScanPath(root string, opts Options) ([]Finding, error) {
 		return nil, fmt.Errorf("stat %s: %w", root, err)
 	}
 
-	if opts.Languages == nil || len(opts.Languages) == 0 {
+	if len(opts.Languages) == 0 {
 		opts.Languages = make(map[string]bool)
 		for _, lang := range defaultLanguages {
 			opts.Languages[lang] = true
@@ -162,6 +162,10 @@ var (
 )
 
 func scanGoLine(path, line string, lineNum int) []Finding {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+		return nil
+	}
 	lower := strings.ToLower(line)
 	var out []Finding
 
@@ -268,6 +272,10 @@ func isLocalhostHost(host string) bool {
 }
 
 func scanPythonLine(path, line string, lineNum int) []Finding {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "#") {
+		return nil
+	}
 	lower := strings.ToLower(line)
 	var out []Finding
 
@@ -348,6 +356,10 @@ func scanPythonLine(path, line string, lineNum int) []Finding {
 }
 
 func scanCLine(path, line string, lineNum int) []Finding {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "//") || strings.HasPrefix(trimmed, "/*") {
+		return nil
+	}
 	var out []Finding
 
 	if cSystemRe.MatchString(line) || cPopenRe.MatchString(line) || cExecFamilyRe.MatchString(line) {
@@ -414,6 +426,10 @@ func scanCLine(path, line string, lineNum int) []Finding {
 }
 
 func scanConfigLine(path, line string, lineNum int) []Finding {
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "#") {
+		return nil
+	}
 	var out []Finding
 	lower := strings.ToLower(line)
 
