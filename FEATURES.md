@@ -2,6 +2,8 @@
 
 **Security guard for AI coding agents & development workflows — zero friction, massive peace of mind.**
 
+Features are ordered by **impact**: high-impact first, then more features. See [README](README.md#-features-by-impact) and [GETTING_STARTED](GETTING_STARTED.md) for the high-impact path.
+
 ---
 
 ## 👇 What It Does (TL;DR)
@@ -44,6 +46,8 @@ Works seamlessly with Cursor, VS Code, Replit, Copilot workflows — protects de
 | **Session Auditing**    | Track all agent/dev actions with JSON logs         |
 | **Trust Store**         | Trust common commands to skip sandbox              |
 | **IDE + Shell Support** | Works with Cursor, VS Code, any shell              |
+
+**By impact:** **High impact** — install, exec, validate, session/audit, CVE scanning, scan-secrets/scan-security. **More features** — seed agents, explain, trust store, context summaries, roadmap, metrics, shell tracker, lockdown, prompt firewall, validate-agent, container mode, git hook, IDE integration.
 
 ---
 

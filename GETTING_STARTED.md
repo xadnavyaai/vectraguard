@@ -6,12 +6,12 @@
 
 ## 🎯 What You'll Achieve
 
-After following this guide:
-- ✅ CVE scanning for known vulnerable dependencies
+After following this guide (critical outcomes first):
 - ✅ Commands run with `vectra-guard exec` will be protected
-- ✅ Risky commands will be caught automatically
-- ✅ Full audit trail of everything executed
-- ✅ Works transparently - no workflow changes needed
+- ✅ Risky commands will be caught or sandboxed automatically
+- ✅ Full audit trail of everything executed (sessions)
+- ✅ CVE scanning for known vulnerable dependencies
+- ✅ Secret and code scanning before deploy (`scan-secrets`, `scan-security`)
 - ✅ Optional agent helpers: context summaries + roadmap planning
 
 **Supported platforms:** macOS and Debian Linux (x86_64, arm64).
@@ -55,45 +55,6 @@ SESSION=$(vectra-guard session start --agent "manual")
 export VECTRAGUARD_SESSION_ID=$SESSION
 ```
 
-### Step 2b: Agentic Usage (Cursor/IDE)
-
-```bash
-# Seed agent instructions into the current repo
-vectra-guard seed agents --target . --targets "agents,cursor"
-```
-
-### Agentic Workflow Examples
-
-**A) Install safely with traceability**
-
-```bash
-SESSION=$(vectra-guard session start --agent "agent-install")
-export VECTRAGUARD_SESSION_ID=$SESSION
-vectra-guard exec -- npm install
-vectra-guard audit session
-```
-
-**A2) Scan dependencies for CVEs**
-
-```bash
-vectra-guard cve sync --path .
-vectra-guard cve scan --path .
-```
-
-**B) Review a risky script before running**
-
-```bash
-vectra-guard validate scripts/deploy.sh
-vectra-guard explain scripts/deploy.sh
-```
-
-**C) Track everything, enforce only when needed**
-
-```bash
-./scripts/install-shell-tracker.sh
-vg exec -- make build
-```
-
 ### Step 3: Run a Protected Command
 
 ```bash
@@ -106,22 +67,34 @@ vectra-guard exec -- echo "Hello, Vectra Guard!"
 vectra-guard audit session
 ```
 
-### Step 4b: CVE Scan (optional, recommended)
+### Step 4b: CVE Scan (recommended)
 
 ```bash
 vectra-guard cve sync --path .
 vectra-guard cve scan --path .
 ```
 
-**That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
-
-### Optional: Shell Tracker (logging only)
+### Step 5: Validate a script and/or scan for secrets
 
 ```bash
-./scripts/install-shell-tracker.sh
+# Validate a script (never executes)
+vectra-guard validate scripts/deploy.sh
+
+# Scan for secrets and risky code before deploy
+vectra-guard scan-secrets --path .
+vectra-guard scan-security --path . --languages go,python,c,config
 ```
 
-This adds a lightweight shell hook to log commands. Protection still requires `vg`/`vectra-guard`.
+**That's it!** Vectra Guard is now protecting commands run with `vectra-guard exec`.
+
+### Optional: Agentic setup (Cursor/IDE)
+
+For agent workflows: seed agent instructions, install workflow examples. See [More features](#-more-features) and [README](README.md#-features-by-impact).
+
+```bash
+# Seed agent instructions into the current repo
+vectra-guard seed agents --target . --targets "agents,cursor"
+```
 
 ---
 
@@ -138,60 +111,21 @@ echo $VECTRAGUARD_SESSION_ID
 
 ---
 
-## 🧭 Optional: Supercharge Agent Workflows
+## 🛡️ Features in order (by impact)
 
-### 1) Repo-local config + cache
+What you just did, ordered by impact:
 
-```bash
-# Create repo-scoped config and cache directory
-vg init --local
-```
+1. **Execution protection** — Commands run with `vectra-guard exec` are sandboxed or blocked by risk. Example: `vectra-guard exec -- npm install`
+2. **Script validation** — Analyze scripts without executing: `vectra-guard validate scripts/deploy.sh`
+3. **Session and audit** — Traceability: `vectra-guard session start`, then `vectra-guard audit session`
+4. **CVE scanning** — Flag vulnerable dependencies: `vectra-guard cve sync --path .` and `vectra-guard cve scan --path .`
+5. **Secret and code scanning** — Predetect before deploy: `vectra-guard scan-secrets --path .`, `vectra-guard scan-security --path .`. See [Control panel & deployment security](docs/control-panel-security.md).
 
-This writes `.vectra-guard/config.yaml` and creates `.vectra-guard/cache` (ignored in git). Use it for per-repo settings without polluting global config.
+---
 
-### 2) Context summaries (quick code mapping)
+## 🎯 More features
 
-```bash
-# Summarize a single file
-vg context summarize advanced cmd/root.go --max 3
-vg context summarize docs README.md --max 3
-
-# Summarize entire repository (works across repo after init)
-vg context summarize code . --max 5
-vg context summarize docs . --max 3
-
-# JSON output for programmatic use (perfect for AI agents!)
-vg context summarize code . --output json --max 10
-
-# Only process changed files (great for PR reviews)
-vg context summarize code . --since HEAD~1
-vg context summarize code . --since 2024-01-01  # Since date
-```
-
-**Features:**
-- **Advanced mode** parses Go files and uses call-graph signals to surface the most connected functions
-- **Repo-wide** processing: pass a directory (`.`, `cmd/`, `internal/`) to summarize all relevant files
-- **JSON output** (`--output json`) for structured data that agents can parse
-- **Change detection** (`--since <commit|date>`) to only process files changed since a commit or date
-- **Caching**: Results are cached in `.vectra-guard/cache/` so re-running on the same files is instant
-- Run `vg init --local` first to set up repo-local cache
-
-### 3) Roadmap planning
-
-```bash
-# Capture a plan item and add logs as you work
-vg roadmap add --title "Investigate sandbox cache" --summary "Check hit rate on CI"
-vg roadmap log rm-123456789 --note "Checked cache stats in metrics"
-```
-Roadmaps live per workspace at `~/.vectra-guard/roadmaps` (workspace path is hashed). List and filter by status (`planned`, `in-progress`, `done`) with `vg roadmap list --status planned`, and update status with `vg roadmap status <id> <status>`.
-
-### 4) Built-in help
-
-```bash
-vg help
-vg help context
-vg help roadmap
-```
+Additional features that improve workflow, ordered by impact: **seed agents** (Cursor/IDE), **explain** (why a script is risky), **trust store**, **context summaries**, **roadmap planning**, **shell tracker** (logging only), **lockdown**, **prompt firewall**, **validate-agent**, **container mode**, **git pre-commit hook**, **IDE integration**. See [README](README.md#-more-features) or [FEATURES.md](FEATURES.md) for details.
 
 ---
 
@@ -239,6 +173,8 @@ vectra-guard exec -- rm -rf /tmp/test-file
 ---
 
 ## 🎓 How to Use Daily
+
+Once critical setup is done, use these patterns.
 
 ### Just Use Your Tools Normally!
 
