@@ -34,7 +34,7 @@ func ScanPath(root string, opts Options) ([]Finding, error) {
 		return nil, fmt.Errorf("stat %s: %w", root, err)
 	}
 
-	if opts.Languages == nil || len(opts.Languages) == 0 {
+	if len(opts.Languages) == 0 {
 		opts.Languages = make(map[string]bool)
 		for _, lang := range defaultLanguages {
 			opts.Languages[lang] = true

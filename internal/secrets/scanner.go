@@ -327,10 +327,7 @@ func shouldSkipFile(path string) bool {
 		"cargo.lock", "go.sum", "composer.lock":
 		return true
 	}
-	if strings.HasSuffix(lower, ".lock") {
-		return true
-	}
-	return false
+	return strings.HasSuffix(lower, ".lock")
 }
 
 // isProbablyBinary does a quick sniff of the first chunk of a file to see if it
