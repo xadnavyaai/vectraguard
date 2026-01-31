@@ -132,6 +132,69 @@ else
 fi
 
 echo ""
+echo "--- 10. validate: risky script (old feature - DANGEROUS_DELETE_ROOT) ---"
+T=$(mktemp -d)
+echo 'rm -rf /' > "$T/risky.sh"
+out=$("$VG" validate "$T/risky.sh" 2>&1) || true
+if echo "$out" | grep -q "DANGEROUS_DELETE_ROOT\|critical\|violations"; then
+  ok "Risky script (rm -rf /) detected"
+else
+  fail "Expected DANGEROUS_DELETE_ROOT or critical; got: $out"
+fi
+rm -rf "$T"
+
+echo ""
+echo "--- 11. session + exec + audit (old feature) ---"
+SESSION=$("$VG" session start --agent "e2e" 2>&1) || true
+if [ -z "$SESSION" ] || ! echo "$SESSION" | grep -q "session-"; then
+  fail "Session start should return session ID; got: $SESSION"
+else
+  export VECTRAGUARD_SESSION_ID="$SESSION"
+  out=$("$VG" exec -- echo "e2e-ok" 2>&1) || true
+  if echo "$out" | grep -q "e2e-ok"; then
+    audit=$("$VG" audit session 2>&1) || true
+    if echo "$audit" | grep -q "session\|audit\|execution"; then
+      ok "Session + exec + audit works"
+    else
+      fail "Audit session should emit summary; got: $audit"
+    fi
+  else
+    fail "Exec should run echo; got: $out"
+  fi
+fi
+unset VECTRAGUARD_SESSION_ID 2>/dev/null || true
+
+echo ""
+echo "--- 12. explain (old feature) ---"
+T=$(mktemp -d)
+echo 'rm -rf /tmp/foo' > "$T/script.sh"
+out=$("$VG" explain "$T/script.sh" 2>&1) || true
+if echo "$out" | grep -q "risk\|DANGEROUS\|recommendation\|script"; then
+  ok "Explain runs and describes risk"
+else
+  fail "Explain should describe risk; got: $out"
+fi
+rm -rf "$T"
+
+echo ""
+echo "--- 13. CVE (old feature) ---"
+T=$(mktemp -d)
+out=$("$VG" cve sync --path "$T" 2>&1) || true
+if echo "$out" | grep -q "sync\|CVE\|complete\|fetched"; then
+  ok "CVE sync runs"
+else
+  out2=$("$VG" cve scan --path "$T" 2>&1) || true
+  if echo "$out2" | grep -q "scan\|CVE\|packages\|report"; then
+    ok "CVE scan runs"
+  elif echo "$out $out2" | grep -q "cve.*disabled\|cve.enabled"; then
+    ok "CVE command runs (disabled in config)"
+  else
+    fail "CVE sync or scan should run; sync: $out scan: $out2"
+  fi
+fi
+rm -rf "$T"
+
+echo ""
 if [ "$failed" -eq 0 ]; then
   echo -e "${GREEN}All binary E2E checks passed.${NC}"
   exit 0
